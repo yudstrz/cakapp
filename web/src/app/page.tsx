@@ -2,90 +2,111 @@ import React from 'react';
 
 export default function HomePage() {
   return (
-    <div className="relative overflow-hidden">
-      {/* Background Glow */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-blue-600/15 blur-[120px] pointer-events-none rounded-full" />
-
+    <div className="mx-auto max-w-5xl px-4 sm:px-6">
       {/* Hero Section */}
-      <section className="relative mx-auto max-w-5xl px-6 pt-20 pb-24 text-center">
-        <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-3.5 py-1.5 text-xs font-semibold text-blue-300 mb-8 backdrop-blur-md">
-          <span className="flex h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
-          Ekosistem Hybrid Mirip Fathom — Desktop Recorder + Cloud Web Portal
+      <section className="pt-16 sm:pt-24 pb-16 sm:pb-20 text-center">
+        <div className="inline-flex items-center gap-2 rounded-md border border-zinc-800 bg-zinc-900/80 px-3 py-1 text-xs font-medium text-zinc-300 mb-6 sm:mb-8">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          Perekaman Audio Sistem Native + Web Hub
         </div>
 
-        <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-white leading-tight md:leading-tight">
+        <h1 className="text-3xl sm:text-5xl md:text-6xl font-semibold tracking-tight text-zinc-100 leading-[1.15]">
           Rekam Rapat Tanpa Bot, <br />
-          <span className="bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent">
-            Akses Notulen dari Mana Saja.
-          </span>
+          <span className="text-zinc-400">Akses Notulen dari Mana Saja.</span>
         </h1>
 
-        <p className="mx-auto mt-6 max-w-2xl text-base md:text-lg text-slate-300 leading-relaxed">
-          Cakapp merekam audio Zoom, Google Meet, dan Microsoft Teams secara native tanpa mengundang bot mengganggu ke room. Hasil rekaman langsung diringkas oleh AI dan otomatis tersinkron ke cloud portal ini.
+        <p className="mx-auto mt-5 sm:mt-6 max-w-2xl text-sm sm:text-base md:text-lg text-zinc-400 leading-relaxed">
+          Cakapp merekam audio Zoom, Google Meet, dan Microsoft Teams langsung melalui sistem operasi. Tanpa bot mengganggu di ruang rapat. Seluruh ringkasan AI otomatis tersinkron ke web portal ini.
         </p>
 
         {/* Primary CTA Buttons */}
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
+        <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
           <a
             href="/download"
-            className="flex items-center gap-3 rounded-xl bg-blue-600 px-6 py-3.5 text-base font-semibold text-white shadow-xl shadow-blue-600/25 transition-all hover:bg-blue-500 hover:scale-[1.02] active:scale-[0.98]"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-100 px-5 py-2.5 text-sm font-semibold text-zinc-950 transition-colors hover:bg-white"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            Download Cakapp Desktop (.exe)
+            Download Cakapp Desktop
           </a>
 
           <a
             href="/dashboard"
-            className="flex items-center gap-2.5 rounded-xl border border-slate-700 bg-slate-900/60 px-6 py-3.5 text-base font-semibold text-slate-200 transition-all hover:bg-slate-800 hover:border-slate-600"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-5 py-2.5 text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-800"
           >
             Buka Web Dashboard
             <span aria-hidden="true">&rarr;</span>
           </a>
         </div>
 
-        <p className="mt-4 text-xs text-slate-400">
-          Tersedia untuk Windows 10/11 x64, macOS (Apple Silicon & Intel), dan Linux.
+        <p className="mt-4 text-xs text-zinc-500">
+          Mendukung Windows 10/11 x64, macOS (Apple Silicon & Intel), dan Linux.
         </p>
       </section>
 
-      {/* Feature Grid (Fathom-like) */}
-      <section className="border-t border-slate-800/80 bg-slate-900/20 py-20">
-        <div className="mx-auto max-w-6xl px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-2xl md:text-3xl font-bold text-white">Dirancang untuk Profesional & Tim Modern</h2>
-            <p className="mt-3 text-slate-400">Dua pilar aplikasi yang saling melengkapi untuk produktivitas maksimal.</p>
+      {/* Feature Grid */}
+      <section className="border-t border-zinc-800/80 py-16 sm:py-20">
+        <div className="text-center mb-12 sm:mb-16">
+          <h2 className="text-xl sm:text-2xl font-semibold text-zinc-100">
+            Arsitektur Hybrid untuk Privasi & Kolaborasi
+          </h2>
+          <p className="mt-2 text-xs sm:text-sm text-zinc-400">
+            Pemisahan yang jelas antara engine perekam lokal dan portal penayangan cloud.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Card 1 */}
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-6 flex flex-col justify-between">
+            <div>
+              <div className="h-9 w-9 rounded-lg border border-zinc-700 bg-zinc-800 flex items-center justify-center text-zinc-200 mb-4">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
+                </svg>
+              </div>
+              <h3 className="text-sm sm:text-base font-semibold text-zinc-100 mb-2">
+                100% Perekaman Tanpa Bot
+              </h3>
+              <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                Terhubung langsung ke audio driver OS (WASAPI di Windows, CoreAudio di Mac). Tidak ada bot luar yang masuk ke room panggilan.
+              </p>
+            </div>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-8 backdrop-blur-sm transition-all hover:border-slate-700">
-              <div className="h-12 w-12 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center text-2xl mb-6">
-                🛡️
+          {/* Card 2 */}
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-6 flex flex-col justify-between">
+            <div>
+              <div className="h-9 w-9 rounded-lg border border-zinc-700 bg-zinc-800 flex items-center justify-center text-zinc-200 mb-4">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">100% Perekaman Tanpa Bot</h3>
-              <p className="text-sm text-slate-400 leading-relaxed">
-                Aplikasi desktop Cakapp terhubung langsung ke audio sistem operasi (WASAPI/CoreAudio). Tidak ada bot aneh yang masuk ke room meeting.
+              <h3 className="text-sm sm:text-base font-semibold text-zinc-100 mb-2">
+                Audio & Karaoke Player
+              </h3>
+              <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                Teks transkrip tersorot sinkron detik demi detik saat audio diputar. Cukup klik sembarang kalimat untuk melompat ke momen tersebut.
               </p>
             </div>
+          </div>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-8 backdrop-blur-sm transition-all hover:border-slate-700">
-              <div className="h-12 w-12 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-2xl mb-6">
-                🎵
+          {/* Card 3 */}
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-6 flex flex-col justify-between">
+            <div>
+              <div className="h-9 w-9 rounded-lg border border-zinc-700 bg-zinc-800 flex items-center justify-center text-zinc-200 mb-4">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                </svg>
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">Pemutar Audio Karaoke Interaktif</h3>
-              <p className="text-sm text-slate-400 leading-relaxed">
-                Teks transkrip tersorot sinkron saat audio berbicara di website. Cukup klik sembarang kata untuk melompat langsung ke momen audio tersebut.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-8 backdrop-blur-sm transition-all hover:border-slate-700">
-              <div className="h-12 w-12 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center text-2xl mb-6">
-                🔗
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">Shareable Meeting Links</h3>
-              <p className="text-sm text-slate-400 leading-relaxed">
-                Bagikan link ringkasan rapat ke rekan kerja atau klien. Penerima dapat langsung membuka, membaca, dan mendengarkan rekaman tanpa harus install apa pun.
+              <h3 className="text-sm sm:text-base font-semibold text-zinc-100 mb-2">
+                Shareable Web Links
+              </h3>
+              <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                Bagikan ringkasan rapat ke rekan kerja atau klien. Penerima cukup membuka tautan browser tanpa harus memasang aplikasi desktop.
               </p>
             </div>
           </div>
