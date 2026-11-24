@@ -19,9 +19,9 @@ const wait = (ms = 5) => new Promise((r) => setTimeout(r, ms))
 const until = (check: () => void) => vi.waitFor(check, { timeout: 5000, interval: 10 })
 
 function setup(o: { source?: string; summaryLanguage?: () => string; me?: string; named?: () => Promise<void>; namesWaitMs?: number; reply?: string | ((prompt: string) => string); during?: () => void; load?: Promise<void>; title?: string; recording?: () => boolean; smallMac?: boolean; showLoading?: boolean } = {}) {
-  const d = mkdtempSync(join(tmpdir(), 'yogurt-notes-'))
+  const d = mkdtempSync(join(tmpdir(), 'Cakapp-notes-'))
   dirs.push(d)
-  const store = openStore(join(d, 'yogurt.db'))
+  const store = openStore(join(d, 'Cakapp.db'))
   stores.push(store)
   const m = store.createMeeting({ source: o.source, title: o.title ?? 'Sync', startedAt: 1, endedAt: 2, eventId: null, app: null, attendees: [], state: 'stopped' })
   store.addSegments([{ meetingId: m.id, track: 'them', startMs: 0, endMs: 1000, text: 'We ship Tuesday.', speaker: 'Priya Nair' }])
@@ -389,7 +389,7 @@ describe('hookNotes', () => {
     expect(s.prompts).toHaveLength(1)
     expect(s.notes.view(s.m.id).peopleChanged).toBe(true)
   })
-  it('notes written before Yogurt kept who was there are not marked out of date for their attendees', async () => {
+  it('notes written before Cakapp kept who was there are not marked out of date for their attendees', async () => {
     const s = setup()
     s.store.updateMeeting(s.m.id, { attendees: [{ name: 'Ann Lee', email: null }] })
     s.store.setNotes(s.m.id, { enhanced: '## Old' })

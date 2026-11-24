@@ -56,7 +56,7 @@ it('saves the event address for prepared, started and later-linked notes, and re
 })
 
 it('retains event and fallback addresses after reopening without calendar access, and merges them in backups', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-own-')), file = join(dir, 'notes.db')
+  const dir = mkdtempSync(join(tmpdir(), 'Cakapp-own-')), file = join(dir, 'notes.db')
   let store = openStore(file)
   const into = openStore(':memory:')
   try {

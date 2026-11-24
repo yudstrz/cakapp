@@ -11,9 +11,9 @@ it('uninstalling on Windows never deletes the profile: it holds every meeting', 
 })
 
 it('Windows and Linux builds have fixed file names, like the Mac one', () => {
-  expect(config).toContain('artifactName: Yogurt-mac-${arch}.${ext}')
-  expect(config).toContain('artifactName: Yogurt-windows-${arch}.${ext}')
-  expect(config).toContain('artifactName: Yogurt-linux-${arch}.${ext}')
+  expect(config).toContain('artifactName: Cakapp-mac-${arch}.${ext}')
+  expect(config).toContain('artifactName: Cakapp-windows-${arch}.${ext}')
+  expect(config).toContain('artifactName: Cakapp-linux-${arch}.${ext}')
 })
 
 it('ships the compact and titled Mac tray templates at both display scales', () => {

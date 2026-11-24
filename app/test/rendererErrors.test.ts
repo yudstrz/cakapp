@@ -30,7 +30,7 @@ it('keeps runtime diagnostics and code frames without document values, paths, so
   expect(rendererError({ stack: Array(100).fill('    at App (index.js:1:2)').join('\n') }).stack.split('\n')).toHaveLength(40)
 })
 it('forwards global errors and rejections without serializing arbitrary rejection payloads, and removes listeners', () => {
-  const send = vi.fn(), win = Object.assign(new EventTarget(), { yogurt: { reportRendererError: send } })
+  const send = vi.fn(), win = Object.assign(new EventTarget(), { Cakapp: { reportRendererError: send } })
   vi.stubGlobal('window', win)
   const stop = installRendererErrors()
   const thrown = Object.assign(new Event('error'), { error: Object.assign(new TypeError(), error()) })

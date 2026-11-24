@@ -25,7 +25,7 @@ describe('Zoom', () => {
     expect(zoomTile('Share screen, Alt+S')).toBeNull()
   })
 
-  it('a call of three: the marked tile talks; "(me)" in the list is the person using Yogurt', () => {
+  it('a call of three: the marked tile talks; "(me)" in the list is the person using Cakapp', () => {
     const r = readCall('zoom', [zoomWindow(
       ['Alex Morgan, Computer audio unmuted, Video on', 'Dana Smith, Computer audio unmuted, Video off, Active speaker', 'Ann Lee, Computer audio muted, Video off'],
       ['Alex Morgan (me)', 'Dana Smith (Host)', 'Ann Lee'],
@@ -33,7 +33,7 @@ describe('Zoom', () => {
     expect(r).toEqual({ speaking: ['Dana Smith'], participants: ['Alex Morgan', 'Dana Smith', 'Ann Lee'], me: 'Alex Morgan' })
   })
 
-  it('the host using Yogurt: "(Host, me)" is one tag group, so the name is clean and known to be "me"', () => {
+  it('the host using Cakapp: "(Host, me)" is one tag group, so the name is clean and known to be "me"', () => {
     const r = readCall('zoom', [zoomWindow(['Alex Morgan, Computer audio unmuted'], ['Alex Morgan (Host, me)', 'Ann Lee (Co-host)'])])
     expect(r).toEqual({ speaking: [], participants: ['Alex Morgan', 'Ann Lee'], me: 'Alex Morgan' })
   })
@@ -217,7 +217,7 @@ describe('Microsoft Teams', () => {
     expect(readCall('teams', [win(tree)])).toEqual({ speaking: [], participants: ['Smith, Dana'], me: null })
   })
 
-  it('a roster row marked (You) is the person using Yogurt', () => {
+  it('a roster row marked (You) is the person using Cakapp', () => {
     const tree = node('frame', {},
       node('tree', { t: 'Attendees' },
         node('tree item', { t: 'Dana Smith (You), Organizer, Unmuted' }),

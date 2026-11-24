@@ -10,7 +10,7 @@ it('a log line has the time, the level and the error with its stack', () => {
 })
 
 it('the log file never grows past its cap: the older half goes', () => {
-  const file = join(mkdtempSync(join(tmpdir(), 'yogurt-log-')), 'main.log')
+  const file = join(mkdtempSync(join(tmpdir(), 'Cakapp-log-')), 'main.log')
   writeFileSync(file, 'x'.repeat(900))
   writeLog(file, 'y'.repeat(200) + '\n', 1000)
   expect(statSync(file).size).toBeLessThanOrEqual(1000)

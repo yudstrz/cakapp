@@ -10,14 +10,14 @@ const dirs: string[] = []
 afterEach(() => dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force: true })))
 
 function rig(answer: (url: string) => Promise<string> | string) {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-callinks-')); dirs.push(dir)
+  const dir = mkdtempSync(join(tmpdir(), 'Cakapp-callinks-')); dirs.push(dir)
   const file = join(dir, 'settings.json')
   const fetched: string[] = []
   let clock = 1_000_000
   const links = createCalendarLinks({
     file, now: () => clock,
     get: async (url) => { fetched.push(url); return answer(url) },
-    // a stand-in for the keychain: Yogurt never writes the address as it is
+    // a stand-in for the keychain: Cakapp never writes the address as it is
     seal: (s) => `sealed:${Buffer.from(s).toString('base64')}`, open: (s) => Buffer.from(s.slice(7), 'base64').toString(),
   })
   return { links, file, fetched, tick: (ms: number) => { clock += ms } }

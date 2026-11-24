@@ -17,9 +17,9 @@ afterEach(() => {
 })
 
 function rig(o: { embedPath?: string; recording?: () => boolean } = {}) {
-  const d = mkdtempSync(join(tmpdir(), 'yogurt-indexer-'))
+  const d = mkdtempSync(join(tmpdir(), 'Cakapp-indexer-'))
   dirs.push(d)
-  const store = openStore(join(d, 'yogurt.db'))
+  const store = openStore(join(d, 'Cakapp.db'))
   stores.push(store)
   const library = new Library(store.db)
   const engine = new FakeEngine()

@@ -19,7 +19,7 @@ it('shows the correct action for existing summaries and source content, hiding e
 
 it('explains disabled actions, prioritizing recording and model download over queued writing', () => {
   expect(summaryAction({ ...available, recording: true, busy: true, downloading: true })?.reason).toBe('Available after recording')
-  expect(summaryAction({ ...available, busy: true, downloading: true })?.reason).toBe('Waiting for Yogurt AI to download')
+  expect(summaryAction({ ...available, busy: true, downloading: true })?.reason).toBe('Waiting for Cakapp AI to download')
   expect(summaryAction({ ...available, busy: true })?.reason).toBe('Writing the summary')
 })
 
@@ -38,7 +38,7 @@ it('renders a focusable but unavailable menu item with a separate accessible des
       expect(item).toContain('aria-description=')
       expect(item).not.toMatch(/\sdisabled=/)
       expect(item).not.toContain('tabindex="-1"')
-      if (locale.id !== 'en') expect(generation.reason).not.toMatch(/^(Available after recording|Writing the summary|Waiting for Yogurt AI to download)$/)
+      if (locale.id !== 'en') expect(generation.reason).not.toMatch(/^(Available after recording|Writing the summary|Waiting for Cakapp AI to download)$/)
     }
   }
 })

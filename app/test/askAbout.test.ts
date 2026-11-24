@@ -8,7 +8,7 @@ describe('Ask knows what it is', () => {
     expect(aboutAsk.length).toBeLessThanOrEqual(400)
     // about 4 characters a token
     expect(Math.ceil(aboutAsk.length / 4)).toBeLessThanOrEqual(100)
-    expect(aboutAsk).toMatch(/Yogurt/)
+    expect(aboutAsk).toMatch(/Cakapp/)
     expect(aboutAsk).toMatch(/on this computer/)
     expect(aboutAsk).toMatch(/can't join calls, browse the web or change settings/)
   })

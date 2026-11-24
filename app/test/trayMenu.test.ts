@@ -63,13 +63,13 @@ describe('Windows and Linux tray', () => {
     expect([settings(), settings('darwin'), settings('win32'), settings('linux')]).toEqual(['Command+,', 'Command+,', 'Ctrl+,', 'Ctrl+,'])
   })
   it('a Mac keeps its template icon and timer title', () => {
-    expect(trayLook('darwin', null, 0)).toEqual({ icon: 'tray', template: true, title: '', tooltip: 'Yogurt' })
-    expect(trayLook('darwin', { paused: false }, 723000)).toEqual({ icon: 'tray-titled', template: true, title: '12:03', tooltip: 'Yogurt is recording' })
+    expect(trayLook('darwin', null, 0)).toEqual({ icon: 'tray', template: true, title: '', tooltip: 'Cakapp' })
+    expect(trayLook('darwin', { paused: false }, 723000)).toEqual({ icon: 'tray-titled', template: true, title: '12:03', tooltip: 'Cakapp is recording' })
     expect(trayLook('darwin', { paused: true }, 723000)).toEqual({ icon: 'tray-titled', template: true, title: 'Paused', tooltip: 'Recording paused' })
   })
   it('elsewhere a colour icon, a recording one while it records, and the time in the tooltip (no title there)', () => {
     for (const os of ['win32', 'linux']) {
-      expect(trayLook(os, null, 0)).toEqual({ icon: 'tray-color', template: false, title: null, tooltip: 'Yogurt' })
+      expect(trayLook(os, null, 0)).toEqual({ icon: 'tray-color', template: false, title: null, tooltip: 'Cakapp' })
       expect(trayLook(os, { paused: false }, 723000)).toEqual({ icon: 'tray-recording', template: false, title: null, tooltip: '● 12:03' })
       expect(trayLook(os, { paused: true }, 723000)).toEqual({ icon: 'tray-color', template: false, title: null, tooltip: 'Paused' })
     }

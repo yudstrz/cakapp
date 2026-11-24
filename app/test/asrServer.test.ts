@@ -10,7 +10,7 @@ import { createTranscriber } from '../src/main/asr/transcribe'
  * modes: what each launch does with a request to /inference (the last one repeats): ok, crash (exits), wedge (never answers).
  */
 function fakeBinary(loadMs = 0, modes: string[] = ['ok']) {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-ws-'))
+  const dir = mkdtempSync(join(tmpdir(), 'Cakapp-ws-'))
   const js = join(dir, 'ws.js')
   writeFileSync(join(dir, 'modes'), modes.join('\n'))
   writeFileSync(js, `
@@ -94,7 +94,7 @@ describe.skipIf(process.platform === 'win32')('whisper server', () => {
   })
 
   it('fails when the program exits before it answers', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'yogurt-ws-'))
+    const dir = mkdtempSync(join(tmpdir(), 'Cakapp-ws-'))
     const bin = join(dir, 'whisper-server')
     writeFileSync(bin, '#!/bin/sh\nexit 3\n'); chmodSync(bin, 0o755)
     await expect(make(bin).url()).rejects.toThrow(/exited/)
@@ -317,11 +317,11 @@ describe('pid file', () => {
     const killed: number[] = []
     return { killed, deps: { name: (pid: number) => names[pid] ?? null, kill: (pid: number) => { killed.push(pid) } } }
   }
-  const pidFile = () => join(mkdtempSync(join(tmpdir(), 'yogurt-pid-')), 'whisper-server.pid')
+  const pidFile = () => join(mkdtempSync(join(tmpdir(), 'Cakapp-pid-')), 'whisper-server.pid')
 
   it('kills a left-over whisper-server and removes the file', () => {
     const f = pidFile(); writeFileSync(f, '4242')
-    const r = rig({ 4242: '/Applications/Yogurt.app/Contents/Resources/bin/whisper-server' })
+    const r = rig({ 4242: '/Applications/Cakapp.app/Contents/Resources/bin/whisper-server' })
     killStale(f, r.deps)
     expect(r.killed).toEqual([4242])
     expect(existsSync(f)).toBe(false)

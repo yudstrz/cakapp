@@ -68,7 +68,7 @@ it('firms cubically from 70%, stays soft at the last threshold, and reduced moti
 })
 it('handles the real fake-mode download steps over 45 seconds without changing lap speed', async () => {
   vi.useFakeTimers()
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-blob-fake-')), events: { at: number; fraction: number }[] = []
+  const dir = mkdtempSync(join(tmpdir(), 'Cakapp-blob-fake-')), events: { at: number; fraction: number }[] = []
   const began = Date.now()
   try {
     const run = fakeDownloadDeps({ stepMs: 11_250 }).download('fixture', dir, 'model', p => events.push({ at: (Date.now() - began) / 1000, fraction: p.fraction }), new AbortController().signal)

@@ -11,26 +11,26 @@ describe('what each computer can do', () => {
     expect(capabilities('linux')).toEqual({ calendar: true, calendarLink: true, callNames: true, permissionPrompts: false, mediaPause: false })
   })
   it('only fake mode can pretend to be another computer, so the Mac CI can try the Windows and Linux screens', () => {
-    expect(platformOf('darwin', { YOGURT_FAKE: '1', YOGURT_FAKE_PLATFORM: 'win32' })).toBe('win32')
-    expect(platformOf('darwin', { YOGURT_FAKE: '1', YOGURT_FAKE_PLATFORM: 'linux' })).toBe('linux')
-    expect(platformOf('darwin', { YOGURT_FAKE_PLATFORM: 'win32' })).toBe('darwin')
-    expect(platformOf('darwin', { YOGURT_FAKE: '1', YOGURT_FAKE_PLATFORM: 'beos' })).toBe('darwin')
+    expect(platformOf('darwin', { Cakapp_FAKE: '1', Cakapp_FAKE_PLATFORM: 'win32' })).toBe('win32')
+    expect(platformOf('darwin', { Cakapp_FAKE: '1', Cakapp_FAKE_PLATFORM: 'linux' })).toBe('linux')
+    expect(platformOf('darwin', { Cakapp_FAKE_PLATFORM: 'win32' })).toBe('darwin')
+    expect(platformOf('darwin', { Cakapp_FAKE: '1', Cakapp_FAKE_PLATFORM: 'beos' })).toBe('darwin')
     expect(platformOf('linux', {})).toBe('linux')
   })
 })
 
 describe('helper programs', () => {
   it('a Mac keeps its helpers names', () => {
-    expect(['system', 'audio', 'mcp', 'whisper'].map((h) => helperFile(h as never, 'darwin'))).toEqual(['yogurt-mac', 'yogurt-audio', 'yogurt-mcp', 'whisper-server'])
+    expect(['system', 'audio', 'mcp', 'whisper'].map((h) => helperFile(h as never, 'darwin'))).toEqual(['Cakapp-mac', 'Cakapp-audio', 'Cakapp-mcp', 'whisper-server'])
   })
-  it('Windows and Linux get yogurt-system in place of yogurt-mac, and .exe on Windows', () => {
-    expect(['system', 'audio', 'mcp', 'whisper'].map((h) => helperFile(h as never, 'linux'))).toEqual(['yogurt-system', 'yogurt-audio', 'yogurt-mcp', 'whisper-server'])
-    expect(['system', 'audio', 'mcp', 'whisper'].map((h) => helperFile(h as never, 'win32'))).toEqual(['yogurt-system.exe', 'yogurt-audio.exe', 'yogurt-mcp.exe', 'whisper-server.exe'])
+  it('Windows and Linux get Cakapp-system in place of Cakapp-mac, and .exe on Windows', () => {
+    expect(['system', 'audio', 'mcp', 'whisper'].map((h) => helperFile(h as never, 'linux'))).toEqual(['Cakapp-system', 'Cakapp-audio', 'Cakapp-mcp', 'whisper-server'])
+    expect(['system', 'audio', 'mcp', 'whisper'].map((h) => helperFile(h as never, 'win32'))).toEqual(['Cakapp-system.exe', 'Cakapp-audio.exe', 'Cakapp-mcp.exe', 'whisper-server.exe'])
   })
 })
 
 describe('the mic list', () => {
-  it("comes from yogurt-mac on a Mac and from the recorder itself on Windows and Linux", () => {
+  it("comes from Cakapp-mac on a Mac and from the recorder itself on Windows and Linux", () => {
     expect(['darwin', 'win32', 'linux'].map(micListHelper)).toEqual(['system', 'audio', 'audio'])
   })
 })

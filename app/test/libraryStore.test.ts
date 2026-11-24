@@ -8,9 +8,9 @@ import { Library, libraryTables } from '../src/main/library/store'
 const dirs: string[] = []
 const stores: Store[] = []
 function fresh() {
-  const d = mkdtempSync(join(tmpdir(), 'yogurt-library-'))
+  const d = mkdtempSync(join(tmpdir(), 'Cakapp-library-'))
   dirs.push(d)
-  const s = openStore(join(d, 'yogurt.db'))
+  const s = openStore(join(d, 'Cakapp.db'))
   stores.push(s)
   return { s, lib: new Library(s.db) }
 }

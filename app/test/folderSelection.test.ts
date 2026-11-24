@@ -48,7 +48,7 @@ it('waits for the write to finish even if a refresh already agrees, and preserve
 it('adds every selected meeting once while preserving other folder memberships', async () => {
   const memberships = new Map([['a', new Set(['existing'])], ['b', new Set<string>()]])
   const add = vi.fn(async (folder: string, id: string) => { memberships.get(id)!.add(folder) })
-  vi.stubGlobal('window', { yogurt: { folders: { add, of: async (id: string) => [...memberships.get(id)!].map(id => ({ id })) } } })
+  vi.stubGlobal('window', { Cakapp: { folders: { add, of: async (id: string) => [...memberships.get(id)!].map(id => ({ id })) } } })
   await addMeetingsToFolder('new', ['a', 'b', 'a'])
   expect(add.mock.calls).toEqual([['new', 'a'], ['new', 'b']])
   expect([...memberships.get('a')!]).toEqual(['existing', 'new'])
@@ -58,7 +58,7 @@ it('adds every selected meeting once while preserving other folder memberships',
 it('waits for every write and reports rejection or a missing folder', async () => {
   const add = vi.fn(async (_folder: string, id: string) => { if (id === 'a') throw new Error('Unavailable') })
   const of = vi.fn(async () => [])
-  vi.stubGlobal('window', { yogurt: { folders: { add, of } } })
+  vi.stubGlobal('window', { Cakapp: { folders: { add, of } } })
   await expect(addMeetingsToFolder('gone', ['a', 'b'])).rejects.toThrow('Folder not added')
   expect(add).toHaveBeenCalledTimes(2)
   expect(of).toHaveBeenCalledWith('b')
@@ -68,7 +68,7 @@ it('waits for every write and reports rejection or a missing folder', async () =
 it('removes every selected meeting once without touching its other folders', async () => {
   const memberships = new Map([['a', new Set(['target', 'other'])], ['b', new Set(['target'])]])
   const remove = vi.fn(async (folder: string, id: string) => { memberships.get(id)!.delete(folder) })
-  vi.stubGlobal('window', { yogurt: { folders: { remove, of: async (id: string) => [...memberships.get(id)!].map(id => ({ id })) } } })
+  vi.stubGlobal('window', { Cakapp: { folders: { remove, of: async (id: string) => [...memberships.get(id)!].map(id => ({ id })) } } })
   await setMeetingsInFolder('target', ['a', 'b', 'a'], false)
   expect(remove.mock.calls).toEqual([['target', 'a'], ['target', 'b']])
   expect([...memberships.get('a')!]).toEqual(['other'])
@@ -77,7 +77,7 @@ it('removes every selected meeting once without touching its other folders', asy
 
 it('reports failed removals after trying the entire selection', async () => {
   const remove = vi.fn(async (_folder: string, id: string) => { if (id === 'a') throw new Error('Unavailable') })
-  vi.stubGlobal('window', { yogurt: { folders: { remove, of: async () => [{ id: 'target' }] } } })
+  vi.stubGlobal('window', { Cakapp: { folders: { remove, of: async () => [{ id: 'target' }] } } })
   await expect(setMeetingsInFolder('target', ['a', 'b'], false)).rejects.toThrow('Folder not removed')
   expect(remove).toHaveBeenCalledTimes(2)
 })

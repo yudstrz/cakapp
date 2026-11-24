@@ -52,11 +52,11 @@ describe('permission action hierarchy', () => {
 afterEach(() => { vi.unstubAllGlobals() })
 
 it.each([
-  ['darwin', 'Beside the Yogurt icon in the menu bar.'],
-  ['win32', 'In the tooltip of the Yogurt icon in the notification area.'],
-  ['linux', 'In the tooltip of the Yogurt icon in the tray.'],
+  ['darwin', 'Beside the Cakapp icon in the menu bar.'],
+  ['win32', 'In the tooltip of the Cakapp icon in the notification area.'],
+  ['linux', 'In the tooltip of the Cakapp icon in the tray.'],
 ])('shows the next meeting switch and its location only when the icon is visible on %s', (os, description) => {
-  vi.stubGlobal('window', { yogurt: { os } })
+  vi.stubGlobal('window', { Cakapp: { os } })
   for (const visible of [false, true]) for (const on of [false, true]) {
     const html = renderToStaticMarkup(createElement(NextMeetingSetting, { visible, on, onChange() {} }))
     if (!visible) expect(html).toBe('')

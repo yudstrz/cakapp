@@ -29,7 +29,7 @@ describe('nameFor: who the other side was, from what the call app showed', () =>
     expect(nameFor({ startMs: 1000, endMs: 5000 }, tl)).toBeNull()
   })
 
-  it('is Them when only the person using Yogurt is marked (their own voice, not the other side)', () => {
+  it('is Them when only the person using Cakapp is marked (their own voice, not the other side)', () => {
     const tl = run(0, 10_000, { ...meetingOf3, speaking: ['Alex Morgan'] })
     expect(nameFor({ startMs: 1000, endMs: 5000 }, tl)).toBeNull()
     // and when they are told apart only by the name in Settings
@@ -65,7 +65,7 @@ describe('nameFor: who the other side was, from what the call app showed', () =>
     expect(label(['Ann Lee', 'Bo Park'])).toBeNull()
   })
 
-  it('a call of two where nobody is known to be the person using Yogurt names nobody', () => {
+  it('a call of two where nobody is known to be the person using Cakapp names nobody', () => {
     expect(nameFor({ startMs: 1000, endMs: 5000 }, run(0, 10_000, { participants: ['Ann Lee', 'Dana Smith'] }))).toBeNull()
     // the name in Settings tells them apart
     expect(nameFor({ startMs: 1000, endMs: 5000 }, run(0, 10_000, { participants: ['Ann Lee', 'Dana Smith'] }), { myNames: ['Ann  Lee'] })).toBe('Dana Smith')
@@ -82,7 +82,7 @@ describe('nameFor: who the other side was, from what the call app showed', () =>
   })
 })
 
-describe('othersIn: everyone seen in the call but the person using Yogurt', () => {
+describe('othersIn: everyone seen in the call but the person using Cakapp', () => {
   it('lists each other name once, in the order first seen', () => {
     const tl = [...run(0, 1000, meetingOf3), ...run(1000, 2000, { participants: ['Alex Morgan', 'Bo Park', 'Dana Smith'], me: 'Alex Morgan', speaking: ['Bo Park'] })]
     expect(othersIn(tl)).toEqual(['Dana Smith', 'Ann Lee', 'Bo Park'])

@@ -17,7 +17,7 @@ vi.mock('electron-updater', () => ({ default: { autoUpdater: updater } }))
 it('updates are on by default, and turning them off also keeps a downloaded version from installing on quit', async () => {
   vi.useFakeTimers()
   const { hookUpdates } = await import('../src/main/updates')
-  const file = join(mkdtempSync(join(tmpdir(), 'yogurt-updates-')), 'settings.json')
+  const file = join(mkdtempSync(join(tmpdir(), 'Cakapp-updates-')), 'settings.json')
   await hookUpdates({ file, available: true, recording: () => false })
   expect((handlers.get('updates:status')!() as { on: boolean }).on).toBe(true)
   expect(updater.autoInstallOnAppQuit).toBe(true)
@@ -33,7 +33,7 @@ it('Later hides only this version for this app session without changing installa
   try {
     updater.removeAllListeners()
     const { hookUpdates } = await import('../src/main/updates')
-    const file = join(mkdtempSync(join(tmpdir(), 'yogurt-updates-')), 'settings.json')
+    const file = join(mkdtempSync(join(tmpdir(), 'Cakapp-updates-')), 'settings.json')
     await hookUpdates({ file, available: true, recording: () => false })
     const status = () => handlers.get('updates:status')!() as import('../src/shared/types').UpdateStatus
     handlers.get('updates:later')!()

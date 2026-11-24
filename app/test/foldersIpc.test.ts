@@ -13,8 +13,8 @@ let dir: string, store: Store
 const changed = vi.fn()
 beforeEach(() => {
   handlers.clear(); changed.mockReset()
-  dir = mkdtempSync(join(tmpdir(), 'yogurt-folders-ipc-'))
-  store = openStore(join(dir, 'yogurt.db'))
+  dir = mkdtempSync(join(tmpdir(), 'Cakapp-folders-ipc-'))
+  store = openStore(join(dir, 'Cakapp.db'))
   hookFolders({ store, changed })
 })
 afterEach(() => { store.close(); rmSync(dir, { recursive: true, force: true }) })

@@ -15,7 +15,7 @@ it('publishes ready immediately, protects recordings, and restarts only on reque
   const { hookUpdates } = await import('../src/main/updates')
   let recording = true
   const restarted = vi.fn()
-  await hookUpdates({ file: join(mkdtempSync(join(tmpdir(), 'yogurt-update-')), 'settings.json'), available: false,
+  await hookUpdates({ file: join(mkdtempSync(join(tmpdir(), 'Cakapp-update-')), 'settings.json'), available: false,
     recording: () => recording, fake: { version: '0.3.2', restarted } })
   const status = () => handlers.get('updates:status')!() as UpdateStatus
   expect(status()).toMatchObject({ state: 'ready', next: '0.3.2' })

@@ -18,7 +18,7 @@ it('renders the last day and its people immediately on remount, refreshes quietl
   const listeners = new Set<() => void>()
   vi.stubGlobal('window', {
     addEventListener: vi.fn(), removeEventListener: vi.fn(), matchMedia: () => ({ matches: true }),
-    yogurt: { calendar: { day, onChange: (cb: () => void) => { listeners.add(cb); return () => listeners.delete(cb) } },
+    Cakapp: { calendar: { day, onChange: (cb: () => void) => { listeners.add(cb); return () => listeners.delete(cb) } },
       meetings: { onChange: () => () => {} } },
   })
   const render = () => {
@@ -46,7 +46,7 @@ it('renders the last day and its people immediately on remount, refreshes quietl
 
 it.each([false, true])('places an offline feed according to whether healthy events remain (%s)', async hasEvents => {
   const event: AgendaEvent = { id: 'healthy', title: 'Design review', start: Date.now(), end: Date.now()+60000, attendees: [], url: null }
-  vi.stubGlobal('window', { addEventListener() {}, removeEventListener() {}, matchMedia: () => ({ matches: true }), yogurt: {
+  vi.stubGlobal('window', { addEventListener() {}, removeEventListener() {}, matchMedia: () => ({ matches: true }), Cakapp: {
     calendar: { day: async () => ({ status: 'granted', unavailable: ['Team calendar'], events: hasEvents ? [event] : [] }), onChange: () => () => {} },
     meetings: { onChange: () => () => {} },
   } })

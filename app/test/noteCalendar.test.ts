@@ -38,7 +38,7 @@ const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve() 
 function deferred() { let resolve!: (value: any) => void; const promise = new Promise<any>(done => { resolve = done }); return { promise, resolve } }
 function setup(day = vi.fn().mockResolvedValue(dayValue), list = vi.fn().mockResolvedValue(listValue)) {
   const changes = new Set<() => void>(), focus = new Set<() => void>()
-  vi.stubGlobal('window', { yogurt: { capabilities: { calendar: true }, calendar: { day, list, onChange: (fn: () => void) => { changes.add(fn); return () => changes.delete(fn) } } }, addEventListener: (_event: string, fn: () => void) => focus.add(fn), removeEventListener: (_event: string, fn: () => void) => focus.delete(fn) })
+  vi.stubGlobal('window', { Cakapp: { capabilities: { calendar: true }, calendar: { day, list, onChange: (fn: () => void) => { changes.add(fn); return () => changes.delete(fn) } } }, addEventListener: (_event: string, fn: () => void) => focus.add(fn), removeEventListener: (_event: string, fn: () => void) => focus.delete(fn) })
   return { day, list, change: () => [...changes].forEach(fn => fn()), focus: () => [...focus].forEach(fn => fn()) }
 }
 beforeEach(() => vi.resetModules())
@@ -87,7 +87,7 @@ it('ignores old note reads and makes no requests for unlinked notes or unsupport
   old.resolve({ status: 'denied', events: [] }); await flush()
   expect(note.render(next).details).toBe(current)
   expect(note.render(meeting).details).toBeUndefined()
-  window.yogurt.capabilities.calendar = false
+  window.Cakapp.capabilities.calendar = false
   const calls = api.day.mock.calls.length
   expect(note.render(next).details).toBeUndefined()
   expect(api.day).toHaveBeenCalledTimes(calls)

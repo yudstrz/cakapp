@@ -2,16 +2,16 @@ import { expect, it } from 'vitest'
 import { relaunchOptions, stripAppImageEnv } from '../src/main/relaunch'
 
 it('reopens the exact installed Mac bundle through Launch Services without inherited Electron arguments', () => {
-  expect(relaunchOptions('darwin', true, '/Users/sam/My Apps/Yogurt.app/Contents/MacOS/Yogurt')).toEqual({ execPath: '/usr/bin/open', args: ['-n', '-a', '/Users/sam/My Apps/Yogurt.app'] })
+  expect(relaunchOptions('darwin', true, '/Users/sam/My Apps/Cakapp.app/Contents/MacOS/Cakapp')).toEqual({ execPath: '/usr/bin/open', args: ['-n', '-a', '/Users/sam/My Apps/Cakapp.app'] })
 })
 it('leaves development and non-Mac relaunches to Electron', () => {
   expect(relaunchOptions('darwin', false, '/dev/Electron.app/Contents/MacOS/Electron')).toBeUndefined()
-  expect(relaunchOptions('win32', true, 'C:\\Yogurt.exe')).toBeUndefined()
+  expect(relaunchOptions('win32', true, 'C:\\Cakapp.exe')).toBeUndefined()
 })
 
-it('Linux starts the AppImage itself again: its mount goes away when Yogurt quits', () => {
-  expect(relaunchOptions('linux', true, '/tmp/.mount_abc/yogurt', '/home/sam/Yogurt.AppImage')).toEqual({ execPath: '/home/sam/Yogurt.AppImage' })
-  expect(relaunchOptions('linux', true, '/usr/bin/yogurt')).toBeUndefined()
+it('Linux starts the AppImage itself again: its mount goes away when Cakapp quits', () => {
+  expect(relaunchOptions('linux', true, '/tmp/.mount_abc/Cakapp', '/home/sam/Cakapp.AppImage')).toEqual({ execPath: '/home/sam/Cakapp.AppImage' })
+  expect(relaunchOptions('linux', true, '/usr/bin/Cakapp')).toBeUndefined()
 })
 
 it('a relaunch forgets the library path that points into the AppImage mount it takes with it', () => {

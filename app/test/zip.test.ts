@@ -16,7 +16,7 @@ vi.mock('node:child_process', async (original) => {
 beforeEach(() => vi.resetAllMocks())
 
 const dirs: string[] = []
-const tmp = () => { const d = mkdtempSync(join(tmpdir(), 'yogurt-zip-')); dirs.push(d); return d }
+const tmp = () => { const d = mkdtempSync(join(tmpdir(), 'Cakapp-zip-')); dirs.push(d); return d }
 afterEach(() => dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force: true })))
 
 /** every file under dir, as relative paths with / */
@@ -71,7 +71,7 @@ async function evilZip(safe: string, evil: string): Promise<string> {
 
 describe('backup zip, everywhere', () => {
   it('packs and unpacks a folder unchanged: both audio formats, spaces and names in other scripts', async () => {
-    const zip = join(tmp(), 'Yogurt backup.zip'), out = tmp()
+    const zip = join(tmp(), 'Cakapp backup.zip'), out = tmp()
     await packPortable(sample(), zip)
     await unpackPortable(zip, out)
     same(out)
@@ -202,7 +202,7 @@ describe.skipIf(process.platform !== 'darwin')('backup zip, Mac and the others',
 
   it('pack is ditto on a Mac, with a sequestered resource folder', async () => {
     const src = sample(), zip = join(tmp(), 'mac.zip')
-    execFileSync('/usr/bin/xattr', ['-w', 'com.yogurt.test', '1', join(src, 'manifest.json')])
+    execFileSync('/usr/bin/xattr', ['-w', 'com.Cakapp.test', '1', join(src, 'manifest.json')])
     await pack(src, zip)
     expect(execFileSync('/usr/bin/unzip', ['-Z1', zip], { encoding: 'utf8' })).toContain('__MACOSX/')
   })

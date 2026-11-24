@@ -29,7 +29,7 @@ describe('companyOf', () => {
 })
 
 describe('meetingWords', () => {
-  it('has the names, the companies of everyone on the invite (the person using Yogurt too) and a title that came from them', () => {
+  it('has the names, the companies of everyone on the invite (the person using Cakapp too) and a title that came from them', () => {
     setOwnerName(() => 'Alex Morgan')
     noteOwnEmail('alex@zentrik.example')
     expect(meetingWords(robin)).toEqual({ title: robin.title, names: ['Robin Smith', 'Tarun Mehra', 'Alex Morgan'], companies: ['Northwind', 'Zentrik'] })
@@ -143,7 +143,7 @@ describe('personal jargon', () => {
 })
 
 describe('the word list for lowercase respelling', () => {
-  it("a Mac reads its own; Windows and Linux read the same list shipped with Yogurt (Webster's 2nd, public domain)", () => {
+  it("a Mac reads its own; Windows and Linux read the same list shipped with Cakapp (Webster's 2nd, public domain)", () => {
     expect(dictionaryFiles('darwin', '/R')).toEqual(['/usr/share/dict/words'])
     expect(dictionaryFiles('win32', 'C:\\Y\\resources')[0]).toMatch(/resources[\\/]dict[\\/]words$/)
     expect(dictionaryFiles('linux', '/opt/y/resources')).toEqual([expect.stringMatching(/[\\/]opt[\\/]y[\\/]resources[\\/]dict[\\/]words$/), expect.stringMatching(/resources[\\/]dict[\\/]words$/), '/usr/share/dict/words'])

@@ -22,7 +22,7 @@ const attendees = [{ name: 'Attendee One', email: 'one@zeta.example' }, { name: 
 const meeting = { id: 'note', attendees, startedAt: 1, ownEmail: 'self@zeta.example' } as Meeting
 function setup(m: Meeting = meeting) {
   const renameAttendee = vi.fn().mockResolvedValue(true), setAttendees = vi.fn().mockResolvedValue(undefined)
-  vi.stubGlobal('window', { yogurt: { meetings: { renameAttendee, setAttendees } } })
+  vi.stubGlobal('window', { Cakapp: { meetings: { renameAttendee, setAttendees } } })
   hooks.values = [false, 'Self']; hooks.index = 0
   const root = People({ m }) as any
   const element = root.props.children[1]

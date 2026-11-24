@@ -57,7 +57,7 @@ beforeEach(() => {
   transcriptGet.mockResolvedValue([])
   resume.mockResolvedValue({ id: meeting.id })
   stopSummary.mockResolvedValue(undefined)
-  vi.stubGlobal('window', { matchMedia: () => ({ matches: true }), yogurt: {
+  vi.stubGlobal('window', { matchMedia: () => ({ matches: true }), Cakapp: {
     meetings: { get: async () => meeting, onChange: (cb: typeof meetingChanged) => { meetingListeners.add(cb); return ()=>meetingListeners.delete(cb) }, resume, stop: vi.fn() },
     notes: { stop: stopSummary, setMine: async (_id: string, _text: string, revision: number) => ({ revision, status: 'saved' }), get: async () => notes, onChange: (cb: typeof notesChanged) => { notesChanged = cb; return vi.fn() } },
     transcript: { get: transcriptGet, onSegment: (cb: typeof segmentChanged) => { segmentChanged = cb; return vi.fn() }, onSpeakers: (cb: typeof transcriptChanged) => { transcriptChanged = cb; return vi.fn() } },
@@ -184,11 +184,11 @@ it('waits for the first notes model but allows generation during an optional upg
   notes = { ...notes, status: 'done', enhanced: '## Plan' }; requested = undefined
   await render(); await render()
   setupChanged({ phase: 'ready', fraction: 1, notesDownloading: true }); await render()
-  expect(find(tree, NoteMenu)?.props.generation).toMatchObject({ reason: 'Waiting for Yogurt AI to download' })
+  expect(find(tree, NoteMenu)?.props.generation).toMatchObject({ reason: 'Waiting for Cakapp AI to download' })
   setupChanged({ phase: 'ready', fraction: 1, notesUpgradeDownloading: true }); await render()
   expect(find(tree, NoteMenu)?.props.generation).toMatchObject({ reason: undefined })
   setupChanged({ phase: 'ready', fraction: 1, notesError: 'Download failed' }); await render()
-  expect(find(tree, NoteMenu)?.props.generation).toMatchObject({ reason: 'Waiting for Yogurt AI to download' })
+  expect(find(tree, NoteMenu)?.props.generation).toMatchObject({ reason: 'Waiting for Cakapp AI to download' })
 })
 
 

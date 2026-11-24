@@ -6,8 +6,8 @@ import { createHelperRunner } from '../src/main/calendar'
 
 /** a stand-in helper: answers at once, or waits (like a permission question nobody answered) */
 function fakeHelper() {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-helper-'))
-  const file = join(dir, 'yogurt-mac')
+  const dir = mkdtempSync(join(tmpdir(), 'Cakapp-helper-'))
+  const file = join(dir, 'Cakapp-mac')
   writeFileSync(file, '#!/bin/sh\nif [ "$1" = wait ]; then exec sleep 60; fi\necho \'{"ok":true}\'\n')
   chmodSync(file, 0o755)
   return file
@@ -21,7 +21,7 @@ it.skipIf(process.platform === 'win32')('answers with the helper\'s JSON', async
   expect(r.running()).toEqual([])
 })
 
-it.skipIf(process.platform === 'win32')('quitting kills a helper still waiting, so none outlives Yogurt', async () => {
+it.skipIf(process.platform === 'win32')('quitting kills a helper still waiting, so none outlives Cakapp', async () => {
   const r = createHelperRunner(fakeHelper)
   const waiting = r.run(['wait'])
   await new Promise((res) => setTimeout(res, 200))

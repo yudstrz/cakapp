@@ -74,7 +74,7 @@ describe('store & meeting user association', () => {
   function fresh(): Store {
     const d = mkdtempSync(join(tmpdir(), 'cakapp-store-user-'))
     dirs.push(d)
-    const s = openStore(join(d, 'yogurt.db'))
+    const s = openStore(join(d, 'Cakapp.db'))
     stores.push(s)
     return s
   }

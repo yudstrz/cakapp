@@ -3,7 +3,7 @@ import { isPreviewBuild, updatesOn } from '../src/main/updates'
 
 const installed = { packaged: true, fake: false, profile: false, feed: true }
 
-it('an installed Yogurt looks for new versions', () => {
+it('an installed Cakapp looks for new versions', () => {
   expect(updatesOn(installed)).toBe(true)
 })
 
@@ -30,8 +30,8 @@ it('a preview build (unsigned, never released) never looks for new versions, on 
 })
 
 it('a preview build is told by its package.json; a release build or anything unreadable is not one', () => {
-  expect(isPreviewBuild(JSON.stringify({ name: 'yogurt', yogurtPreview: true }))).toBe(true)
-  expect(isPreviewBuild(JSON.stringify({ name: 'yogurt' }))).toBe(false)
+  expect(isPreviewBuild(JSON.stringify({ name: 'Cakapp', CakappPreview: true }))).toBe(true)
+  expect(isPreviewBuild(JSON.stringify({ name: 'Cakapp' }))).toBe(false)
   expect(isPreviewBuild('')).toBe(false)
 })
 

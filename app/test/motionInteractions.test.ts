@@ -370,13 +370,13 @@ function watchRetryToast() {
 }
 
 it.each([
-  ['darwin', true, 'Appears while you record with Yogurt in the background.'],
-  ['darwin', false, 'Show Yogurt in the menu bar to hide the pill.'],
+  ['darwin', true, 'Appears while you record with Cakapp in the background.'],
+  ['darwin', false, 'Show Cakapp in the menu bar to hide the pill.'],
   ['win32', true, null], ['linux', true, null],
 ])('describes the pill switch on %s with menu bar visibility %s', async (os, showInMenuBar, description) => {
   const { Settings } = await import('../src/renderer/src/screens/Settings')
   const settings = { get: async () => ({ showInMenuBar, showRecordingPill: true }) }
-  vi.stubGlobal('window', { yogurt: { os, settings, capabilities: {} } })
+  vi.stubGlobal('window', { Cakapp: { os, settings, capabilities: {} } })
   const draw = renderer(() => Settings({ revision: 17 }))
   draw()
   vi.mocked(useEffect).mock.calls.find(([, deps]) => deps?.includes(17))![0]()
@@ -422,7 +422,7 @@ it('keeps a failed preference actionable when another preference saves', async (
   const close = vi.spyOn(toasts, 'close').mockImplementation(() => {})
   const reminder = vi.fn().mockRejectedValueOnce(new Error('read only')).mockResolvedValue(undefined)
   const settings = { get: async () => ({ myName: 'Meeting host', recordingReminder: true, theme: 'system' }), setRecordingReminder: reminder, setTheme: vi.fn().mockResolvedValue(undefined) }
-  vi.stubGlobal('window', { yogurt: { settings, capabilities: {} } })
+  vi.stubGlobal('window', { Cakapp: { settings, capabilities: {} } })
   try {
     const draw = renderer(() => Settings({ revision: 17 }))
     draw()
@@ -447,7 +447,7 @@ it.each([false, true])('retries the last requested AI access setting (reopen Set
   let reject!: (reason: Error) => void
   const set = vi.fn(async (enabled: boolean) => (saved = { ...saved, enabled }))
     .mockImplementationOnce(() => new Promise((_, no) => { reject = no }))
-  vi.stubGlobal('window', { yogurt: { capabilities: {}, mcp: { status: async () => saved, onClients: () => () => {}, set } } })
+  vi.stubGlobal('window', { Cakapp: { capabilities: {}, mcp: { status: async () => saved, onClients: () => () => {}, set } } })
   const panel = find(renderer(() => Settings({}))(), 'AiApps')
   const mount = async () => {
     const render = renderer(() => (panel.type as Function)(panel.props))
@@ -483,7 +483,7 @@ it('offers letting AI apps make changes only once they can read, off until turne
   const { Settings } = await import('../src/renderer/src/screens/Settings')
   let saved = { enabled: false, changes: false, command: 'test', clients: [] as string[] }
   const setChanges = vi.fn(async (changes: boolean) => (saved = { ...saved, changes }))
-  vi.stubGlobal('window', { yogurt: { capabilities: {}, mcp: { status: async () => saved, onClients: () => () => {}, set: vi.fn(), setChanges } } })
+  vi.stubGlobal('window', { Cakapp: { capabilities: {}, mcp: { status: async () => saved, onClients: () => () => {}, set: vi.fn(), setChanges } } })
   const panel = find(renderer(() => Settings({}))(), 'AiApps')
   const mount = async () => {
     const render = renderer(() => (panel.type as Function)(panel.props))
@@ -508,7 +508,7 @@ it('opens a command-search question as a draft when recording prevents an answer
   vi.stubGlobal('HTMLButtonElement', class {})
   const draft = vi.fn().mockResolvedValue(undefined), onNavigate = vi.fn()
   const conversations = { current: async () => 'draft-id', ask: async () => ({ waitsForMeeting: true }), draft }
-  vi.stubGlobal('window', { yogurt: { capabilities: { calendar: false }, conversations } })
+  vi.stubGlobal('window', { Cakapp: { capabilities: { calendar: false }, conversations } })
   const render = renderer(() => Search({ onOpen() {}, onNavigate, onSettingsChange() {}, onShortcuts() {}, onClose() {}, sidebarCollapsed: false, onToggleSidebar() {} }))
   find(render(), 'search-input').props.onChange({ target: { value: 'What did we decide?' } })
   find(render(), 'search').props.onKeyDown({ key: 'Enter', metaKey: true, nativeEvent: {}, preventDefault() {} })
@@ -520,7 +520,7 @@ it.each([true, false])('offers and runs the date command only with an agenda (ca
   vi.useFakeTimers()
   vi.stubGlobal('document', { activeElement: null })
   vi.stubGlobal('HTMLButtonElement', class {})
-  vi.stubGlobal('window', { yogurt: { capabilities: { calendar }, search: { query: vi.fn().mockResolvedValue([]) } } })
+  vi.stubGlobal('window', { Cakapp: { capabilities: { calendar }, search: { query: vi.fn().mockResolvedValue([]) } } })
   const onNavigate = vi.fn()
   const render = renderer(() => Search({ onOpen() {}, onNavigate, onSettingsChange() {}, onShortcuts() {}, onClose() {}, sidebarCollapsed: false, onToggleSidebar() {} }))
   find(render(), 'search-input').props.onChange({ target: { value: 'November 11, 2028' } })
@@ -542,7 +542,7 @@ it('jumps a mounted agenda to the day and week, closes details, and keeps arrows
   vi.useFakeTimers()
   vi.setSystemTime(new Date(2026, 10, 14, 12))
   const day = vi.fn(async (at: number) => ({ status: 'granted', events: [{ id: 'example', title: 'Example event', start: at, end: at + 60_000, attendees: [], url: null }] }))
-  vi.stubGlobal('window', { addEventListener() {}, removeEventListener() {}, yogurt: {
+  vi.stubGlobal('window', { addEventListener() {}, removeEventListener() {}, Cakapp: {
     calendar: { day, onChange: () => () => {} }, meetings: { onChange: () => () => {} },
   } })
   let jumpTo: { at: number } | undefined
@@ -592,7 +592,7 @@ it.each(['dark', 'mode'])('executes the ranked result when Enter beats a slow se
   const meeting = { meetingId: 'm1', title: 'Dark mode planning', startedAt: 1, parts: [], confident: true }
   const query = vi.fn(async () => { await new Promise(resolve => setTimeout(resolve, 300)); return [meeting] })
   const setTheme = vi.fn().mockResolvedValue(undefined), onOpen = vi.fn()
-  vi.stubGlobal('window', { yogurt: { capabilities: {}, settings: { get: async () => ({ theme: 'light' }), setTheme }, search: { query } } })
+  vi.stubGlobal('window', { Cakapp: { capabilities: {}, settings: { get: async () => ({ theme: 'light' }), setTheme }, search: { query } } })
   const render = renderer(() => Search({ onOpen, onNavigate() {}, onSettingsChange() {}, onShortcuts() {}, onClose() {}, sidebarCollapsed: false, onToggleSidebar() {} }))
   render()
   vi.mocked(useEffect).mock.calls[1][0]()
@@ -614,7 +614,7 @@ it.each(['dark', 'mode'])('executes the ranked result when Enter beats a slow se
 it('offers another read when a palette query fails', async () => {
   vi.stubGlobal('document', { activeElement: null })
   const query = vi.fn().mockRejectedValueOnce(new Error('read failed')).mockResolvedValue([])
-  vi.stubGlobal('window', { yogurt: { capabilities: { calendar: true }, search: { query } } })
+  vi.stubGlobal('window', { Cakapp: { capabilities: { calendar: true }, search: { query } } })
   const render = renderer(() => Search({ onOpen() {}, onNavigate() {}, onSettingsChange() {}, onShortcuts() {}, onClose() {}, sidebarCollapsed: false, onToggleSidebar() {} }))
   render()
   vi.mocked(useEffect).mock.calls.find(([, deps]) => deps?.length === 6)![0]()
@@ -628,7 +628,7 @@ it('keeps initial search results still, ignores stationary hover, and scrolls on
   const meetings = [{ meetingId: 'm1', title: 'Recent meeting', startedAt: 1000, parts: [] }]
   vi.stubGlobal('document', { activeElement: null })
   vi.stubGlobal('HTMLButtonElement', class {})
-  vi.stubGlobal('window', { yogurt: { capabilities: { calendar: true }, search: { query: vi.fn().mockResolvedValue(meetings) } } })
+  vi.stubGlobal('window', { Cakapp: { capabilities: { calendar: true }, search: { query: vi.fn().mockResolvedValue(meetings) } } })
   const render = renderer(() => Search({ onOpen() {}, onNavigate() {}, onSettingsChange() {}, onShortcuts() {}, onClose() {}, sidebarCollapsed: false, onToggleSidebar() {} }))
   const scrollIntoView = vi.fn()
   const scroll = () => { vi.mocked(useEffect).mock.lastCall![0]() }
@@ -672,7 +672,7 @@ it('keeps row glyphs stable across typing, filters, and keyboard selection witho
   vi.useFakeTimers()
   vi.stubGlobal('document', { activeElement: null })
   vi.stubGlobal('HTMLButtonElement', class {})
-  vi.stubGlobal('window', { yogurt: {
+  vi.stubGlobal('window', { Cakapp: {
     capabilities: { calendar: true },
     settings: { get: async () => ({ theme: 'light' }) },
     meetings: { onChange: () => () => {} },
@@ -724,7 +724,7 @@ it('keeps row glyphs stable across typing, filters, and keyboard selection witho
 it.each(['/chat', '/chat/saved'])('focuses Ask without a conversation lookup or navigation on %s', async route => {
   const current = vi.fn().mockResolvedValue('other'), go = vi.fn(), focus = vi.fn()
   const keydown = vi.fn(), onAsk = vi.fn(), takeAsk = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true)
-  vi.stubGlobal('window', { addEventListener: keydown, yogurt: { os: 'win32', conversations: { current }, nav: { onAsk, takeAsk } } })
+  vi.stubGlobal('window', { addEventListener: keydown, Cakapp: { os: 'win32', conversations: { current }, nav: { onAsk, takeAsk } } })
   vi.stubGlobal('document', { querySelector: () => null, getElementById: (id: string) => id === 'library-question' ? { focus } : null })
   renderer(() => Workspace({ route, go, search() {}, shortcuts() {}, collapsed: false, sidebarMotion: false, toggleSidebar() {}, children: null }))()
   vi.mocked(useEffect).mock.lastCall![0]()
@@ -739,7 +739,7 @@ it.each(['/chat', '/chat/saved'])('focuses Ask without a conversation lookup or 
 it.each(['darwin', 'win32'])('toggles the meeting panel once per shortcut press on %s', os => {
   const listeners = new Map<string, (e: any) => void>()
   vi.stubGlobal('window', { matchMedia: () => ({ matches: false }), addEventListener: (name: string, fn: (e: any) => void) => listeners.set(name, fn), removeEventListener() {},
-    yogurt: { os, nav: { onAsk: () => () => {}, takeAsk: vi.fn().mockResolvedValue(false) } } })
+    Cakapp: { os, nav: { onAsk: () => () => {}, takeAsk: vi.fn().mockResolvedValue(false) } } })
   const renderAsk = renderer(() => Ask({ id: 'm1', recording: false, anchor: null, onSource() {} }))
   let tree = renderAsk()
   const click = vi.fn(() => { find(tree, 'chat-open').props.onClick(); tree = renderAsk() })
@@ -869,7 +869,7 @@ it.each(['send', 'load', 'resolve'] as const)('keeps an early Enter through load
   const draft = vi.fn().mockResolvedValue(undefined)
   const body = {}
   vi.stubGlobal('document', { body, activeElement: body })
-  vi.stubGlobal('window', { yogurt: {
+  vi.stubGlobal('window', { Cakapp: {
     conversations: { get, ask, draft, onChange: () => () => {} },
     meetings: { onChange: () => () => {} }, folders: { onChange: () => () => {} },
   } })
@@ -929,7 +929,7 @@ function mentionComposer(panel: boolean, draft = 'Keep this question') {
     { kind: 'meeting', id: 'meeting', title: 'Planning review' },
   ])
   const removeContext = vi.fn().mockResolvedValue(undefined)
-  vi.stubGlobal('window', { yogurt: { conversations: { context, removeContext, draft: save, targets } } })
+  vi.stubGlobal('window', { Cakapp: { conversations: { context, removeContext, draft: save, targets } } })
   vi.stubGlobal('requestAnimationFrame', (callback: () => void) => { callback(); return 0 })
   const initial: ConversationView = { id: `mention-${panel}`, title: '', draft, chips: [{ kind: 'meeting', id: 'attached', title: 'Already attached' }], draftChips: [], firstChips: null, turns: [], waitsForMeeting: false, waitsForModel: false }
   const render = renderer(() => AskConversation({ id: initial.id, initial, panel, onSelect() {}, onDeleted() {}, onSource() {} }))
@@ -1126,7 +1126,7 @@ it('retains an export error and reopens the file save action on retry', async ()
   const toast = watchRetryToast()
   const { ShareMenu } = await import('../src/renderer/src/components/ShareMenu')
   const save = vi.fn().mockResolvedValueOnce('failed').mockResolvedValueOnce('saved')
-  vi.stubGlobal('window', { yogurt: { share: { save } } })
+  vi.stubGlobal('window', { Cakapp: { share: { save } } })
   const render = renderer(() => ShareMenu({ id: 'note', shown: 'mine', status: 'idle', hasEnhanced: false, beforeUse: async () => true }))
   find(render(), 'share-button').props.onClick({ detail: 0 })
   find(render(), 'share-export').props.onClick()
@@ -1359,7 +1359,7 @@ it('checks an inline match already in scope and consumes its mention without add
 
 it.each([false, true])('keeps Copy on the current answer without revealing older controls during streaming (panel: %s)', panel => {
   vi.stubGlobal('document', { body: {} })
-  vi.stubGlobal('window', { yogurt: { conversations: {} } })
+  vi.stubGlobal('window', { Cakapp: { conversations: {} } })
   const initial: ConversationView = { id: 'copy-visibility', title: '', draft: '', chips: [], draftChips: [], firstChips: [], waitsForMeeting: false, waitsForModel: false,
     turns: [1, 2, 3].map(id => ({ id, question: 'What changed?', answer: 'The release is ready.', status: 'done', sources: [], createdAt: id })) }
   const render = renderer(() => AskConversation({ id: initial.id, initial, panel, onSelect() {}, onDeleted() {}, onSource() {} }))
@@ -1377,7 +1377,7 @@ it.each([false, true])('keeps Copy on the current answer without revealing older
 it('hands the same shell from the Mac launch to a read error, checking and the ready workspace', async () => {
   vi.useFakeTimers()
   let checking!: (s: { phase: string }) => void
-  vi.stubGlobal('window', { innerWidth: 1100, yogurt: { platform: 'darwin',
+  vi.stubGlobal('window', { innerWidth: 1100, Cakapp: { platform: 'darwin',
     setup: { state: vi.fn().mockRejectedValue(new Error('read')), onState: (update: typeof checking) => { checking = update; return () => {} } },
     onboarding: { plan: async () => ({ steps: [], intro: false }) },
   } })

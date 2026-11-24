@@ -44,7 +44,7 @@ describe('which locale it listens in', () => {
   })
 })
 
-describe('the spoken language picked in Yogurt', () => {
+describe('the spoken language picked in Cakapp', () => {
   const supported = ['en-US', 'en-GB', 'en-AU', 'es-ES', 'de-DE']
   it('English only listens in English whatever the last meeting was, in the region of the interface when it is English', () => {
     expect(wantedSpeechLocale({ spoken: 'en', supported, last: 'spanish', ui: 'en-GB' })).toBe('en-GB')

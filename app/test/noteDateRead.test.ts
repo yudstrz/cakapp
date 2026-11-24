@@ -40,7 +40,7 @@ function setup(day: ReturnType<typeof vi.fn>, onClose = vi.fn()) {
   vi.useFakeTimers()
   vi.setSystemTime(at)
   vi.stubGlobal('requestAnimationFrame', vi.fn())
-  vi.stubGlobal('window', { yogurt: { capabilities: { calendar: true }, calendar: { day, onChange: () => () => {} } }, matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }), addEventListener() {}, removeEventListener() {} })
+  vi.stubGlobal('window', { Cakapp: { capabilities: { calendar: true }, calendar: { day, onChange: () => () => {} } }, matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }), addEventListener() {}, removeEventListener() {} })
   h.details = undefined
   function cardFor(m: Meeting) {
     const cardState = h.values

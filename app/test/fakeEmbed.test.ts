@@ -21,7 +21,7 @@ describe('the fake embedding model', () => {
 describe('the fake notes model, asked across meetings', () => {
   it('cites the first sources by number and title, or says nothing was found', async () => {
     const e = new FakeEngine()
-    process.env.YOGURT_FAKE_LLM_MS = '0'
+    process.env.Cakapp_FAKE_LLM_MS = '0'
     const ask = (content: string) => e.chat({ messages: [{ role: 'user', content }] }, () => {})
     const sources = '…<sources>\nMeeting: Pricing call · Tuesday\n[1] 0:04 into the meeting\nx\n\n[2] 0:09 into the meeting\nz\n\nMeeting: Weekly sync · Monday\n[3] the meeting notes\ny\n</sources>\n<question>\n'
     // like a small model: every part of a meeting cited after its line

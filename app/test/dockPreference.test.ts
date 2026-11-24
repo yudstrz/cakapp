@@ -18,7 +18,7 @@ const hook = (file: string, setDockVisible: (...args: any[]) => any, setTrayVisi
 }
 
 it('defaults to both and persists each choice as the existing two booleans', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-dock-pref-')); dirs.push(dir)
+  const dir = mkdtempSync(join(tmpdir(), 'Cakapp-dock-pref-')); dirs.push(dir)
   const file = join(dir, 'settings.json')
   hook(file, vi.fn(), vi.fn())
   const get = () => handlers.get('settings:get')!()
@@ -38,7 +38,7 @@ it('defaults to both and persists each choice as the existing two booleans', () 
 })
 
 it('rejects invalid choices without persisting or touching either icon', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-dock-invalid-')); dirs.push(dir)
+  const dir = mkdtempSync(join(tmpdir(), 'Cakapp-dock-invalid-')); dirs.push(dir)
   const file = join(dir, 'settings.json')
   updateSettings(file, { showInDock: false })
   const dock = vi.fn(), tray = vi.fn()
@@ -50,7 +50,7 @@ it('rejects invalid choices without persisting or touching either icon', () => {
 })
 
 it('shows the kept icon before hiding the other in all nine choice transitions', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-dock-transitions-')); dirs.push(dir)
+  const dir = mkdtempSync(join(tmpdir(), 'Cakapp-dock-transitions-')); dirs.push(dir)
   const file = join(dir, 'settings.json')
   for (const initial of [[true, true], [true, false], [false, true]]) {
     for (const [choice, expected, calls] of [
@@ -78,7 +78,7 @@ it('shows the kept icon before hiding the other in all nine choice transitions',
 })
 
 it('keeps the existing entry point and saved choice if showing its replacement fails', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-dock-failure-')); dirs.push(dir)
+  const dir = mkdtempSync(join(tmpdir(), 'Cakapp-dock-failure-')); dirs.push(dir)
   const file = join(dir, 'settings.json')
   updateSettings(file, { showInMenuBar: false })
   const dock = vi.fn()
@@ -89,7 +89,7 @@ it('keeps the existing entry point and saved choice if showing its replacement f
 })
 
 it('keeps platform-specific IPCs separate, so the tray setter cannot bypass the Mac choice', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-dock-platform-')); dirs.push(dir)
+  const dir = mkdtempSync(join(tmpdir(), 'Cakapp-dock-platform-')); dirs.push(dir)
   const file = join(dir, 'settings.json')
   updateSettings(file, { showInDock: false })
   const dock = vi.fn(), tray = vi.fn()
@@ -105,7 +105,7 @@ it('keeps platform-specific IPCs separate, so the tray setter cannot bypass the 
 })
 
 it('reads legacy booleans without a migration and retains the both-off startup heal', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-dock-legacy-')); dirs.push(dir)
+  const dir = mkdtempSync(join(tmpdir(), 'Cakapp-dock-legacy-')); dirs.push(dir)
   const file = join(dir, 'settings.json')
   hook(file, vi.fn(), vi.fn())
   for (const [menuBar, dock, choice] of [

@@ -53,7 +53,7 @@ it('cancels an unpainted show when closed, and never shows background or destroy
   expect(hidden.activate).not.toHaveBeenCalled()
 })
 
-it('Windows and Linux without a tray icon minimise on close, so Yogurt never runs out of sight; with one they hide like a Mac', () => {
+it('Windows and Linux without a tray icon minimise on close, so Cakapp never runs out of sight; with one they hide like a Mac', () => {
   expect(['darwin', 'win32', 'linux'].map(os => closeAction(os, true))).toEqual(['hide', 'hide', 'hide'])
   expect(['darwin', 'win32', 'linux'].map(os => closeAction(os, false))).toEqual(['hide', 'minimize', 'minimize'])
   const { window } = fixture(false, { closeTo: () => 'minimize' })

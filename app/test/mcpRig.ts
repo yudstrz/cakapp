@@ -6,21 +6,21 @@ import { openStore, type Store } from '../src/main/store'
 import { createMcp, type Mcp, type McpApp } from '../src/main/mcp/server'
 import type { CalEvent } from '../src/main/calendar'
 
-/** A made-up Yogurt for the MCP tests: a real store with two meetings, and the app's actions recorded as calls. */
+/** A made-up Cakapp for the MCP tests: a real store with two meetings, and the app's actions recorded as calls. */
 const dirs: string[] = []
 const stores: Store[] = []
 afterEach(() => {
   stores.splice(0).forEach((s) => s.close())
   dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force: true }))
 })
-const tmp = () => { const d = mkdtempSync(join(tmpdir(), 'yogurt-mcp-')); dirs.push(d); return d }
+const tmp = () => { const d = mkdtempSync(join(tmpdir(), 'Cakapp-mcp-')); dirs.push(d); return d }
 
 export const EVENT: CalEvent = { id: 'evt-9', title: 'Pricing sync', start: Date.parse('2026-11-21T15:00:00Z'), end: Date.parse('2026-11-21T15:30:00Z'),
   attendees: [{ name: 'Dana Smith', email: 'dana@acme.com' }], url: 'https://meet.example.com/abc', calendar: { id: 'c1', name: 'Work', source: 'iCloud' } }
 
 export function setup(o: { enabled?: boolean; changes?: boolean; platform?: string; app?: Partial<McpApp> } = {}) {
   const dir = tmp()
-  const store = openStore(join(dir, 'yogurt.db')); stores.push(store)
+  const store = openStore(join(dir, 'Cakapp.db')); stores.push(store)
   const base = { endedAt: null, eventId: null, app: 'Zoom', state: 'done' as const }
   const older = store.createMeeting({ ...base, title: 'Budget review', startedAt: Date.parse('2026-11-01T17:00:00Z'), endedAt: Date.parse('2026-11-01T17:25:00Z'), attendees: [{ name: 'Ann Lee', email: 'ann@acme.com' }] })
   const newer = store.createMeeting({ ...base, title: 'Launch plan', startedAt: Date.parse('2026-11-02T16:00:00Z'), attendees: [] })

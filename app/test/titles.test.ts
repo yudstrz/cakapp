@@ -16,7 +16,7 @@ afterEach(() => {
 const base = { endedAt: null, eventId: null, app: null, attendees: [], state: 'done' as const, startedAt: 1 }
 
 describe('genericTitle', () => {
-  it('the titles Yogurt gives a meeting with no event are generic', () => {
+  it('the titles Cakapp gives a meeting with no event are generic', () => {
     for (const t of ['Meeting', 'Zoom call', 'zoom.us call', 'Microsoft Teams call', 'Google Meet', 'Teams meeting', 'Zoom meeting', 'Untitled', 'New note', '  meeting ', 'FaceTime call', 'Slack call']) expect(genericTitle(t)).toBe(true)
   })
   it("the interface language's own words, given by the app, are generic too", () => {
@@ -32,7 +32,7 @@ describe('genericTitle', () => {
     expect(src).not.toMatch(/from ['"][^'"]*i18n/)
   })
   it('a real title is not', () => {
-    for (const t of ['Testing Yogurt transcription accuracy with Dana', 'Weekly sync', 'Call with the bank about the loan', 'Design review', 'Long meeting about pricing', '']) expect(genericTitle(t)).toBe(t === '')
+    for (const t of ['Testing Cakapp transcription accuracy with Dana', 'Weekly sync', 'Call with the bank about the loan', 'Design review', 'Long meeting about pricing', '']) expect(genericTitle(t)).toBe(t === '')
   })
 })
 
@@ -63,8 +63,8 @@ describe('where a title came from', () => {
     expect(store.meeting(m.id)).toMatchObject({ title: 'Pricing with Dana', titleSource: 'auto' })
   })
   it("a database from before titles had a source gets one: generic titles generic (even an event's), other events calendar, the rest theirs", () => {
-    const d = mkdtempSync(join(tmpdir(), 'yogurt-titles-')); dirs.push(d)
-    const file = join(d, 'yogurt.db')
+    const d = mkdtempSync(join(tmpdir(), 'Cakapp-titles-')); dirs.push(d)
+    const file = join(d, 'Cakapp.db')
     const old = new DatabaseSync(file)
     old.exec(`CREATE TABLE meetings (id TEXT PRIMARY KEY, title TEXT NOT NULL, started_at INTEGER NOT NULL, ended_at INTEGER, event_id TEXT, app TEXT, attendees TEXT NOT NULL DEFAULT '[]', state TEXT NOT NULL, language TEXT);
       INSERT INTO meetings (id, title, started_at, event_id, state) VALUES ('a', 'Design review', 1, 'e1', 'done'), ('b', 'Zoom call', 2, NULL, 'done'), ('c', 'Budget review', 3, NULL, 'done'), ('d', 'Meeting', 4, 'e2', 'done')`)

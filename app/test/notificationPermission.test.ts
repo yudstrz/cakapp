@@ -13,17 +13,17 @@ vi.mock('electron', () => ({ Notification: class extends EventEmitter {
   constructor() { super(); notices.push(this) }
 } }))
 vi.mock('node:child_process', () => ({ execFile: (_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
-  native.reads++; cb(null, native.requirement, 'Executable=/build/Yogurt.app/Contents/MacOS/Yogurt\n')
+  native.reads++; cb(null, native.requirement, 'Executable=/build/Cakapp.app/Contents/MacOS/Cakapp\n')
 } }))
 const { createNotificationPermission, notificationIdentity } = await import('../src/main/notificationPermission')
-const local = 'designated => identifier "so.yogurt.app" and certificate leaf = H"1111111111111111111111111111111111111111"'
-const review = local.replace('so.yogurt.app', 'local.yogurt.native-review')
+const local = 'designated => identifier "so.Cakapp.app" and certificate leaf = H"1111111111111111111111111111111111111111"'
+const review = local.replace('so.Cakapp.app', 'local.Cakapp.native-review')
 const otherSigner = local.replace(/1/g, '2')
 const dirs: string[] = []
 function rig() {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-notification-test-')); dirs.push(dir)
+  const dir = mkdtempSync(join(tmpdir(), 'Cakapp-notification-test-')); dirs.push(dir)
   const path = join(dir, 'settings.json')
-  native.requirement = `Executable=/build/Yogurt.app/Contents/MacOS/Yogurt\n${local}\n`
+  native.requirement = `Executable=/build/Cakapp.app/Contents/MacOS/Cakapp\n${local}\n`
   return { path, permission: createNotificationPermission(path) }
 }
 afterEach(() => {
@@ -32,9 +32,9 @@ afterEach(() => {
 })
 
 it('uses the bundle and signing requirement, excluding the install path', () => {
-  expect(notificationIdentity(`Executable=/somewhere/Yogurt.app\n${local}\n`)).toBe(local)
+  expect(notificationIdentity(`Executable=/somewhere/Cakapp.app\n${local}\n`)).toBe(local)
   expect(notificationIdentity('code object is not signed at all')).toBeNull()
-  expect(notificationIdentity('designated => identifier "so.yogurt.app"')).toBeNull()
+  expect(notificationIdentity('designated => identifier "so.Cakapp.app"')).toBeNull()
 })
 
 it('ignores a migrated legacy flag and records only a confirmed post for this identity', async () => {

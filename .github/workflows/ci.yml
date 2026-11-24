@@ -19,11 +19,9 @@ concurrency:
 jobs:
   test:
     # Xcode 26: the helpers use macOS 26's speech APIs
-    runs-on: macos-26
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
-      - name: Xcode
-        run: sudo xcode-select -s /Applications/Xcode_26.4.1.app && xcodebuild -version
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:

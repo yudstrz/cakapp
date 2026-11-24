@@ -50,7 +50,7 @@ describe('folders, with changes allowed', () => {
     expect(await call(mcp, 'create_folder', { name: 42 })).toMatchObject({ isError: true, text: 'name must be text.' })
     expect(await call(mcp, 'create_folder', { name: '   ' })).toMatchObject({ isError: true, text: "name can't be blank." })
   })
-  it("accepts or dismisses Yogurt's folder suggestion", async () => {
+  it("accepts or dismisses Cakapp's folder suggestion", async () => {
     const { mcp, store, older, newer } = setup({ changes: true })
     const f = store.createFolder('Finance')
     expect(await call(mcp, 'accept_folder_suggestion', { id: older.id })).toMatchObject({ isError: true, text: expect.stringContaining('no folder suggestion') })
@@ -114,7 +114,7 @@ describe('notes, with changes allowed', () => {
 describe('recording, with changes allowed', () => {
   it('starts, pauses, resumes and stops a recording through the same functions as the app', async () => {
     const { mcp, calls } = setup({ changes: true })
-    for (const t of ['pause_recording', 'resume_recording', 'stop_recording']) expect(await call(mcp, t)).toMatchObject({ isError: true, text: 'Yogurt is not recording.' })
+    for (const t of ['pause_recording', 'resume_recording', 'stop_recording']) expect(await call(mcp, t)).toMatchObject({ isError: true, text: 'Cakapp is not recording.' })
     const m = await json(mcp, 'start_recording', { title: 'Standup' })
     expect(m).toMatchObject({ title: 'Standup', recording: true })
     expect(await call(mcp, 'start_recording')).toMatchObject({ isError: true, text: expect.stringContaining('already recording') })

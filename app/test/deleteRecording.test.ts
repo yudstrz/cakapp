@@ -12,8 +12,8 @@ import { createQueue } from '../src/main/notes/queue'
 const roots: string[] = [], stores: Store[] = []
 afterEach(() => { vi.useRealTimers(); stores.splice(0).forEach(s => s.close()); roots.splice(0).forEach(d => rmSync(d, { recursive: true, force: true })) })
 function setup({ transcript = true, summary = true } = {}) {
-  const root = mkdtempSync(join(tmpdir(), 'yogurt-recording-')); roots.push(root)
-  const store = openStore(join(root, 'yogurt.db')); stores.push(store)
+  const root = mkdtempSync(join(tmpdir(), 'Cakapp-recording-')); roots.push(root)
+  const store = openStore(join(root, 'Cakapp.db')); stores.push(store)
   const m = store.createMeeting({ title: 'Launch', startedAt: 1, endedAt: 2000, eventId: null, app: null, state: 'done', attendees: [{ name: 'Ann', email: 'ann@example.com' }] })
   if (transcript) store.addSegments([{ meetingId: m.id, track: 'them', startMs: 0, endMs: 1000, text: 'Launch on Tuesday', speaker: 'Ann' }])
   store.setNotes(m.id, { mine: 'My launch notes', ...(summary ? { enhanced: '## Launch\nTuesday' } : {}) })
@@ -47,7 +47,7 @@ describe('deleting only a recording', () => {
     expect(s.store.notes(s.m.id)).toEqual(notes)
     expect(trackFile(s.dir, 'me', ['m4a', 'wav', 'ogg'])).toBeNull()
     const handle = createAudioHandler({ dirOf: () => s.dir, known: () => true, ready: async () => {}, exts: ['m4a'] })
-    expect((await handle(new Request(`yogurt-audio://${s.m.id}/me`))).status).toBe(404)
+    expect((await handle(new Request(`Cakapp-audio://${s.m.id}/me`))).status).toBe(404)
     expect(await s.remove()).toBe('deleted')
   })
   it('never deletes without a saved transcript, even with typed notes and a summary', async () => {
@@ -61,7 +61,7 @@ describe('deleting only a recording', () => {
     s.store.updateMeeting(s.m.id, { transcriptionPending: true })
     expect(await s.remove()).toBe('not-transcribed')
     expect(await s.remove(() => false)).toBe('not-transcribed')
-    const reopened = openStore(join(s.root, 'yogurt.db')); stores.push(reopened)
+    const reopened = openStore(join(s.root, 'Cakapp.db')); stores.push(reopened)
     expect(reopened.meeting(s.m.id)?.transcriptionPending).toBe(true)
     expect(existsSync(join(s.dir, 'me.m4a'))).toBe(true)
   })

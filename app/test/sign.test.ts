@@ -7,20 +7,20 @@ import { helperEntitlements } from '../scripts/sign.cjs'
 
 const build = join(__dirname, '../build')
 const keys = (file: string) => [...readFileSync(file, 'utf8').matchAll(/<key>([^<]+)<\/key>/g)].map((m) => m[1]).sort()
-const bin = '/x/Yogurt.app/Contents/Resources/bin'
+const bin = '/x/Cakapp.app/Contents/Resources/bin'
 
 describe('each helper gets only what it uses', () => {
-  it('yogurt-audio: the microphone', () => {
-    expect(keys(helperEntitlements(`${bin}/yogurt-audio`, build))).toEqual(['com.apple.security.device.audio-input'])
+  it('Cakapp-audio: the microphone', () => {
+    expect(keys(helperEntitlements(`${bin}/Cakapp-audio`, build))).toEqual(['com.apple.security.device.audio-input'])
   })
-  it('yogurt-mac: calendars, Apple events (browsers, Music, Spotify) and the microphone question', () => {
-    expect(keys(helperEntitlements(`${bin}/yogurt-mac`, build))).toEqual(['com.apple.security.automation.apple-events', 'com.apple.security.device.audio-input', 'com.apple.security.personal-information.calendars'])
+  it('Cakapp-mac: calendars, Apple events (browsers, Music, Spotify) and the microphone question', () => {
+    expect(keys(helperEntitlements(`${bin}/Cakapp-mac`, build))).toEqual(['com.apple.security.automation.apple-events', 'com.apple.security.device.audio-input', 'com.apple.security.personal-information.calendars'])
   })
   it('whisper-server: nothing', () => {
     expect(keys(helperEntitlements(`${bin}/whisper-server`, build))).toEqual([])
   })
   it("Electron's own files keep electron-builder's choice; an unknown helper is an error", () => {
-    expect(helperEntitlements('/x/Yogurt.app/Contents/Frameworks/Yogurt Helper.app', build)).toBeNull()
+    expect(helperEntitlements('/x/Cakapp.app/Contents/Frameworks/Cakapp Helper.app', build)).toBeNull()
     expect(() => helperEntitlements(`${bin}/something-new`, build)).toThrow(/something-new/)
   })
 })
@@ -54,15 +54,15 @@ it('local signing disables timestamps for every file; release signing keeps its 
   const signed = vi.spyOn(osx, 'signAsync').mockResolvedValue(undefined)
   try {
     const options = { identity: 'certificate', optionsForFile: (_file: string) => ({ timestamp: 'release-server', hardenedRuntime: true }) }
-    vi.stubEnv('YOGURT_SIGN_ID', 'Yogurt Local'); vi.stubEnv('YOGURT_NOTARIZE', '0')
+    vi.stubEnv('Cakapp_SIGN_ID', 'Cakapp Local'); vi.stubEnv('Cakapp_NOTARIZE', '0')
     await sign(options)
     const local = signed.mock.calls[0][0] as typeof options
-    for (const file of [`${bin}/yogurt-audio`, '/x/Yogurt.app/Contents/Frameworks/file']) {
+    for (const file of [`${bin}/Cakapp-audio`, '/x/Cakapp.app/Contents/Frameworks/file']) {
       expect(local.optionsForFile(file)).toMatchObject({ timestamp: 'none', hardenedRuntime: true })
     }
-    vi.stubEnv('YOGURT_SIGN_ID', 'Developer ID')
+    vi.stubEnv('Cakapp_SIGN_ID', 'Developer ID')
     await sign(options)
     const release = signed.mock.calls[1][0] as typeof options
-    expect(release.optionsForFile('/x/Yogurt.app')).toMatchObject({ timestamp: 'release-server', hardenedRuntime: true })
+    expect(release.optionsForFile('/x/Cakapp.app')).toMatchObject({ timestamp: 'release-server', hardenedRuntime: true })
   } finally { signed.mockRestore(); vi.unstubAllEnvs() }
 })

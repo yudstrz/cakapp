@@ -10,12 +10,12 @@ import { BOOT } from '../src/shared/onboarding'
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
 function startup(platform: string, elapsed: number) {
-  vi.stubGlobal('window', { innerWidth: 1100, yogurt: { platform } })
+  vi.stubGlobal('window', { innerWidth: 1100, Cakapp: { platform } })
   vi.spyOn(performance, 'now').mockReturnValue(elapsed)
   return renderToStaticMarkup(createElement(App))
 }
 
-it('exposes the Mac material with one still Yogurt mark after the existing startup delay', () => {
+it('exposes the Mac material with one still Cakapp mark after the existing startup delay', () => {
   expect(startup('darwin', BOOT.showAfterMs - 1)).not.toContain('<svg')
   const html = startup('darwin', BOOT.showAfterMs)
   expect(html).toContain('class="mac-launch" data-active="true"')

@@ -9,9 +9,9 @@ import { mergeBackup } from '../src/main/backup'
 const dirs: string[] = []
 const stores: Store[] = []
 function fresh(): Store {
-  const d = mkdtempSync(join(tmpdir(), 'yogurt-folders-'))
+  const d = mkdtempSync(join(tmpdir(), 'Cakapp-folders-'))
   dirs.push(d)
-  const s = openStore(join(d, 'yogurt.db'))
+  const s = openStore(join(d, 'Cakapp.db'))
   stores.push(s)
   return s
 }
@@ -73,8 +73,8 @@ describe('folders', () => {
   })
 
   it('migrates old folders without changing names and safely reads unknown appearances', () => {
-    const d = mkdtempSync(join(tmpdir(), 'yogurt-folder-migration-')); dirs.push(d)
-    const file = join(d, 'yogurt.db'), old = new DatabaseSync(file)
+    const d = mkdtempSync(join(tmpdir(), 'Cakapp-folder-migration-')); dirs.push(d)
+    const file = join(d, 'Cakapp.db'), old = new DatabaseSync(file)
     old.exec("CREATE TABLE folders (id TEXT PRIMARY KEY, name TEXT NOT NULL, created_at INTEGER NOT NULL); INSERT INTO folders VALUES ('old', 'Design', 42)")
     old.close()
     const s = openStore(file); stores.push(s)

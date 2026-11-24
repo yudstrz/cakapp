@@ -16,11 +16,11 @@ describe('Windows signing', () => {
     expect(preview).toContain("environment: ${{ inputs.release && 'signing' || '' }}")
     expect(preview).toMatch(/uses: azure\/login@[0-9a-f]{40}/)
     for (const v of ['AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_SUBSCRIPTION_ID']) expect(preview).toContain(`vars.${v}`)
-    expect(preview).toContain('azureSignOptions.codeSigningAccountName=yogurt-signing')
+    expect(preview).toContain('azureSignOptions.codeSigningAccountName=Cakapp-signing')
     expect(preview).toContain('azureSignOptions.endpoint=https://eus.codesigning.azure.net/')
     expect(preview).toContain('Get-AuthenticodeSignature')
   })
-  it("signs the libraries too (#99: Code Integrity blocked an unsigned whisper.dll), and a release fails if a helper of Yogurt's own isn't signed", () => {
+  it("signs the libraries too (#99: Code Integrity blocked an unsigned whisper.dll), and a release fails if a helper of Cakapp's own isn't signed", () => {
     const builder = readFileSync(join(root, 'app/electron-builder.yml'), 'utf8')
     expect(builder).toMatch(/signExts: \[".dll", ".node"\]/)
     expect(preview).toContain('resources\\\\bin')

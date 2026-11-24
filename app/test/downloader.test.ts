@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ChecksumError, ensureFile, fetchResumable, fileNameFor, isVerified, partialDownloadGB, retryStalled, safeRelPath, type DownloadDeps } from '../src/main/downloader'
 
 const URL = 'https://huggingface.co/x/y/resolve/main/model-Q4.gguf'
-const dir = () => mkdtempSync(join(tmpdir(), 'yogurt-dl-'))
+const dir = () => mkdtempSync(join(tmpdir(), 'Cakapp-dl-'))
 
 function deps(over: Partial<DownloadDeps> = {}): DownloadDeps {
   return {

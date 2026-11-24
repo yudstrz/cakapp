@@ -9,8 +9,8 @@ import { askDestination, attachContext, chipScope, contextKey, mentionAt } from 
 
 const dirs: string[] = [], stores: Store[] = []
 const fresh = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-context-')); dirs.push(dir)
-  const file = join(dir, 'yogurt.db'), store = openStore(file); stores.push(store)
+  const dir = mkdtempSync(join(tmpdir(), 'Cakapp-context-')); dirs.push(dir)
+  const file = join(dir, 'Cakapp.db'), store = openStore(file); stores.push(store)
   return { store, file, library: new Library(store.db) }
 }
 const meeting = (s: Store, title: string) => s.createMeeting({ title, startedAt: 1000, endedAt: 2000, state: 'done', eventId: null, app: null, attendees: [] })

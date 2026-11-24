@@ -29,7 +29,7 @@ vi.mock('electron', () => ({
 vi.mock('../src/main/float', async (real) => ({ ...(await real<typeof import('../src/main/float')>()), floatOverFullScreen: vi.fn() }))
 let prompts: ReturnType<typeof import('../src/main/prompts').createPrompts>
 beforeEach(async () => {
-  vi.stubEnv('YOGURT_BACKGROUND', '0'); vi.resetModules()
+  vi.stubEnv('Cakapp_BACKGROUND', '0'); vi.resetModules()
   state.windows.length = 0; state.notices.length = 0; state.handlers.clear(); state.theme.clear(); state.dark = false
   const { createPrompts } = await import('../src/main/prompts')
   prompts = createPrompts({windowVisible:()=>true,takeNotes:vi.fn(),stop:vi.fn(),dismissed:vi.fn(),keepGoing:vi.fn(),dismissStop:vi.fn(),open:vi.fn()})
@@ -41,7 +41,7 @@ it('gives both prompts the same compact frame and top-right placement', () => {
   prompts.askStop({id:'meeting',title:'Design review'} as any)
   expect(state.windows[1].options).toMatchObject({width:381,height:60,x:803,y:12,focusable:true})
 })
-it("a Mac's Take notes card is a non-activating panel, so its X never brings Yogurt forward; Windows and Linux make it a tool window that never takes focus", async () => {
+it("a Mac's Take notes card is a non-activating panel, so its X never brings Cakapp forward; Windows and Linux make it a tool window that never takes focus", async () => {
   prompts.offer({key:'call',app:'Zoom',title:''} as any)
   expect(state.windows[0].options.type).toBe('panel')
   prompts.askStop({id:'meeting',title:'Design review'} as any)

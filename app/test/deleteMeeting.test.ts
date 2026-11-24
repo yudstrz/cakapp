@@ -17,9 +17,9 @@ const stores: Store[] = []
 afterEach(() => { vi.useRealTimers(); stores.splice(0).forEach((s) => s.close()); dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force: true })) })
 
 function setup() {
-  const root = mkdtempSync(join(tmpdir(), 'yogurt-delete-'))
+  const root = mkdtempSync(join(tmpdir(), 'Cakapp-delete-'))
   dirs.push(root)
-  const store = openStore(join(root, 'yogurt.db'))
+  const store = openStore(join(root, 'Cakapp.db'))
   stores.push(store)
   const meetings = join(root, 'meetings')
   const make = (state: 'recording' | 'stopped' | 'done') => {

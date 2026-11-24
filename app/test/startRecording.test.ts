@@ -17,7 +17,7 @@ it('hides unknown recording state and retains state across remounts without acce
   let reply!: (view: WidgetView | null) => void
   const off = vi.fn()
   vi.stubGlobal('document', { getElementById: () => ({ nodeType: 1 }) })
-  vi.stubGlobal('window', { yogurt: { widget: {
+  vi.stubGlobal('window', { Cakapp: { widget: {
     onState: (cb: typeof update) => { update = cb; return off },
     state: () => new Promise<WidgetView | null>(resolve => { reply = resolve }),
   } } })

@@ -8,9 +8,9 @@ import { openStore, type Store } from '../src/main/store'
 const dirs: string[] = []
 const stores: Store[] = []
 function fresh(): Store {
-  const d = mkdtempSync(join(tmpdir(), 'yogurt-store-'))
+  const d = mkdtempSync(join(tmpdir(), 'Cakapp-store-'))
   dirs.push(d)
-  const s = openStore(join(d, 'yogurt.db'))
+  const s = openStore(join(d, 'Cakapp.db'))
   stores.push(s)
   return s
 }
@@ -107,12 +107,12 @@ describe('store', () => {
   })
 
   it('adds the edited column to a notes table from before it existed', () => {
-    const d = mkdtempSync(join(tmpdir(), 'yogurt-store-'))
+    const d = mkdtempSync(join(tmpdir(), 'Cakapp-store-'))
     dirs.push(d)
-    const old = new DatabaseSync(join(d, 'yogurt.db'))
+    const old = new DatabaseSync(join(d, 'Cakapp.db'))
     old.exec(`CREATE TABLE notes (id INTEGER PRIMARY KEY AUTOINCREMENT, meeting_id TEXT NOT NULL UNIQUE, mine TEXT NOT NULL DEFAULT '', enhanced TEXT)`)
     old.close()
-    const s = openStore(join(d, 'yogurt.db'))
+    const s = openStore(join(d, 'Cakapp.db'))
     stores.push(s)
     const m = s.createMeeting({ ...base, startedAt: 1 })
     s.setNotes(m.id, { enhanced: 'x', edited: true })
@@ -153,9 +153,9 @@ describe('store', () => {
   })
 
   it('keeps notes search correct after VACUUM', () => {
-    const d = mkdtempSync(join(tmpdir(), 'yogurt-store-'))
+    const d = mkdtempSync(join(tmpdir(), 'Cakapp-store-'))
     dirs.push(d)
-    const file = join(d, 'yogurt.db')
+    const file = join(d, 'Cakapp.db')
     const s = openStore(file)
     stores.push(s)
     const ms = [1, 2, 3, 4].map((i) => s.createMeeting({ ...base, startedAt: i }))
@@ -296,7 +296,7 @@ describe('round 2: hidden lines', () => {
 
 describe('a database from when voices had letters', () => {
   it('loses the letters (those lines say Them) and the speakers table; names from the call are kept from then on', () => {
-    const d = mkdtempSync(join(tmpdir(), 'yogurt-store-')); dirs.push(d)
+    const d = mkdtempSync(join(tmpdir(), 'Cakapp-store-')); dirs.push(d)
     const file = join(d, 'y.db')
     const first = openStore(file)
     const m = first.createMeeting({ title: 't', startedAt: 1, endedAt: 2, eventId: null, app: null, attendees: [], state: 'done' })
@@ -345,7 +345,7 @@ describe('round 3: the search index and hidden lines, on a fresh database and on
   }
   for (const mode of ['from before', 'fresh'] as const) for (const [name, step] of Object.entries(steps)) {
     it(`${mode}: ${name} leaves the search index whole`, () => {
-      const d = mkdtempSync(join(tmpdir(), 'yogurt-store-')); dirs.push(d)
+      const d = mkdtempSync(join(tmpdir(), 'Cakapp-store-')); dirs.push(d)
       const file = join(d, 'y.db')
       if (mode === 'from before') oldSchema(file)
       const s = openStore(file); stores.push(s)
@@ -376,7 +376,7 @@ describe('round 3: the search index and hidden lines, on a fresh database and on
     expect(() => integrity(s)).not.toThrow()
   })
   it('a database from before: hide and show twice, then delete with a hidden line', () => {
-    const d = mkdtempSync(join(tmpdir(), 'yogurt-store-')); dirs.push(d)
+    const d = mkdtempSync(join(tmpdir(), 'Cakapp-store-')); dirs.push(d)
     const file = join(d, 'y.db'); oldSchema(file)
     const s = openStore(file); stores.push(s)
     const b = s.segments('old1').find((x) => x.track === 'me')!.id
@@ -387,8 +387,8 @@ describe('round 3: the search index and hidden lines, on a fresh database and on
 })
 
 it('persists speaker order across reopening and late attribution, including hidden history', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-colours-')); dirs.push(dir)
-  const file = join(dir, 'yogurt.db')
+  const dir = mkdtempSync(join(tmpdir(), 'Cakapp-colours-')); dirs.push(dir)
+  const file = join(dir, 'Cakapp.db')
   const first = openStore(file)
   const m = first.createMeeting({ ...base, startedAt: 1 })
   first.addSegments([
@@ -429,7 +429,7 @@ it('retains confident echoes through storage and the final sweep, and restores t
 })
 
 it('backfills only strong word matches among already hidden historical echoes', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-echo-confidence-')); dirs.push(dir)
+  const dir = mkdtempSync(join(tmpdir(), 'Cakapp-echo-confidence-')); dirs.push(dir)
   const file = join(dir, 'y.db'), s = openStore(file)
   const m = s.createMeeting({ title: 't', startedAt: 1, endedAt: 2, eventId: null, app: null, attendees: [], state: 'done' })
   s.addSegments([
@@ -469,8 +469,8 @@ it('refreshes all linked copies and aliases once, without reviving unlinked note
   expect(s.rememberEvent(event)).toEqual([])
 })
 it('migrates old meetings with nullable snapshot columns and preserves them across reopening', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-snapshot-migration-')); dirs.push(dir)
-  const file = join(dir, 'yogurt.db')
+  const dir = mkdtempSync(join(tmpdir(), 'Cakapp-snapshot-migration-')); dirs.push(dir)
+  const file = join(dir, 'Cakapp.db')
   const old = new DatabaseSync(file)
   old.exec(`CREATE TABLE meetings (id TEXT PRIMARY KEY, title TEXT NOT NULL, started_at INTEGER NOT NULL, ended_at INTEGER, event_id TEXT, event_started_at INTEGER, app TEXT, attendees TEXT NOT NULL DEFAULT '[]', state TEXT NOT NULL, language TEXT);
     INSERT INTO meetings (id, title, started_at, event_id, event_started_at, state) VALUES ('old', 'My old note', 50, 'event', 100, 'done');
@@ -497,14 +497,14 @@ it('migrates old meetings with nullable snapshot columns and preserves them acro
 
 describe('meetings recorded before transcripts were tracked (#30)', () => {
   it('on the first open after the update, a stopped meeting with no transcript is marked as waiting for one, once', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'yogurt-store-30-')), file = join(dir, 'y.db')
+    const dir = mkdtempSync(join(tmpdir(), 'Cakapp-store-30-')), file = join(dir, 'y.db')
     let s = openStore(file)
     const silent = s.createMeeting({ title: 'old call', startedAt: 1, endedAt: 2, eventId: null, app: null, attendees: [], state: 'stopped' })
     // its empty notes were "written", which made it done: the #30 meeting
     const finished = s.createMeeting({ title: 'notes came out empty', startedAt: 5, endedAt: 6, eventId: null, app: null, attendees: [], state: 'done' })
     const heard = s.createMeeting({ title: 'had words', startedAt: 3, endedAt: 4, eventId: null, app: null, attendees: [], state: 'stopped' })
     s.addSegments([{ meetingId: heard.id, track: 'them', startMs: 0, endMs: 900, text: 'hello', speaker: null }])
-    // as an older Yogurt left it: nothing marked, and the store never looked
+    // as an older Cakapp left it: nothing marked, and the store never looked
     ;(s as unknown as { db: { exec(q: string): void } }).db.exec('PRAGMA user_version = 0')
     s.close()
     s = openStore(file)
@@ -520,7 +520,7 @@ describe('meetings recorded before transcripts were tracked (#30)', () => {
 })
 
 it('a store already marked by 0.3.31 (only stopped meetings) is marked again for done ones, once', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-store-30b-')), file = join(dir, 'y.db')
+  const dir = mkdtempSync(join(tmpdir(), 'Cakapp-store-30b-')), file = join(dir, 'y.db')
   let s = openStore(file)
   const done = s.createMeeting({ title: 'empty notes', startedAt: 1, endedAt: 2, eventId: null, app: null, attendees: [], state: 'done' })
   ;(s as unknown as { db: { exec(q: string): void } }).db.exec('PRAGMA user_version = 1')

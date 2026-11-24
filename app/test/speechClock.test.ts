@@ -4,9 +4,9 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 // Apple's SpeechAnalyzer stops for good on a buffer that starts before the last one ended. The helper places each
-// buffer on its timeline in samples; this runs that placement (yogurt-audio speech-clock RATE: "ms frames" lines in,
+// buffer on its timeline in samples; this runs that placement (Cakapp-audio speech-clock RATE: "ms frames" lines in,
 // one start sample per line out).
-const bin = join(import.meta.dirname, '../resources/bin/yogurt-audio')
+const bin = join(import.meta.dirname, '../resources/bin/Cakapp-audio')
 const run = existsSync(bin) && process.platform === 'darwin'
 
 function place(rate: number, feeds: [number, number][]): number[] {

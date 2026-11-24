@@ -36,7 +36,7 @@ beforeEach(() => {
   restart.mockResolvedValue(true)
   const store = new Map<string, string>()
   vi.stubGlobal('localStorage', { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v), removeItem: (k: string) => store.delete(k) })
-  vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn(), yogurt: { updates: {
+  vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn(), Cakapp: { updates: {
     status: () => new Promise<UpdateStatus>(resolve => { initial = resolve }),
     onStatus: (fn: typeof notify) => { notify = fn; return off }, restart,
   } } })
@@ -58,8 +58,8 @@ it('uses the approved seven rows and appends the downloaded version nearest the 
   }
   expect(nodes(tree).filter(n => n.type === 'kbd').map(n => n.props.children)).toEqual(['⌘/', '⌘,', '⌘3'])
   expect(links.map(n => n.props.href)).toEqual([
-    'https://yogurt.so/updates', 'https://github.com/FrigadeHQ/yogurt', 'https://yogurt.so/discord',
-    'https://github.com/FrigadeHQ/yogurt/issues/new',
+    'https://Cakapp.so/updates', 'https://github.com/FrigadeHQ/Cakapp', 'https://Cakapp.so/discord',
+    'https://github.com/FrigadeHQ/Cakapp/issues/new',
   ])
   expect(props('settings-open')!['aria-current']).toBe('page')
   const focus = vi.fn()
@@ -124,7 +124,7 @@ it.each(['false','reject'])('keeps a failed restart visible and retryable (%s)',
   else restart.mockRejectedValueOnce(new Error('unavailable'))
   props('update-restart')!.onClick(); props('update-restart')!.onClick(); render()
   expect(props('update-restart')!.disabled).toBe(true); expect(restart).toHaveBeenCalledOnce()
-  await vi.waitFor(() => { render(); expect(JSON.stringify(tree)).toContain("Yogurt couldn't restart. Try again.") })
+  await vi.waitFor(() => { render(); expect(JSON.stringify(tree)).toContain("Cakapp couldn't restart. Try again.") })
   expect(root().open).toBe(true)
   props('update-restart')!.onClick()
   await vi.waitFor(() => { render(); expect(root().open).toBe(false) })

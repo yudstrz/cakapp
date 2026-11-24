@@ -41,7 +41,7 @@ beforeEach(() => {
   vi.resetAllMocks()
   includeCredit = true
   segments = []
-  dir = mkdtempSync(join(tmpdir(), 'yogurt-share-test-'))
+  dir = mkdtempSync(join(tmpdir(), 'Cakapp-share-test-'))
   handlers.clear(); written.length = 0; state.clipboardFails = false; state.dialog = { canceled: false, filePath: join(dir, 'notes.md') }
   store.notes = () => ({ mine: 'my line', enhanced: null, edited: false })
   hookShare({ store: store as never, includeRecordingCredit: () => includeCredit, window: () => undefined })
@@ -62,7 +62,7 @@ describe('share:app-link', () => {
     vi.stubGlobal('process', Object.create(process, { platform: { value: 'darwin' } }))
     const open = handlers.get('share:app-link')!
     expect(open(event, 20.5, 42, 'unrelated renderer data')).toBe(true)
-    expect(shareMenus).toEqual([{ urls: ['https://yogurt.so'] }])
+    expect(shareMenus).toEqual([{ urls: ['https://Cakapp.so'] }])
     expect(popup).toHaveBeenCalledWith({ window, x: 31, y: 63 })
     expect(open(event, -3, 501)).toBe(true)
     expect(popup).toHaveBeenLastCalledWith({ window, x: 0, y: 399 })
@@ -91,9 +91,9 @@ describe('share:copy', () => {
     includeCredit = on
     store.notes = () => ({ mine: 'my line', enhanced: '## Plan', edited: true })
     expect(await call('share:copy', 'm', 'notes', 'enhanced')).toBe('copied')
-    expect(written.at(-1)!['text/plain']).toBe(on ? 'Plan\n\nRecorded with Yogurt · yogurt.so' : 'Plan')
+    expect(written.at(-1)!['text/plain']).toBe(on ? 'Plan\n\nRecorded with Cakapp · Cakapp.so' : 'Plan')
     if (on) {
-      expect(written.at(-1)!['text/html']).toMatch(/^<h2>Plan<\/h2><p[^>]*><small>Recorded with <a href="https:\/\/yogurt\.so"[^>]*>Yogurt<\/a> · yogurt\.so<\/small><\/p>$/)
+      expect(written.at(-1)!['text/html']).toMatch(/^<h2>Plan<\/h2><p[^>]*><small>Recorded with <a href="https:\/\/Cakapp\.so"[^>]*>Cakapp<\/a> · Cakapp\.so<\/small><\/p>$/)
     } else {
       expect(written.at(-1)!['text/html']).toBe('<h2>Plan</h2>')
     }
@@ -147,7 +147,7 @@ describe('share:save', () => {
   it('reads the current credit preference for each Markdown export, including My notes', async () => {
     expect(await call('share:save', 'm', 'mine')).toBe('saved')
     const credited = readFileSync(state.dialog.filePath!, 'utf8')
-    const credit = ' · Recorded with [Yogurt](https://yogurt.so)'
+    const credit = ' · Recorded with [Cakapp](https://Cakapp.so)'
     expect(credited.split('\n')[2]).toContain(credit)
     includeCredit = false
     expect(await call('share:save', 'm', 'mine')).toBe('saved')

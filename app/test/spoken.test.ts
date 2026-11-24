@@ -15,7 +15,7 @@ describe('the spoken language setting', () => {
     expect(spokenSetting({ spoken: 'multi' })).toBe('multi')
   })
   it('English only is the default, so only Multi-language is written down', () => {
-    const file = join(mkdtempSync(join(tmpdir(), 'yogurt-spoken-')), 'settings.json')
+    const file = join(mkdtempSync(join(tmpdir(), 'Cakapp-spoken-')), 'settings.json')
     updateSettings(file, { spoken: 'multi' })
     expect(loadSettings(file).spoken).toBe('multi')
     updateSettings(file, { spoken: undefined })

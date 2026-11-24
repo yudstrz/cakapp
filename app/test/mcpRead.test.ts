@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { setup, call, json, EVENT } from './mcpRig'
 
 describe('reading more through MCP', () => {
-  it("ask gives Yogurt's own answer with its sources, read from the folder or meetings named", async () => {
+  it("ask gives Cakapp's own answer with its sources, read from the folder or meetings named", async () => {
     const { mcp, store, older, calls } = setup()
     const f = store.createFolder('Finance')
     const got = await json(mcp, 'ask', { question: 'What happened to travel?', folder: 'finance', meeting_ids: [older.id] })
@@ -66,7 +66,7 @@ describe('reading more through MCP', () => {
     expect((await call(mcp, 'export_meeting', { id: older.id, side: 'my_notes' })).text).toContain('travel flat')
     expect(await call(mcp, 'export_meeting', { id: older.id, side: 'both' })).toMatchObject({ isError: true })
   })
-  it('says which folder Yogurt suggests for a meeting not filed yet', async () => {
+  it('says which folder Cakapp suggests for a meeting not filed yet', async () => {
     const { mcp, store, older } = setup()
     const f = store.createFolder('Finance')
     store.saveFolderSuggestion(older.id, { folderId: f.id, confidence: 0.9 }, 'v')

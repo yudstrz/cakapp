@@ -26,7 +26,7 @@ afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); setLanguage('en') }
 const at = +new Date(2026, 10, 10, 12, 24)
 const meeting = { id: 'note', title: 'Planning', startedAt: at, durationMs: 420_000, eventId: null, attendees: [], state: 'done' } as unknown as Meeting
 function render(status?: CalendarStatus, { picking = false, linked = false, calendar = true, day = at, linking = false, loading = false, compact = false, keyboard = false, snapshot = {} as Partial<Meeting>, event = null as CalEvent | null, events = [] as CalEvent[], colors = {} as Record<string, string> } = {}) {
-  vi.stubGlobal('window', { yogurt: { capabilities: { calendar } }, matchMedia: () => ({ matches: false }) })
+  vi.stubGlobal('window', { Cakapp: { capabilities: { calendar } }, matchMedia: () => ({ matches: false }) })
   state.index = 0; state.keyboard = keyboard; state.focusEffect = undefined
   const result = status ? { status, events: event ? [event, ...events.filter(e => e.id !== event.id)] : events } : undefined
   state.details = linked && result ? { result, colors } : undefined
@@ -37,7 +37,7 @@ function render(status?: CalendarStatus, { picking = false, linked = false, cale
 it.each([
   ['notDetermined', 'Calendar access is off', 'Connect calendar'],
   ['denied', 'Calendar access is off', 'Open System Settings'],
-  ['error', "Yogurt couldn't read your calendar", 'Try again'],
+  ['error', "Cakapp couldn't read your calendar", 'Try again'],
 ] as const)('keeps date and duration with a normal recovery action for %s', (status, message, action) => {
   for (const picking of [false, true]) {
     const html = render(status, { picking })
@@ -128,7 +128,7 @@ it('uses existing short translations for every recovery and empty state in all 3
   expect(LOCALES).toHaveLength(32)
   for (const { id } of LOCALES) {
     setLanguage(id)
-    for (const key of ['Calendar access is off', "Yogurt couldn't read your calendar", 'Connect calendar', 'Open System Settings', 'Try again', 'No events', 'Select calendar event', 'Previous day', 'Next day']) {
+    for (const key of ['Calendar access is off', "Cakapp couldn't read your calendar", 'Connect calendar', 'Open System Settings', 'Try again', 'No events', 'Select calendar event', 'Previous day', 'Next day']) {
       expect(t(key)).toBeTruthy()
       expect(t(key)).not.toMatch(/[:：—\n]/)
       if (id !== 'en') expect(t(key)).not.toBe(key)

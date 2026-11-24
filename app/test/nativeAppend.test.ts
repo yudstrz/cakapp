@@ -6,10 +6,10 @@ import { join } from 'node:path'
 import { readWav, wavOf } from '../src/main/fakeCapture'
 
 // Local fixture-only check: compile the changed helper to a separate path. Never opens a microphone.
-const helper = process.env.YOGURT_AUDIO_TEST_BIN
+const helper = process.env.Cakapp_AUDIO_TEST_BIN
 const dirs: string[] = []
 afterEach(() => dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force: true })))
-const folder = () => { const dir = mkdtempSync(join(tmpdir(), 'yogurt-native-append-')); dirs.push(dir); return dir }
+const folder = () => { const dir = mkdtempSync(join(tmpdir(), 'Cakapp-native-append-')); dirs.push(dir); return dir }
 const tone = (seconds: number, hz = 220) => wavOf([Float32Array.from({ length: seconds * 16_000 }, (_, i) => Math.sin(i * hz * 2 * Math.PI / 16_000) * 0.15)])
 const writeTone = (dir: string, file: string, hz = 220, seconds = 1) => {
   const wav = join(dir, 'tone.wav'); writeFileSync(wav, tone(seconds, hz))

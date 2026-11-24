@@ -26,9 +26,9 @@ const meaning = (t: string) => /pric|cost|dollar|money|cheap|expensive/i.test(t.
   : /launch|live|release|ship/i.test(t.replace(/^.*\| (?:query|text): /, '')) ? [0, 1, 0] : [0, 0, 1]
 
 async function rig(o: { embeds?: boolean } = {}) {
-  const d = mkdtempSync(join(tmpdir(), 'yogurt-retrieve-'))
+  const d = mkdtempSync(join(tmpdir(), 'Cakapp-retrieve-'))
   dirs.push(d)
-  const store = openStore(join(d, 'yogurt.db'))
+  const store = openStore(join(d, 'Cakapp.db'))
   stores.push(store)
   const library = new Library(store.db)
   const embedder = createEmbedder({ engine: { embed: async (_p, texts) => texts.map(meaning), unloadEmbed: async () => {} }, modelPath: () => (o.embeds === false ? undefined : '/m/e.gguf'), id: 'test', dims: 3 })
@@ -152,9 +152,9 @@ describe('gathering across meetings', () => {
 
 describe('speed', () => {
   it('a library of a thousand meeting hours is searched in under 200 ms', async () => {
-    const d = mkdtempSync(join(tmpdir(), 'yogurt-retrieve-'))
+    const d = mkdtempSync(join(tmpdir(), 'Cakapp-retrieve-'))
     dirs.push(d)
-    const store = openStore(join(d, 'yogurt.db'))
+    const store = openStore(join(d, 'Cakapp.db'))
     stores.push(store)
     // seeding commits ~3000 times; a sync per commit takes over a minute on GitHub's Windows runners
     store.db.exec('PRAGMA synchronous = OFF')

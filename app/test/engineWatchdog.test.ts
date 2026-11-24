@@ -32,7 +32,7 @@ describe('the notes engine off a Mac: a graphics card that hangs', () => {
     // the next load runs without the graphics card
     const again = e.load('m.gguf', 32768, 8192)
     expect(procs).toHaveLength(2)
-    expect(procs[1].env?.YOGURT_ENGINE_GPU).toBe('off')
+    expect(procs[1].env?.Cakapp_ENGINE_GPU).toBe('off')
     procs[1].answer('load', { contextSize: 32768 })
     await expect(again).resolves.toEqual({ contextSize: 32768 })
   })
@@ -75,7 +75,7 @@ describe('the notes engine off a Mac: a graphics card that hangs', () => {
     await vi.advanceTimersByTimeAsync(1001)
     expect(await probe).toBeInstanceOf(GraphicsGaveUpError)
     void e.load('m.gguf', 32768, 8192).catch(() => {})
-    expect(procs[1].env?.YOGURT_ENGINE_GPU).toBe('off')
+    expect(procs[1].env?.Cakapp_ENGINE_GPU).toBe('off')
   })
 
   it('tells the log which graphics the model loaded on', async () => {
@@ -124,7 +124,7 @@ describe('the notes engine off a Mac: a graphics card that is lost, and a proces
     const c = win.chat(chat, () => {}).catch((x) => x)
     fail(procs[0], 'chat', 'vk::Queue::submit: ErrorDeviceLost'); await c
     void win.load('m.gguf', 32768, 8192).catch(() => {})
-    expect(procs[1].env?.YOGURT_ENGINE_GPU).toBe('off')
+    expect(procs[1].env?.Cakapp_ENGINE_GPU).toBe('off')
 
     procs.length = 0
     const linux = new UtilityEngine('engine.js', { gpuFallback: true, cpuCrashes: true, ...limits })
@@ -132,7 +132,7 @@ describe('the notes engine off a Mac: a graphics card that is lost, and a proces
     const d = linux.chat(chat, () => {}).catch((x) => x)
     fail(procs[0], 'chat', 'VK_ERROR_DEVICE_LOST'); await d
     void linux.load('m.gguf', 32768, 8192).catch(() => {})
-    expect(procs[1].env?.YOGURT_ENGINE_GPU).toBeUndefined()
+    expect(procs[1].env?.Cakapp_ENGINE_GPU).toBeUndefined()
   })
 
   it('an ordinary error leaves the engine running', async () => {
@@ -150,10 +150,10 @@ describe('the notes engine off a Mac: a graphics card that is lost, and a proces
     procs[0].emit('exit', 132)
     expect(await first).toBeInstanceOf(GraphicsGaveUpError)
     const second = e.load('m.gguf', 32768, 8192).catch((x) => x)
-    expect(procs[1].env?.YOGURT_ENGINE_GPU).toBe('off')
+    expect(procs[1].env?.Cakapp_ENGINE_GPU).toBe('off')
     procs[1].emit('exit', 132)
     expect(await second).not.toBeInstanceOf(GraphicsGaveUpError)
     void e.load('m.gguf', 32768, 8192).catch(() => {})
-    expect(procs[2].env?.YOGURT_ENGINE_GPU).toBeUndefined()
+    expect(procs[2].env?.Cakapp_ENGINE_GPU).toBeUndefined()
   })
 })

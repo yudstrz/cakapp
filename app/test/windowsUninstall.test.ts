@@ -10,7 +10,7 @@ const nsis = builder.slice(builder.indexOf('\nnsis:'), builder.indexOf('\nlinux:
 const script = () => readFileSync(join(__dirname, '../build/installer.nsh'), 'utf8')
 
 describe('a Windows update whose old uninstaller fails (#126)', () => {
-  it('includes Yogurt\'s installer script', () => {
+  it('includes Cakapp\'s installer script', () => {
     expect(nsis).toMatch(/\n  include: build\/installer\.nsh\n/)
   })
   it('handles the old uninstaller\'s result itself, for per-user installs too, and never quits over it', () => {

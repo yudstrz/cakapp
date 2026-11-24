@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import { speedKey, type Catalog, type Hardware } from '@yogurt/picker'
+import { speedKey, type Catalog, type Hardware } from '@Cakapp/picker'
 import bundled from '../../catalog/catalog.json'
 import { SetupController, type SetupDeps, type SpeedDeps, type SpeedResult } from '../src/main/setup'
 import { tooSlow } from '../src/main/localCheck'
@@ -35,7 +35,7 @@ function recorder(hold: (url: string) => boolean = () => false) {
 }
 
 function setup(over: Partial<SetupDeps> = {}) {
-  const root = mkdtempSync(join(tmpdir(), 'yogurt-setup-'))
+  const root = mkdtempSync(join(tmpdir(), 'Cakapp-setup-'))
   const rec = recorder()
   const deps: SetupDeps = { getHardware: async () => m1max, getCatalog: async () => catalog, modelsDir: root, download: rec.deps, sha256Override: 'FAKE', retryDelaysMs: [0, 0], ...over }
   const c = new SetupController(deps)
@@ -95,7 +95,7 @@ describe('SetupController', () => {
   })
 
   it('is ready before the recommended notes model finishes, which keeps downloading', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-setup-'))
+    const root = mkdtempSync(join(tmpdir(), 'Cakapp-setup-'))
     const rec = recorder((u) => u === bigUrl)
     const c = new SetupController({ getHardware: async () => m1max, getCatalog: async () => catalog, modelsDir: root, download: rec.deps, sha256Override: 'FAKE', retryDelaysMs: [0] })
     await c.start()
@@ -108,7 +108,7 @@ describe('SetupController', () => {
   })
 
   it('is ready as soon as speech and the speaker models are in: the first notes model arrives after, and says so', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-setup-'))
+    const root = mkdtempSync(join(tmpdir(), 'Cakapp-setup-'))
     const rec = recorder((u) => u === starterUrl)
     const c = new SetupController({ getHardware: async () => m1max, getCatalog: async () => catalog, modelsDir: root, download: rec.deps, sha256Override: 'FAKE', retryDelaysMs: [0] })
     const arrived: string[] = []
@@ -125,7 +125,7 @@ describe('SetupController', () => {
   })
 
   it('a first notes model that fails to download keeps being tried in the background; ready stays', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-setup-'))
+    const root = mkdtempSync(join(tmpdir(), 'Cakapp-setup-'))
     const inner = fakeDownloadDeps({ stepMs: 0 })
     let fails = 3
     const download: DownloadDeps['download'] = async (u, ...rest) => { if (u === starterUrl && fails-- > 0) throw new Error('fetch failed'); return inner.download(u, ...rest) }
@@ -138,7 +138,7 @@ describe('SetupController', () => {
   })
 
   it('the embedding model (meaning search) comes after the first notes model and before the bigger one; ready never waits for it', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-setup-'))
+    const root = mkdtempSync(join(tmpdir(), 'Cakapp-setup-'))
     const rec = recorder((u) => u === embedUrl)
     const c = new SetupController({ getHardware: async () => m1max, getCatalog: async () => catalog, modelsDir: root, download: rec.deps, sha256Override: 'FAKE', retryDelaysMs: [0] })
     const arrived: string[] = []
@@ -156,7 +156,7 @@ describe('SetupController', () => {
   })
 
   it('an embedding model that fails keeps being tried, and the bigger notes model does not wait for it', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-setup-'))
+    const root = mkdtempSync(join(tmpdir(), 'Cakapp-setup-'))
     const inner = fakeDownloadDeps({ stepMs: 0 })
     let fails = 5
     const asked: string[] = []
@@ -321,7 +321,7 @@ describe('SetupController', () => {
   it('a Mac too small for any notes model says so, as it always did', async () => {
     const { c, rec } = setup({ getHardware: async () => ({ ...mac8, totalRamGB: 4 }) })
     await c.start(); await c.idle()
-    expect(c.state).toMatchObject({ phase: 'error', message: 'Yogurt needs a Mac with at least 8 GB of memory.' })
+    expect(c.state).toMatchObject({ phase: 'error', message: 'Cakapp needs a Mac with at least 8 GB of memory.' })
     expect(rec.asked).toEqual([])
   })
 
@@ -330,7 +330,7 @@ describe('SetupController', () => {
       const pc: Hardware = { os, arch: 'x64', cpuModel: 'Intel Core i3', totalRamGB: 4, freeDiskGB: 500, gpu: { kind: 'none', name: '', vramGB: 0 } }
       const { c, rec } = setup({ getHardware: async () => pc })
       await c.start(); await c.idle()
-      expect(c.state).toMatchObject({ phase: 'error', message: "Yogurt runs entirely on your computer, and this one isn't strong enough. It needs at least 8 GB of memory." })
+      expect(c.state).toMatchObject({ phase: 'error', message: "Cakapp runs entirely on your computer, and this one isn't strong enough. It needs at least 8 GB of memory." })
       expect(rec.asked).toEqual([])
     }
   })
@@ -593,7 +593,7 @@ describe('optional better notes model', () => {
 
   it('skips in the gap, persists across launches, and Settings can download it again once', async () => {
     const rec = recorder(u => u === embedUrl)
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-upgrade-'))
+    const root = mkdtempSync(join(tmpdir(), 'Cakapp-upgrade-'))
     const prefs = preference(root)
     const { c } = setup({ modelsDir: root, download: rec.deps, upgradePreference: prefs })
     await c.start()
@@ -744,7 +744,7 @@ describe('optional better notes model', () => {
   })
 
   it('Settings removal restores the small model, waits for work and unload, then stays removed after restart', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-upgrade-'))
+    const root = mkdtempSync(join(tmpdir(), 'Cakapp-upgrade-'))
     const prefs = preference(root)
     const { c } = setup({ modelsDir: root, upgradePreference: prefs })
     const engine = new FakeEngine()

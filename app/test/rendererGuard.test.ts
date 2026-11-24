@@ -12,7 +12,7 @@ afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks() })
 
 it('replaces failed children with an accessible recovery action and reports the component stack', () => {
   const send = vi.fn()
-  vi.stubGlobal('window', { yogurt: { reportRendererError: send } })
+  vi.stubGlobal('window', { Cakapp: { reportRendererError: send } })
   const child = createElement('span', null, 'App'), guard = new RendererGuard({ children: child })
   expect(guard.render()).toBe(child)
   guard.state = RendererGuard.getDerivedStateFromError()
@@ -40,17 +40,17 @@ it('reloads only after pending edits were handed to main, keeping recovery avail
 
 it('installs the synthetic throw trigger only in fake mode', () => {
   const addEventListener = vi.fn(), removeEventListener = vi.fn()
-  const win = { yogurt: { fake: false }, addEventListener, removeEventListener }
+  const win = { Cakapp: { fake: false }, addEventListener, removeEventListener }
   vi.stubGlobal('window', win)
   RendererFailureTest({ children: null })
   const effect = vi.mocked(useEffect).mock.calls.at(-1)![0]
   expect(effect()).toBeUndefined()
   expect(addEventListener).not.toHaveBeenCalled()
-  win.yogurt.fake = true
+  win.Cakapp.fake = true
   const stop = effect()
-  expect(addEventListener).toHaveBeenCalledWith('yogurt:renderer-fail', expect.any(Function))
+  expect(addEventListener).toHaveBeenCalledWith('Cakapp:renderer-fail', expect.any(Function))
   addEventListener.mock.calls[0][1]()
   expect(state.set).toHaveBeenCalledWith(true)
   if (stop) stop()
-  expect(removeEventListener).toHaveBeenCalledWith('yogurt:renderer-fail', addEventListener.mock.calls[0][1])
+  expect(removeEventListener).toHaveBeenCalledWith('Cakapp:renderer-fail', addEventListener.mock.calls[0][1])
 })

@@ -12,11 +12,11 @@ it('flags source and test folders at the top of the archive, nothing else', () =
 })
 
 it('flags workspace packages copied into node_modules (vite bundles them; a copy is their source)', () => {
-  expect(sourceFolders(['/node_modules/@yogurt/picker/src/index.ts', '/node_modules/@yogurt/picker/package.json', '/node_modules/electron-updater/out/main.js'])).toEqual(['/node_modules/@yogurt'])
+  expect(sourceFolders(['/node_modules/@Cakapp/picker/src/index.ts', '/node_modules/@Cakapp/picker/package.json', '/node_modules/electron-updater/out/main.js'])).toEqual(['/node_modules/@Cakapp'])
 })
 
 it('reads a real archive: a clean one passes, one with src in it fails', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'yogurt-asar-'))
+  const root = mkdtempSync(join(tmpdir(), 'Cakapp-asar-'))
   const make = async (name: string, files: string[]) => {
     const dir = join(root, name)
     for (const f of files) { mkdirSync(join(dir, f, '..'), { recursive: true }); writeFileSync(join(dir, f), 'x') }

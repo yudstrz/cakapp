@@ -128,7 +128,7 @@ describe('meeting titles from the notes', () => {
     expect(p).toMatch(/70/)
   })
   it('cleanTitle: the first line, no quotes, label, heading marks or closing period; too long is cut at a word', () => {
-    expect(cleanTitle('"Testing Yogurt transcription accuracy with Dana."')).toBe('Testing Yogurt transcription accuracy with Dana')
+    expect(cleanTitle('"Testing Cakapp transcription accuracy with Dana."')).toBe('Testing Cakapp transcription accuracy with Dana')
     expect(cleanTitle('Title: **Pricing for schools**\nmore')).toBe('Pricing for schools')
     expect(cleanTitle('## Q3 roadmap review')).toBe('Q3 roadmap review')
     expect(cleanTitle('«Revisión de precios»')).toBe('Revisión de precios')

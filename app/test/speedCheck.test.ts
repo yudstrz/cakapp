@@ -7,7 +7,7 @@ import { fakeMeasure, measureSpeed, readWav, speedClipPath, speedStore } from '.
 import { wavBytes } from '../src/main/asr/transcribe'
 import type { WhisperServer } from '../src/main/asr/server'
 
-const dir = () => mkdtempSync(join(tmpdir(), 'yogurt-speed-'))
+const dir = () => mkdtempSync(join(tmpdir(), 'Cakapp-speed-'))
 
 describe('the speed check (Windows and Linux)', () => {
   it('ships a 15 s clip of speech, 16 kHz mono', () => {

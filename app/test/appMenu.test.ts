@@ -6,7 +6,7 @@ const state = vi.hoisted(() => ({
   handlers: new Map<string, (...args: any[]) => void>(),
 }))
 vi.mock('electron', () => ({
-  app: { name: 'Yogurt' },
+  app: { name: 'Cakapp' },
   Menu: {
     buildFromTemplate: (template: MenuItemConstructorOptions[]) => { state.templates.push(template); return template },
     setApplicationMenu: vi.fn(),
@@ -25,7 +25,7 @@ beforeEach(() => { state.templates.length = 0; state.handlers.clear() })
 it('documents the native sidebar shortcut and names the action for the current state', () => {
   const toggle = vi.fn()
   for (const [open, label, enabled] of [[true, 'Hide Sidebar', true], [false, 'Show Sidebar', true], [null, 'Show Sidebar', false]] as const) {
-    expect(sidebarItem(appMenuTemplate('Yogurt', { open, toggle }))).toMatchObject({
+    expect(sidebarItem(appMenuTemplate('Cakapp', { open, toggle }))).toMatchObject({
       label, enabled, accelerator: 'Control+Command+S',
     })
   }
@@ -74,7 +74,7 @@ describe('Windows and Linux', () => {
   const all = (template: MenuItemConstructorOptions[]) => template.flatMap(item => Array.isArray(item.submenu) ? item.submenu : [])
   it("have no app menu or the Mac's own items, and use Ctrl", () => {
     for (const os of ['win32', 'linux']) {
-      const template = appMenuTemplate('Yogurt', { open: true, toggle: vi.fn() }, vi.fn(), os)
+      const template = appMenuTemplate('Cakapp', { open: true, toggle: vi.fn() }, vi.fn(), os)
       expect(template.map(item => item.label)).toEqual(['File', 'Edit', 'View', 'Window'])
       const roles = all(template).map(item => item.role).filter(Boolean)
       for (const mac of ['about', 'services', 'hide', 'hideOthers', 'unhide', 'front', 'zoom']) expect(roles).not.toContain(mac)

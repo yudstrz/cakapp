@@ -30,7 +30,7 @@ it('keeps selections across searches and a failed save, and skips meetings alrea
   let rows: FolderMeetingChoice[] = []
   const addMany = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true)
   const onChange = () => () => {}
-  vi.stubGlobal('window', { yogurt: { folders: { meetingChoices: async () => rows, addMany, onChange }, meetings: { onChange } } })
+  vi.stubGlobal('window', { Cakapp: { folders: { meetingChoices: async () => rows, addMany, onChange }, meetings: { onChange } } })
   const choices = () => controls(render()).filter(el => el.type === Checkbox)
   const search = () => controls(render()).find(el => el.props['data-dialog-focus'])!
   const confirm = () => controls(render()).find(el => el.type === 'button' && el.props.className === 'modal-button primary')!

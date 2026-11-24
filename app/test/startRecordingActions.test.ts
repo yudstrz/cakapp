@@ -59,7 +59,7 @@ beforeEach(async () => {
   hooks.values = []; hooks.refs = []; cleanups = []
   start.mockResolvedValue({ id: 'note' }); day.mockResolvedValue({ status: 'granted', events: [] })
   vi.stubGlobal('document', { getElementById: () => ({ nodeType: 1 }) })
-  vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn(), yogurt: {
+  vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn(), Cakapp: {
     capabilities: { calendar: true },
     widget: { state: async () => null, onState: (cb: typeof widgetChanged) => { widgetChanged = cb; return vi.fn() } },
     calendar: { day, onChange: (cb: () => void) => { calendarChanged = cb; return vi.fn() } },
@@ -228,7 +228,7 @@ it('reports a removed event, refreshes choices, and never reports a failed or ra
   expect(uploaded).not.toHaveBeenCalled()
   start.mockRejectedValueOnce(new Error('fixture start failure'))
   await click(find(render(), 'start-recording'))
-  expect(toasts.add).toHaveBeenLastCalledWith(expect.objectContaining({ title: "Yogurt couldn't start the notes. Try again in a moment." }))
+  expect(toasts.add).toHaveBeenLastCalledWith(expect.objectContaining({ title: "Cakapp couldn't start the notes. Try again in a moment." }))
   expect(find(render(), 'start-recording').props.disabled).toBe(false)
   expect(gone).toHaveBeenCalledOnce()
 })
@@ -243,7 +243,7 @@ it('opens the upload flow with the current destination callback without starting
   const dispatchEvent = vi.fn()
   const file = { token: 'sample', name: 'Planning.mp3', title: 'Planning', modifiedAt: now, size: 1000 }
   const pick = vi.fn(async () => file)
-  Object.assign(window.yogurt, { audioUpload: { pick } })
+  Object.assign(window.Cakapp, { audioUpload: { pick } })
   Object.assign(document, { dispatchEvent })
   const tree = await calendar([])
   await click(find(tree, 'recording-upload'))

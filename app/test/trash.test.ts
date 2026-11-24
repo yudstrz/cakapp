@@ -9,9 +9,9 @@ import { TRASH_DAYS, trashCutoff } from '../src/shared/trash'
 const dirs: string[] = []
 const stores: Store[] = []
 function fresh(): Store {
-  const d = mkdtempSync(join(tmpdir(), 'yogurt-trash-'))
+  const d = mkdtempSync(join(tmpdir(), 'Cakapp-trash-'))
   dirs.push(d)
-  const s = openStore(join(d, 'yogurt.db'))
+  const s = openStore(join(d, 'Cakapp.db'))
   stores.push(s)
   return s
 }

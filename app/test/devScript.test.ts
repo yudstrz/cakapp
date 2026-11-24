@@ -14,16 +14,16 @@ it('never on X11, without XWayland, on a Mac or Windows, in fake mode, or over a
   expect(electronArgs('linux', { WAYLAND_DISPLAY: 'wayland-0' }, [])).toEqual([])
   expect(electronArgs('darwin', wayland, [])).toEqual([])
   expect(electronArgs('win32', wayland, [])).toEqual([])
-  expect(electronArgs('linux', { ...wayland, YOGURT_FAKE: '1' }, [])).toEqual([])
+  expect(electronArgs('linux', { ...wayland, Cakapp_FAKE: '1' }, [])).toEqual([])
   expect(electronArgs('linux', wayland, ['--ozone-platform=wayland'])).toEqual(['--ozone-platform=wayland'])
 })
 
-const restricted = { platform: 'linux', env: {}, usernsRestricted: true, electronDir: '/home/sam/code/yogurt/node_modules/electron' }
+const restricted = { platform: 'linux', env: {}, usernsRestricted: true, electronDir: '/home/sam/code/Cakapp/node_modules/electron' }
 const setuid = { uid: 0, mode: 0o104755 }
 
 it("where the sandbox needs its setuid helper, pnpm dev says how to set it up instead of Electron's crash", () => {
   expect(sandboxProblems({ ...restricted, sandbox: { uid: 1000, mode: 0o100755 } })).toEqual([expect.stringContaining('sudo chmod 4755')])
-  expect(sandboxProblems({ ...restricted, sandbox: setuid, electronDir: '/home/sam/Personal Docs/yogurt/node_modules/electron' })).toEqual([expect.stringContaining('space')])
+  expect(sandboxProblems({ ...restricted, sandbox: setuid, electronDir: '/home/sam/Personal Docs/Cakapp/node_modules/electron' })).toEqual([expect.stringContaining('space')])
   expect(sandboxProblems({ ...restricted, sandbox: setuid })).toEqual([])
 })
 

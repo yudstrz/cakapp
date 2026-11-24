@@ -6,7 +6,7 @@ import { loadWindowState, placeWindow, saveWindowState } from '../src/main/windo
 
 const dirs: string[] = []
 afterEach(() => dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force: true })))
-const file = () => { const d = mkdtempSync(join(tmpdir(), 'yogurt-window-')); dirs.push(d); return join(d, 'window.json') }
+const file = () => { const d = mkdtempSync(join(tmpdir(), 'Cakapp-window-')); dirs.push(d); return join(d, 'window.json') }
 
 const screen = { x: 0, y: 25, width: 1512, height: 920 }
 const defaults = { width: 1100, height: 760, minWidth: 720, minHeight: 520 }

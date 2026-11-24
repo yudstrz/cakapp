@@ -23,9 +23,9 @@ afterEach(() => {
 const now = new Date(2026, 10, 4, 15, 30).getTime()
 
 async function rig(o: { llm?: Partial<Llm>; queue?: ReturnType<typeof createQueue>; waitsForModel?: () => boolean; warmAllowed?: () => boolean } = {}) {
-  const d = mkdtempSync(join(tmpdir(), 'yogurt-conversations-'))
+  const d = mkdtempSync(join(tmpdir(), 'Cakapp-conversations-'))
   dirs.push(d)
-  const store = openStore(join(d, 'yogurt.db'))
+  const store = openStore(join(d, 'Cakapp.db'))
   stores.push(store)
   const library = new Library(store.db)
   const engine = new FakeEngine()
@@ -47,7 +47,7 @@ async function rig(o: { llm?: Partial<Llm>; queue?: ReturnType<typeof createQueu
   const lists: unknown[] = []
   const deps = { store, library, indexer, embedder, queue, model: { llm: async () => llm }, send: (v: ConversationView) => { views.push(v) }, sendList: (l: unknown) => { lists.push(l) }, waitsForMeeting: () => false, waitsForModel: o.waitsForModel ?? (() => false), warmAllowed: o.warmAllowed, now: () => now }
   const chats = hookConversations(deps)
-  return { store, library, chats, prompts, read, views, lists, meeting: m, deps, file: join(d, 'yogurt.db') }
+  return { store, library, chats, prompts, read, views, lists, meeting: m, deps, file: join(d, 'Cakapp.db') }
 }
 
 describe('conversations across meetings', () => {

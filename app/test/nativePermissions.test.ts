@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
 
-const helper = join(import.meta.dirname, '../resources/bin/yogurt-mac')
+const helper = join(import.meta.dirname, '../resources/bin/Cakapp-mac')
 
 it.skipIf(process.platform !== 'darwin' || !existsSync(helper))('reading permissions returns without waiting for another app', () => {
   // No permission requests: this must work even when Music or Spotify does not answer Automation checks.

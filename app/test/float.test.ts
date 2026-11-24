@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { floatingType, floatOverFullScreen } from '../src/main/float'
 
 describe('floating windows (widget, card)', () => {
-  it('show over full-screen apps and keep Yogurt in the Dock', () => {
+  it('show over full-screen apps and keep Cakapp in the Dock', () => {
     const calls: unknown[][] = []
     floatOverFullScreen({ setAlwaysOnTop: (...a: unknown[]) => calls.push(['top', ...a]), setVisibleOnAllWorkspaces: (...a: unknown[]) => calls.push(['all', ...a]) })
     expect(calls).toEqual([

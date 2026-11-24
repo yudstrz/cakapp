@@ -12,7 +12,7 @@ describe('the MCP server', () => {
   it('says who it is and that it has tools, in the protocol version the app asked for when it knows it', async () => {
     const { mcp } = setup()
     const r = await mcp.handle({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'claude-ai', version: '1' } } })
-    expect(r).toMatchObject({ jsonrpc: '2.0', id: 1, result: { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'yogurt', version: '0.1.0' } } })
+    expect(r).toMatchObject({ jsonrpc: '2.0', id: 1, result: { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'Cakapp', version: '0.1.0' } } })
     const odd = await mcp.handle({ jsonrpc: '2.0', id: 2, method: 'initialize', params: { protocolVersion: '1999-01-01' } }) as { result: { protocolVersion: string } }
     expect(odd.result.protocolVersion).toBe('2025-06-18')
   })
@@ -40,7 +40,7 @@ describe('the MCP server', () => {
     }
     const mac = "A meeting's recording as files on this Mac: one per side (track me: the person's microphone; them: the other side of the call), AAC in .m4a. Gives paths, which apps on this Mac can open."
     const here = await audioText()
-    expect(here).toEqual([expect.stringMatching(/^Yogurt holds the person's meeting notes, transcripts and recordings on this Mac\. Use list_meetings or search to find a meeting, then get_meeting, get_transcript or get_audio\./), mac])
+    expect(here).toEqual([expect.stringMatching(/^Cakapp holds the person's meeting notes, transcripts and recordings on this Mac\. Use list_meetings or search to find a meeting, then get_meeting, get_transcript or get_audio\./), mac])
     expect(await audioText('darwin')).toEqual(here)
     for (const p of ['win32', 'linux']) {
       const [instructions, audio] = await audioText(p)

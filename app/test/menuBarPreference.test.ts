@@ -11,7 +11,7 @@ import { loadSettings, updateSettings } from '../src/main/settings'
 const dirs: string[] = []
 afterEach(() => { dirs.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true })); handlers.clear(); vi.restoreAllMocks() })
 it.each(['win32', 'linux'])('%s tray defaults on, persists changes and rejects non-booleans without changing the Dock preference', (os) => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-menu-pref-')); dirs.push(dir)
+  const dir = mkdtempSync(join(tmpdir(), 'Cakapp-menu-pref-')); dirs.push(dir)
   const file = join(dir, 'settings.json')
   const setTrayVisible = vi.fn()
   const deps = { setShowNextMeeting: vi.fn(), file, os, permissions: {} as Parameters<typeof hookPreferences>[0]['permissions'], ask: false, setLogin: vi.fn(), loginOn: () => false, macName: () => '', relaunch: () => false, setTrayVisible, setDockVisible: vi.fn() }
@@ -37,7 +37,7 @@ it.each(['win32', 'linux'])('%s tray defaults on, persists changes and rejects n
 
 
 it('keeps recordings by default and persists only a valid retention preference', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-audio-pref-')); dirs.push(dir)
+  const dir = mkdtempSync(join(tmpdir(), 'Cakapp-audio-pref-')); dirs.push(dir)
   const file = join(dir, 'settings.json')
   const deps = { setShowNextMeeting: vi.fn(), file, permissions: {} as Parameters<typeof hookPreferences>[0]['permissions'], ask: false, setLogin: vi.fn(), loginOn: () => false, macName: () => '', relaunch: () => false, setTrayVisible: vi.fn(), setDockVisible: vi.fn() }
   hookPreferences(deps)
@@ -84,7 +84,7 @@ it('shows meeting titles by default, preserves the opt-out across visibility cha
 })
 
 it('defaults the sharing credit on and persists only an explicit opt-out', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-credit-')); dirs.push(dir)
+  const dir = mkdtempSync(join(tmpdir(), 'Cakapp-credit-')); dirs.push(dir)
   const file = join(dir, 'settings.json')
   const deps = { setShowNextMeeting: vi.fn(), file, permissions: {} as Parameters<typeof hookPreferences>[0]['permissions'], ask: false, setLogin: vi.fn(), loginOn: () => false, macName: () => '', relaunch: () => false, setTrayVisible: vi.fn(), setDockVisible: vi.fn() }
   hookPreferences(deps)

@@ -25,7 +25,7 @@ function harness(render:()=>ReactNode) {
  return {run,focus,get:(id:string)=>walk(tree).find(e=>e.props['data-testid']===id)!,type:(type:unknown)=>walk(tree).find(e=>e.type===type)!,all:()=>walk(tree)}
 }
 it.each(['', 'not a calendar', 'ftp://example.com/calendar.ics', 'javascript:alert(1)'])('does not submit an invalid calendar address %j',async url=>{
- const addLink=vi.fn();vi.stubGlobal('window',{yogurt:{calendar:{addLink}}})
+ const addLink=vi.fn();vi.stubGlobal('window',{Cakapp:{calendar:{addLink}}})
  const h=harness(()=>CalendarLinkForm({only:'other',onConnected:vi.fn()}))
  h.get('calendar-link-input').props.onChange({target:{value:url}});h.run()
  expect(h.get('calendar-link-connect').props.disabled).toBe(true)
@@ -59,7 +59,7 @@ it('labels the address and collapses without discarding a draft on Cancel or Esc
 })
 it('holds dismissal during connection and keeps a failed address for correction',async()=>{
  let finish!:(value:unknown)=>void;const addLink=vi.fn(()=>new Promise(resolve=>{finish=resolve})),cancel=vi.fn(),connected=vi.fn(),busy=vi.fn()
- vi.stubGlobal('window',{yogurt:{calendar:{addLink}}})
+ vi.stubGlobal('window',{Cakapp:{calendar:{addLink}}})
  const h=harness(()=>CalendarLinkForm({only:'other',onConnected:connected,onCancel:cancel,onBusyChange:busy}))
  h.get('calendar-link-input').props.onChange({target:{value:'https://calendar.example/private'}});h.run()
  h.get('calendar-link-form').props.onSubmit({preventDefault(){}});h.run()
@@ -77,7 +77,7 @@ it('uses the same keyboard dismissal in setup while keeping its existing extra a
 })
 it.each([false,true])('restores Add focus after collapse and retains the mounted form (link platform %s)',async link=>{
  const view={status:'granted',calendars:[{id:'work',name:'Work',source:'Calendar',enabled:true}],hideEventsWithoutCallLink:false}
- vi.stubGlobal('window',{yogurt:{capabilities:{calendarLink:link},calendar:{list:async()=>view}},addEventListener:vi.fn(),removeEventListener:vi.fn()})
+ vi.stubGlobal('window',{Cakapp:{capabilities:{calendarLink:link},calendar:{list:async()=>view}},addEventListener:vi.fn(),removeEventListener:vi.fn()})
  const h=harness(CalendarSettings);await Promise.resolve();h.run()
  h.get('calendar-link-add').props.onClick();h.run();expect(h.get('calendar-link-add').props['aria-expanded']).toBe(true)
  expect(h.type(CalendarLinkForm).props.autoFocus).toBe(true)
@@ -90,7 +90,7 @@ it.each([false,true])('restores Add focus after collapse and retains the mounted
 })
 it.each(['win32', 'linux'])('keeps focus on Meetings when an empty calendar form appears in Settings on %s', async platform => {
  const view = { status: 'notDetermined', calendars: [], hideEventsWithoutCallLink: false }
- vi.stubGlobal('window', { yogurt: { capabilities: capabilities(platform), calendar: { list: async () => view } }, addEventListener: vi.fn(), removeEventListener: vi.fn() })
+ vi.stubGlobal('window', { Cakapp: { capabilities: capabilities(platform), calendar: { list: async () => view } }, addEventListener: vi.fn(), removeEventListener: vi.fn() })
  let connect = false
  const settings = harness(() => CalendarSettings({ connect }))
  await Promise.resolve()
@@ -120,7 +120,7 @@ it('translates the shorter instruction, validation and privacy line in all local
 it.each([false,true])('keeps per-calendar controls without a bulk disconnect (link-only %s)',async link=>{
  const view={status:'granted',calendars:[{id:'link:sample',name:'Team calendar',source:'calendar.example.com',enabled:true,link:true}],hideEventsWithoutCallLink:false}
  const setEnabled=vi.fn(async()=>true),removeLink=vi.fn(async()=>true)
- vi.stubGlobal('window',{yogurt:{capabilities:{calendarLink:link},calendar:{list:async()=>view,setEnabled,removeLink}},addEventListener:vi.fn(),removeEventListener:vi.fn()})
+ vi.stubGlobal('window',{Cakapp:{capabilities:{calendarLink:link},calendar:{list:async()=>view,setEnabled,removeLink}},addEventListener:vi.fn(),removeEventListener:vi.fn()})
  const h=harness(CalendarSettings);await Promise.resolve();h.run()
  expect(h.get('calendar-disconnect')).toBeUndefined();expect(h.get('calendar-disconnect-all')).toBeUndefined()
  expect(h.all().some(e=>e.props.children==='Add a calendar by link')).toBe(true)

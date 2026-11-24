@@ -6,7 +6,7 @@ import { expect, it } from 'vitest'
 import { loadSettings, recordingReminderOn, updateSettings } from '../src/main/settings'
 
 it('keeps the recording reminder on until explicitly turned off, and saves that choice', () => {
-  const file = join(mkdtempSync(join(tmpdir(), 'yogurt-reminder-')), 'settings.json')
+  const file = join(mkdtempSync(join(tmpdir(), 'Cakapp-reminder-')), 'settings.json')
   expect(recordingReminderOn(loadSettings(file))).toBe(true)
   updateSettings(file, { recordingReminder: false })
   expect(recordingReminderOn(loadSettings(file))).toBe(false)

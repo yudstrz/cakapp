@@ -6,7 +6,7 @@ import { audioExts, createAudioHandler, parseRange, trackFile } from '../src/mai
 
 const ID = '3f2b8c1e-7d4a-4c9b-9e1f-0a1b2c3d4e5f'
 function setup(o: { known?: (id: string) => boolean; ready?: () => Promise<void> } = {}) {
-  const root = mkdtempSync(join(tmpdir(), 'yogurt-audio-'))
+  const root = mkdtempSync(join(tmpdir(), 'Cakapp-audio-'))
   const dirOf = (id: string) => join(root, 'meetings', id)
   mkdirSync(dirOf(ID), { recursive: true })
   writeFileSync(join(dirOf(ID), 'me.m4a'), Buffer.from('0123456789'))
@@ -32,10 +32,10 @@ describe('parseRange', () => {
   })
 })
 
-describe('the yogurt-audio protocol', () => {
+describe('the Cakapp-audio protocol', () => {
   it('serves a whole track, saying it can serve parts', async () => {
     const { handle } = setup()
-    const r = await get(handle, `yogurt-audio://${ID}/me`)
+    const r = await get(handle, `Cakapp-audio://${ID}/me`)
     expect(r.status).toBe(200)
     expect(r.headers.get('accept-ranges')).toBe('bytes')
     expect(r.headers.get('content-type')).toBe('audio/mp4')
@@ -44,7 +44,7 @@ describe('the yogurt-audio protocol', () => {
   })
   it('serves the part asked for, so seeking works', async () => {
     const { handle } = setup()
-    const r = await get(handle, `yogurt-audio://${ID}/them`, 'bytes=2-4')
+    const r = await get(handle, `Cakapp-audio://${ID}/them`, 'bytes=2-4')
     expect(r.status).toBe(206)
     expect(r.headers.get('content-range')).toBe('bytes 2-4/10')
     expect(r.headers.get('content-length')).toBe('3')
@@ -52,7 +52,7 @@ describe('the yogurt-audio protocol', () => {
   })
   it('says when a part is past the end', async () => {
     const { handle } = setup()
-    const r = await get(handle, `yogurt-audio://${ID}/them`, 'bytes=20-')
+    const r = await get(handle, `Cakapp-audio://${ID}/them`, 'bytes=20-')
     expect(r.status).toBe(416)
     expect(r.headers.get('content-range')).toBe('bytes */10')
   })
@@ -60,8 +60,8 @@ describe('the yogurt-audio protocol', () => {
     const { handle } = setup()
     const other = '00000000-0000-4000-8000-000000000000'
     for (const url of [
-      `yogurt-audio://${ID}/secret`, `yogurt-audio://${ID}/me.m4a`, `yogurt-audio://${ID}/../secret`, `yogurt-audio://${ID}/%2e%2e%2fsecret`,
-      `yogurt-audio://${ID}/me/extra`, `yogurt-audio://${other}/me`, 'yogurt-audio://../me', `yogurt-audio://${ID}%2f..%2f..%2f/me`,
+      `Cakapp-audio://${ID}/secret`, `Cakapp-audio://${ID}/me.m4a`, `Cakapp-audio://${ID}/../secret`, `Cakapp-audio://${ID}/%2e%2e%2fsecret`,
+      `Cakapp-audio://${ID}/me/extra`, `Cakapp-audio://${other}/me`, 'Cakapp-audio://../me', `Cakapp-audio://${ID}%2f..%2f..%2f/me`,
     ]) {
       const r = await get(handle, url)
       expect([r.status, url]).toEqual([404, url])
@@ -72,16 +72,16 @@ describe('the yogurt-audio protocol', () => {
     const ready = new Promise<void>((r) => { done = r })
     const { handle } = setup({ ready: () => ready })
     let answered = false
-    const p = get(handle, `yogurt-audio://${ID}/me`).then((r) => { answered = true; return r })
+    const p = get(handle, `Cakapp-audio://${ID}/me`).then((r) => { answered = true; return r })
     await new Promise((r) => setTimeout(r, 20))
     expect(answered).toBe(false)
     done()
     expect((await p).status).toBe(200)
   })
   it('says not found for a track that was never written', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-audio-'))
+    const root = mkdtempSync(join(tmpdir(), 'Cakapp-audio-'))
     const handle = createAudioHandler({ dirOf: (id) => join(root, id), known: () => true, ready: async () => {}, exts: ['m4a'] })
-    expect((await get(handle, `yogurt-audio://${ID}/me`)).status).toBe(404)
+    expect((await get(handle, `Cakapp-audio://${ID}/me`)).status).toBe(404)
   })
 })
 
@@ -93,14 +93,14 @@ describe('recordings from either kind of computer', () => {
     expect(audioExts('darwin', true)).toEqual(['wav'])
   })
   it('serves an Ogg recording as audio/ogg, and a Mac backup\'s m4a beside it', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-audio-'))
+    const root = mkdtempSync(join(tmpdir(), 'Cakapp-audio-'))
     mkdirSync(join(root, ID))
     writeFileSync(join(root, ID, 'me.ogg'), 'OggS-me')
     writeFileSync(join(root, ID, 'them.m4a'), 'mac-them')
     const handle = createAudioHandler({ dirOf: (id) => join(root, id), known: () => true, ready: async () => {}, exts: audioExts('win32', false) })
-    const me = await get(handle, `yogurt-audio://${ID}/me`)
+    const me = await get(handle, `Cakapp-audio://${ID}/me`)
     expect([me.status, me.headers.get('content-type'), await me.text()]).toEqual([200, 'audio/ogg', 'OggS-me'])
-    const them = await get(handle, `yogurt-audio://${ID}/them`)
+    const them = await get(handle, `Cakapp-audio://${ID}/them`)
     expect([them.status, them.headers.get('content-type'), await them.text()]).toEqual([200, 'audio/mp4', 'mac-them'])
     expect(trackFile(join(root, ID), 'me', ['ogg', 'm4a'])).toBe(join(root, ID, 'me.ogg'))
     expect(trackFile(join(root, ID), 'me', ['m4a'])).toBeNull()
@@ -109,15 +109,15 @@ describe('recordings from either kind of computer', () => {
 
 describe('a meeting restored from another computer', () => {
   it('a Mac plays a Windows or Linux meeting (Ogg Opus), and still prefers its own m4a', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-audio-'))
+    const root = mkdtempSync(join(tmpdir(), 'Cakapp-audio-'))
     mkdirSync(join(root, ID))
     writeFileSync(join(root, ID, 'me.ogg'), 'OggS-pc')
     writeFileSync(join(root, ID, 'them.ogg'), 'OggS-pc-them')
     writeFileSync(join(root, ID, 'them.m4a'), 'mac-them')
     const handle = createAudioHandler({ dirOf: (id) => join(root, id), known: () => true, ready: async () => {}, exts: audioExts('darwin', false) })
-    const me = await get(handle, `yogurt-audio://${ID}/me`)
+    const me = await get(handle, `Cakapp-audio://${ID}/me`)
     expect([me.status, me.headers.get('content-type'), await me.text()]).toEqual([200, 'audio/ogg', 'OggS-pc'])
-    const them = await get(handle, `yogurt-audio://${ID}/them`)
+    const them = await get(handle, `Cakapp-audio://${ID}/them`)
     expect([them.headers.get('content-type'), await them.text()]).toEqual(['audio/mp4', 'mac-them'])
   })
 })

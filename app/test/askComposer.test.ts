@@ -46,7 +46,7 @@ it('renders the panel input editable and autofocusable while its conversation is
 
 it('retains typing across pending-ID handoff and failed persistence without carrying it into a new conversation', async () => {
   const draft = vi.fn().mockRejectedValue(new Error('write failed'))
-  vi.stubGlobal('window', { matchMedia: () => ({ matches: false }), yogurt: {
+  vi.stubGlobal('window', { matchMedia: () => ({ matches: false }), Cakapp: {
     conversations: { draft, get: vi.fn().mockResolvedValue({ draft: 'Older saved draft' }), onChange: () => () => {} },
     meetings: { onChange: () => () => {} }, folders: { onChange: () => () => {} },
   } })
@@ -98,7 +98,7 @@ it('keeps the latest recording event when a slower initial read arrives', async 
 
 it.each([true, false])('keeps a blocked field focusable and preserves the draft through recording stop (panel %s)', panel => {
   const ask = vi.fn(), draft = vi.fn()
-  vi.stubGlobal('window', { matchMedia: () => ({ matches: false }), yogurt: { os: 'darwin', conversations: { ask, draft } } })
+  vi.stubGlobal('window', { matchMedia: () => ({ matches: false }), Cakapp: { os: 'darwin', conversations: { ask, draft } } })
   const initial: ConversationView = { id: 'draft', title: '', chips: [], draft: 'Keep this question', draftChips: [], firstChips: null,
     turns: [], waitsForMeeting: true, waitsForModel: false }
   const ui = createElement(AskConversation, { id: initial.id, initial, panel, home: !panel, onSelect() {}, onDeleted() {}, onSource() {} })
@@ -121,7 +121,7 @@ it.each([true, false])('keeps a blocked field focusable and preserves the draft 
 
 it.each([['darwin', true, true], ['darwin', false, false], ['win32', true, false], ['linux', true, false]] as const)(
   'uses the conversation wait while the first recording snapshot is pending (%s, wait %s)', (os, waitsForMeeting, locked) => {
-    vi.stubGlobal('window', { matchMedia: () => ({ matches: false }), yogurt: { os } })
+    vi.stubGlobal('window', { matchMedia: () => ({ matches: false }), Cakapp: { os } })
     const initial: ConversationView = { id: 'call', title: '', chips: [], draft: '', draftChips: [], firstChips: null,
       turns: [], waitsForMeeting, waitsForModel: false }
     const ui = createElement(AskConversation, { id: initial.id, initial, panel: true, recording: true, onSelect() {}, onDeleted() {}, onSource() {} })

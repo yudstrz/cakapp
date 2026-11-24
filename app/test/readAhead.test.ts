@@ -111,9 +111,9 @@ describe('hookReadAhead', () => {
   afterEach(() => { stores.splice(0).forEach((s) => s.close()); dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force: true })) })
 
   function setup(o: { live?: boolean; smallMac?: boolean; backlog?: () => number; contextSize?: number; gate?: Promise<void>; language?: string | null; attendees?: Array<{ name: string; email: string | null }> } = {}) {
-    const d = mkdtempSync(join(tmpdir(), 'yogurt-ahead-'))
+    const d = mkdtempSync(join(tmpdir(), 'Cakapp-ahead-'))
     dirs.push(d)
-    const store = openStore(join(d, 'yogurt.db'))
+    const store = openStore(join(d, 'Cakapp.db'))
     stores.push(store)
     const m = store.createMeeting({ title: 'Sync', startedAt: 0, endedAt: null, eventId: null, app: null, attendees: o.attendees ?? [{ name: 'Ann Lee', email: null }, { name: 'Bo Park', email: null }, { name: 'Cy Ross', email: null }], state: 'recording', language: o.language ?? null })
     let now = 0

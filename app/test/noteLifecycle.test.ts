@@ -6,7 +6,7 @@ afterEach(() => { vi.unstubAllGlobals() })
 function setup() {
   let request!: (closing: boolean) => Promise<boolean>
   const off = vi.fn()
-  const win = Object.assign(new EventTarget(), { yogurt: { notes: { onFlushRequest: (fn: typeof request) => { request = fn; return off } } } })
+  const win = Object.assign(new EventTarget(), { Cakapp: { notes: { onFlushRequest: (fn: typeof request) => { request = fn; return off } } } })
   const doc = Object.assign(new EventTarget(), { body: { inert: false }, visibilityState: 'visible' })
   vi.stubGlobal('window', win); vi.stubGlobal('document', doc)
   const stop = installNoteLifecycle()

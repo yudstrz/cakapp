@@ -4,7 +4,7 @@ import { micsView, micToUse, parseMicDevices } from '../src/main/micDevice'
 const mac = { id: 'BuiltInMicrophoneDevice', name: 'MacBook Pro Microphone', isDefault: false }
 const yeti = { id: 'usb:yeti', name: 'Yeti Stereo Microphone', isDefault: true }
 
-describe('the microphones yogurt-mac lists', () => {
+describe('the microphones Cakapp-mac lists', () => {
   it('reads each mic with its id, name and whether the Mac uses it now', () => {
     expect(parseMicDevices({ devices: [
       { uid: 'usb:yeti', name: 'Yeti Stereo Microphone', default: true },

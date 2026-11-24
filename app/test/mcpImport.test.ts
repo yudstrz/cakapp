@@ -45,11 +45,11 @@ describe('bringing meetings in from other notes apps', () => {
     expect(again.folder.id).toBe(got.folder.id)
     expect(store.folders()).toHaveLength(1)
   })
-  it('has Yogurt write the summary instead, when asked', async () => {
+  it('has Cakapp write the summary instead, when asked', async () => {
     const { mcp, store, calls } = setup({ changes: true })
     const { summary: _, ...rest } = granola
     const got = await json(mcp, 'create_meeting', { ...rest, write_summary: true })
-    expect(got.summary).toBe('Yogurt is writing it')
+    expect(got.summary).toBe('Cakapp is writing it')
     expect(store.notes(got.id).enhanced).toBeNull()
     expect(calls).toContainEqual(['rewriteSummary', got.id, ''])
     expect(await call(mcp, 'create_meeting', { ...granola, write_summary: true })).toMatchObject({ isError: true, text: expect.stringContaining('not both') })

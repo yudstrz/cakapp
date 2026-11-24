@@ -4,7 +4,7 @@ import { recordingDeletedToast, toasts } from '../src/renderer/src/components/Tr
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
 function setup(keepRecordings: boolean) {
   const get = vi.fn(async () => ({ keepRecordings })), go = vi.fn(), setKeepRecordings = vi.fn()
-  vi.stubGlobal('window', { yogurt: { settings: { get, setKeepRecordings }, nav: { go } } })
+  vi.stubGlobal('window', { Cakapp: { settings: { get, setKeepRecordings }, nav: { go } } })
   const add = vi.spyOn(toasts, 'add').mockReturnValue('recording-toast')
   const close = vi.spyOn(toasts, 'close').mockImplementation(() => {})
   return { get, go, setKeepRecordings, add, close }

@@ -56,7 +56,7 @@ describe('Home Agenda', () => {
     const stored = new Map<string, string>()
     const capabilities = { calendar: true }
     vi.stubGlobal('window', {
-      yogurt: { capabilities }, matchMedia: () => ({ matches: true }),
+      Cakapp: { capabilities }, matchMedia: () => ({ matches: true }),
       localStorage: { getItem: (k: string) => stored.get(k) ?? null, setItem: (k: string, v: string) => stored.set(k, v) },
     })
     const render = () => renderToStaticMarkup(createElement(Home, { open() {} }))

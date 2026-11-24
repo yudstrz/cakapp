@@ -22,7 +22,7 @@ async function serve(): Promise<string> {
 }
 
 describe('the certificates the computer trusts (#115)', () => {
-  it('a download signed by a certificate installed in the system works once Yogurt trusts the system', async () => {
+  it('a download signed by a certificate installed in the system works once Cakapp trusts the system', async () => {
     const url = await serve()
     await expect(fetch(url)).rejects.toThrow()
     const added = trustSystemCertificates({ ...tls, getCACertificates: (k) => (k === 'system' ? [ca] : tls.getCACertificates(k)) })

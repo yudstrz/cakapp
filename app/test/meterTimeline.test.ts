@@ -16,7 +16,7 @@ it.each([
   vi.stubGlobal('document', doc)
   let receive!: (p: MeterPacket) => void
   const media = Object.assign(new EventTarget(), { matches: false })
-  vi.stubGlobal('window', { matchMedia: () => media, yogurt: { widget: { onLevel: (cb: typeof receive) => { receive = cb; return vi.fn() } } } })
+  vi.stubGlobal('window', { matchMedia: () => media, Cakapp: { widget: { onLevel: (cb: typeof receive) => { receive = cb; return vi.fn() } } } })
   const bars = Array.from({ length: 5 }, () => ({
     style: { transform: '', opacity: '' },
     animate: vi.fn((_frames: Keyframe[], _timing: KeyframeAnimationOptions) => ({ startTime: 0, cancel: vi.fn() })),

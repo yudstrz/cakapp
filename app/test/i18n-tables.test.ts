@@ -24,13 +24,13 @@ it('translates summary cancellation and its restart state in every locale', () =
 it('translates the app location choice and removes the old Mac toggle labels', () => {
   for (const { id } of LOCALES) {
     const table = load(id)
-    for (const key of ['Show Yogurt in', 'Menu bar and Dock', 'Menu bar only', 'Dock only']) {
+    for (const key of ['Show Cakapp in', 'Menu bar and Dock', 'Menu bar only', 'Dock only']) {
       expect(keys).toContain(key)
       expect(table[key]).toBeTypeOf('string')
       expect(table[key]).not.toBe('')
       if (id !== 'en') expect(table[key]).not.toBe(key)
     }
-    for (const key of ['Show Yogurt in the menu bar', 'Show Yogurt in the Dock']) {
+    for (const key of ['Show Cakapp in the menu bar', 'Show Cakapp in the Dock']) {
       expect(keys).not.toContain(key)
       expect(table).not.toHaveProperty(key)
     }
@@ -209,8 +209,8 @@ describe.each(LOCALES.filter((l) => l.id !== 'en'))('$english', ({ id }) => {
 })
 
 it('translates recording deletion and retention in every locale', () => {
-  for (const { id } of LOCALES) for (const old of ['Delete recording', 'Delete recording?', "Yogurt couldn't delete the recording.", 'Keep recordings after meetings', 'Turn off to delete audio after the transcript and summary are saved.', 'Only applies to meetings that finish from now on.']) expect(load(id)[old]).toBeUndefined()
-  for (const { id } of LOCALES) for (const key of ["Recording deleted", "Settings", "Delete audio", "Delete audio?", "The audio is deleted for good. Your transcript and notes stay.", "Keep the audio until the transcript is saved.", "Yogurt couldn't delete the audio.", "Keep audio recordings after meetings", "When off, new meetings' audio is deleted once the summary is saved."]) {
+  for (const { id } of LOCALES) for (const old of ['Delete recording', 'Delete recording?', "Cakapp couldn't delete the recording.", 'Keep recordings after meetings', 'Turn off to delete audio after the transcript and summary are saved.', 'Only applies to meetings that finish from now on.']) expect(load(id)[old]).toBeUndefined()
+  for (const { id } of LOCALES) for (const key of ["Recording deleted", "Settings", "Delete audio", "Delete audio?", "The audio is deleted for good. Your transcript and notes stay.", "Keep the audio until the transcript is saved.", "Cakapp couldn't delete the audio.", "Keep audio recordings after meetings", "When off, new meetings' audio is deleted once the summary is saved."]) {
     expect(keys).toContain(key)
     expect(load(id)[key]).toBeTypeOf('string')
     if (id !== 'en' && !(id === 'fil' && key === 'Settings')) expect(load(id)[key]).not.toBe(key)

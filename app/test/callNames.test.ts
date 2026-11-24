@@ -41,8 +41,8 @@ const webexCurrentWindows = (): WatchLine['windows'] => [{ title: 'Webex meeting
 const webexLine = (t: number): WatchLine => ({ t, app: 'Cisco-Systems.Spark', windows: webexWindows() })
 
 function setup(o: { app?: string | null; attendees?: Meeting['attendees']; micPids?: Record<string, number[]> } = {}) {
-  const root = mkdtempSync(join(tmpdir(), 'yogurt-callnames-')); dirs.push(root)
-  const store = openStore(join(root, 'yogurt.db')); stores.push(store)
+  const root = mkdtempSync(join(tmpdir(), 'Cakapp-callnames-')); dirs.push(root)
+  const store = openStore(join(root, 'Cakapp.db')); stores.push(store)
   const m = store.createMeeting({ title: 'Sync', startedAt: 1_000_000, endedAt: null, eventId: null, app: o.app === undefined ? 'Zoom' : o.app, attendees: o.attendees ?? [], state: 'recording' })
   let clock = 1_000_000
   const watched: string[][] = [], watchedPids: Array<number[] | undefined> = []
@@ -166,8 +166,8 @@ describe('hookCallNames', () => {
   })
 
   it('says what it read in main.log (info, which the log file keeps; console.log never reaches it)', () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-callnames-')); dirs.push(root)
-    const store = openStore(join(root, 'yogurt.db')); stores.push(store)
+    const root = mkdtempSync(join(tmpdir(), 'Cakapp-callnames-')); dirs.push(root)
+    const store = openStore(join(root, 'Cakapp.db')); stores.push(store)
     const m = store.createMeeting({ title: 'Sync', startedAt: 1_000_000, endedAt: null, eventId: null, app: 'FaceTime', attendees: [], state: 'recording' })
     const info = vi.spyOn(console, 'info').mockImplementation(() => {})
     const starts: Array<(m: Meeting) => void> = []
