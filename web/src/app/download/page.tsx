@@ -113,7 +113,7 @@ export default function DownloadPage() {
         <div className="rounded bg-black/50 border border-zinc-800 p-3 font-mono text-xs text-zinc-200 overflow-x-auto">
           <code>git clone https://github.com/yudstrz/cakapp.git</code><br />
           <code>pnpm install</code><br />
-          <code>pnpm --filter @yogurt/app run dev</code>
+          <code>pnpm --filter @cakapp/app run dev</code>
         </div>
       </div>
     </div>

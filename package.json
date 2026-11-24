@@ -1,11 +1,11 @@
 {
-  "name": "yogurt",
+  "name": "cakapp",
   "private": true,
   "packageManager": "pnpm@10.7.0",
   "scripts": {
-    "build": "pnpm --filter @yogurt/app build",
+    "build": "pnpm --filter @cakapp/app build",
     "test": "pnpm -r test",
-    "dev": "pnpm --filter @yogurt/app dev"
+    "dev": "pnpm --filter @cakapp/app dev"
   },
   "license": "MIT",
   "dependencies": {

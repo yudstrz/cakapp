@@ -1,5 +1,5 @@
 {
-  "name": "@yogurt/app",
+  "name": "@cakapp/app",
   "version": "0.3.66",
   "private": true,
   "type": "module",
@@ -41,7 +41,7 @@
     "@types/yauzl": "3.4.0",
     "@types/yazl": "3.3.1",
     "@vitejs/plugin-react": "6.1.2",
-    "@yogurt/picker": "workspace:^",
+    "@cakapp/picker": "workspace:^",
     "electron": "44.9.1",
     "electron-builder": "26.17.0",
     "electron-vite": "6.0.0",

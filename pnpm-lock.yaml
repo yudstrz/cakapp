@@ -50,6 +50,9 @@ importers:
       '@base-ui/react':
         specifier: 1.9.0
         version: 1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@cakapp/picker':
+        specifier: workspace:^
+        version: link:../packages/picker
       '@electron/asar':
         specifier: 3.4.1
         version: 3.4.1
@@ -101,9 +104,6 @@ importers:
       '@vitejs/plugin-react':
         specifier: 6.1.2
         version: 6.1.2(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
-      '@yogurt/picker':
-        specifier: workspace:^
-        version: link:../packages/picker
       electron:
         specifier: 44.9.1
         version: 44.9.1

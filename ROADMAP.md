@@ -1,10 +1,10 @@
 # Dokumentasi Fitur & Roadmap Pengembangan Terintegrasi 5 Hari
 
-## Yogurt: Dari Local-First ke Hybrid Multi-User Enterprise Platform
+## Cakapp: Dari Local-First ke Hybrid Multi-User Enterprise Platform
 
 Dokumen ini adalah **panduan utama arsitektur, integrasi fitur, jadwal pengembangan 5 hari (Selasa – Senin), dan skenario pengujian perusahaan (*Enterprise QA Testing*)**.
 
-Seluruh **fitur yang sudah ada (eksisting) di dalam codebase Yogurt** telah **dimasukkan dan dipetakan secara logis ke dalam setiap hari pengembangan**. Dengan demikian, Anda dapat langsung menguji (*testing*) dan memverifikasi kesiapan setiap fitur eksisting bersamaan dengan fitur baru yang dibangun sesuai skenario nyata di perusahaan Anda.
+Seluruh **fitur yang sudah ada (eksisting) di dalam codebase Cakapp** telah **dimasukkan dan dipetakan secara logis ke dalam setiap hari pengembangan**. Dengan demikian, Anda dapat langsung menguji (*testing*) dan memverifikasi kesiapan setiap fitur eksisting bersamaan dengan fitur baru yang dibangun sesuai skenario nyata di perusahaan Anda.
 
 ---
 
@@ -14,7 +14,7 @@ Platform ini mengadopsi model arsitektur hybrid modern **persis seperti Fathom V
 
 ```text
 +--------------------------------------------------------------------------------------------------+
-|                                    EKOSISTEM CAKAPP / YOGURT                                      |
+|                                        EKOSISTEM CAKAPP                                          |
 +--------------------------------------------------------------------------------------------------+
 |                                                                                                  |
 |   [ PILAR 1: DESKTOP APP (PC) ]                      [ PILAR 2: WEBSITE PORTAL (WEB & HP) ]      |
@@ -40,7 +40,7 @@ Aplikasi desktop adalah jantung penangkap data yang di-download dan di-install d
 **Mengapa harus ada aplikasi desktop?**
 
 1. **Perekaman Audio Sistem Tanpa Bot (*No-Bot Recording*):** Website biasa dan ekstensi browser terkunci di dalam *sandbox browser* sehingga **tidak bisa** merekam suara lawan bicara dari aplikasi lain (seperti Zoom, Microsoft Teams, Slack Huddle, Discord) kecuali pengguna melakukan *share screen*. Aplikasi desktop memiliki akses langsung ke driver audio sistem operasi (WASAPI di Windows, CoreAudio di Mac, PulseAudio/PipeWire di Linux).
-2. **Tidak Ada Bot Mengganggu di Ruang Rapat:** Tidak perlu mengundang bot pihak ketiga (seperti *"Yogurt Notetaker Bot"*) yang sering kali canggung, memicu kecurigaan peserta lain, atau bahkan diblokir oleh admin keamanan IT perusahaan.
+2. **Tidak Ada Bot Mengganggu di Ruang Rapat:** Tidak perlu mengundang bot pihak ketiga (seperti *"Cakapp Notetaker Bot"*) yang sering kali canggung, memicu kecurigaan peserta lain, atau bahkan diblokir oleh admin keamanan IT perusahaan.
 3. **Identifikasi Nama Pembicara Otomatis (*Speaker Diarization*):** Aplikasi desktop memanfaatkan OS Accessibility API untuk membaca langsung nama orang yang sedang berbicara di jendela panggilan Zoom/Meet/Teams tanpa perlu bot.
 4. **Komputasi AI Cepat & Privat:** Model transkripsi suara Whisper dan LLM GGUF (Qwen 3 / Gemma 4) dapat dijalankan 100% lokal pada CPU/GPU/NPU tanpa mengirim audio sensitif ke luar jika perusahaan menginginkan privasi mutlak.
 5. **Floating Mini Widget:** Widget melayang yang praktis di pojok layar saat rapat untuk kendali Mute, Pause, Resume, Bookmark, atau mengetik catatan kilat.
@@ -245,7 +245,7 @@ flowchart TD
 
 * [x] **TC-1.1 (Autentikasi Karyawan):** Daftarkan akun baru menggunakan email kantor. Keluar (*Sign Out*), lalu masuk kembali (*Sign In*). Pastikan sesi login tetap tersimpan saat aplikasi ditutup dan dibuka lagi.
 * [x] **TC-1.2 (Mode Tamu / Offline):** Klik "Mode Tamu". Pastikan aplikasi tetap dapat digunakan untuk merekam tanpa perlu koneksi internet atau login.
-* [x] **TC-1.3 (Deteksi Otomatis & Perekaman Tanpa Bot):** Buka panggilan Zoom atau Google Meet di komputer. Pastikan Yogurt otomatis mendeteksi rapat, Floating Widget muncul, dan tombol rekam aktif tanpa ada bot aneh yang masuk ke room meeting.
+* [x] **TC-1.3 (Deteksi Otomatis & Perekaman Tanpa Bot):** Buka panggilan Zoom atau Google Meet di komputer. Pastikan Cakapp otomatis mendeteksi rapat, Floating Widget muncul, dan tombol rekam aktif tanpa ada bot aneh yang masuk ke room meeting.
 * [x] **TC-1.4 (Perekaman Audio Dual-Track & Anti-Gema):** Lakukan percakapan 2 menit dengan lawan bicara. Putar kembali rekaman audio: pastikan suara mic Anda (`me`) dan suara lawan bicara (`them`) terdengar jernih tanpa gema berulang.
 * [x] **TC-1.5 (Identifikasi Nama Pembicara):** Periksa apakah nama lawan bicara di Zoom/Teams terbaca otomatis di interface perekaman.
 * [x] **TC-1.6 (Unggah File Audio Manual):** Unggah file rekaman rapat eksternal (MP3/WAV berdurasi 5–10 menit). Pastikan file diterima dan siap diproses ke tahap transkripsi.
@@ -274,7 +274,7 @@ flowchart TD
 * **Custom Jargon & Glosarium Bisnis (`app/src/shared/jargon.ts`):**
   * Memungkinkan pengguna memasukkan kamus istilah khusus perusahaan, singkatan proyek, atau nama orang agar Whisper mengeja dengan tepat.
 * **Embedded SQLite Database (`app/src/main/store.ts` via `node:sqlite`):**
-  * Penyimpanan lokal berkecepatan tinggi di `%APPDATA%\Yogurt\yogurt.db` (Windows) tanpa perlu install server database terpisah.
+  * Penyimpanan lokal berkecepatan tinggi di `%APPDATA%\Cakapp\cakapp.db` (Windows) tanpa perlu install server database terpisah.
 * **Manajemen Folder & Personalisasi Visual (`foldersIpc.ts`, `folderAppearance.ts`):**
   * Pengelompokan rapat ke folder proyek/divisi dengan warna dan ikon kustom.
 * **Rapat Lifecycle Hooks (`app/src/main/meeting.ts`):**
@@ -412,7 +412,7 @@ flowchart TD
 * [ ] **TC-4.4 (Uji Tautan Berbagi / Shareable Link Mirip Fathom):** Klik tombol Share $\rightarrow$ Public Link. Buka tautan tersebut di jendela Incognito / perangkat rekan kerja tanpa login. Pastikan penerima link dapat membaca notulen dan memutar audio rapat secara bersih tanpa akses ke rapat lain.
 * [ ] **TC-4.5 (Uji Akses HP Android & iPhone):** Buka link Website Portal atau link shareable di browser HP (Chrome Android / Safari iOS). Pastikan tampilan responsif, nyaman dibaca satu tangan, dan audio dapat diputar lancar.
 * [ ] **TC-4.6 (Uji Tanya RAG Lintas Rapat di Web & Desktop):** Buka fitur "Ask". Ajukan pertanyaan spesifik perusahaan: *"Apa saja keputusan terkait timeline proyek X pada rapat 3 hari lalu?"*. Pastikan AI menjawab dengan tepat disertai sitasi tautan rapat terkait.
-* [ ] **TC-4.7 (Uji Integrasi Local MCP Server):** Hubungkan Cursor atau Claude Code ke MCP Server Yogurt lokal. Jalankan perintah untuk membaca ringkasan rapat terakhir dan pastikan AI eksternal dapat mengambil konteksnya.
+* [ ] **TC-4.7 (Uji Integrasi Local MCP Server):** Hubungkan Cursor atau Claude Code ke MCP Server Cakapp lokal. Jalankan perintah untuk membaca ringkasan rapat terakhir dan pastikan AI eksternal dapat mengambil konteksnya.
 
 #### 4. Hasil Akhir (Deliverable Hari 4)
 
@@ -454,16 +454,16 @@ flowchart TD
      ```
 
    * Menghasilkan file installer mandiri:
-     * **Windows:** `Yogurt Setup.exe` (x64)
-     * **macOS:** `Yogurt.dmg` (Universal / Apple Silicon & Intel)
-     * **Linux:** `Yogurt.AppImage`
+     * **Windows:** `Cakapp Setup.exe` (x64)
+     * **macOS:** `Cakapp.dmg` (Universal / Apple Silicon & Intel)
+     * **Linux:** `Cakapp.AppImage`
 4. **Penyusunan Dokumentasi Panduan Deployment Perusahaan:**
    * Panduan instalasi satu klik untuk karyawan.
    * Panduan setup environment backend database untuk tim IT perusahaan.
 
 #### 3. Skenario Pengujian Perusahaan Hari 5 (Enterprise QA Checklist)
 
-* [ ] **TC-5.1 (Clean Install Test):** Ambil laptop Windows standar karyawan yang bersih (tanpa Node.js/tools developer). Jalankan file `Yogurt Setup.exe`. Pastikan aplikasi terpasang sempurna dan langsung dapat digunakan.
+* [ ] **TC-5.1 (Clean Install Test):** Ambil laptop Windows standar karyawan yang bersih (tanpa Node.js/tools developer). Jalankan file `Cakapp Setup.exe`. Pastikan aplikasi terpasang sempurna dan langsung dapat digunakan.
 * [ ] **TC-5.2 (Uji Isolasi Data Antar-Karyawan):** Buat 2 akun berbeda (Akun Karyawan & Akun Direktur). Pastikan Akun Karyawan tidak dapat melihat catatan rahasia yang disimpan di Akun Direktur.
 * [ ] **TC-5.3 (Stress Test Rapat Panjang):** Uji perekaman rapat berdurasi panjang (> 90 menit). Pantau penggunaan memori RAM dan CPU: pastikan aplikasi stabil, tidak terjadi *memory leak*, dan tidak crash.
 * [ ] **TC-5.4 (Validasi Skenario Full-Flow):** Uji alur lengkap dari awal hingga akhir: Buka Zoom $\rightarrow$ Deteksi otomatis $\rightarrow$ Rekam $\rightarrow$ Selesai $\rightarrow$ AI generate notulen $\rightarrow$ Sync cloud $\rightarrow$ Buka di browser HP $\rightarrow$ Berbagi link ke rekan kerja.
