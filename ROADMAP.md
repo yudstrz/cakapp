@@ -1,7 +1,8 @@
 # Dokumentasi Fitur & Roadmap Pengembangan Terintegrasi 5 Hari
+
 ## Yogurt: Dari Local-First ke Hybrid Multi-User Enterprise Platform
 
-Dokumen ini adalah **panduan utama arsitektur, integrasi fitur, jadwal pengembangan 5 hari (Selasa – Senin), dan skenario pengujian perusahaan (*Enterprise QA Testing*)**. 
+Dokumen ini adalah **panduan utama arsitektur, integrasi fitur, jadwal pengembangan 5 hari (Selasa – Senin), dan skenario pengujian perusahaan (*Enterprise QA Testing*)**.
 
 Seluruh **fitur yang sudah ada (eksisting) di dalam codebase Yogurt** telah **dimasukkan dan dipetakan secara logis ke dalam setiap hari pengembangan**. Dengan demikian, Anda dapat langsung menguji (*testing*) dan memverifikasi kesiapan setiap fitur eksisting bersamaan dengan fitur baru yang dibangun sesuai skenario nyata di perusahaan Anda.
 
@@ -11,7 +12,7 @@ Seluruh **fitur yang sudah ada (eksisting) di dalam codebase Yogurt** telah **di
 
 Platform ini mengadopsi model arsitektur hybrid modern **persis seperti Fathom Video (fathom.video)** atau Fireflies: memadukan keunggulan **Aplikasi Desktop Mandiri** untuk perekaman audio sistem tanpa bot dengan **Website Portal (Web App)** untuk login, penayangan, berbagi notulen, dan kolaborasi tim dari mana saja.
 
-```
+```text
 +--------------------------------------------------------------------------------------------------+
 |                                    EKOSISTEM CAKAPP / YOGURT                                      |
 +--------------------------------------------------------------------------------------------------+
@@ -33,9 +34,11 @@ Platform ini mengadopsi model arsitektur hybrid modern **persis seperti Fathom V
 ---
 
 ### A. Pilar 1: Aplikasi Desktop Mandiri (Windows, macOS, Linux) — *"The Engine & Silent Recorder"*
+
 Aplikasi desktop adalah jantung penangkap data yang di-download dan di-install di komputer pengguna (PC/Laptop).
 
 **Mengapa harus ada aplikasi desktop?**
+
 1. **Perekaman Audio Sistem Tanpa Bot (*No-Bot Recording*):** Website biasa dan ekstensi browser terkunci di dalam *sandbox browser* sehingga **tidak bisa** merekam suara lawan bicara dari aplikasi lain (seperti Zoom, Microsoft Teams, Slack Huddle, Discord) kecuali pengguna melakukan *share screen*. Aplikasi desktop memiliki akses langsung ke driver audio sistem operasi (WASAPI di Windows, CoreAudio di Mac, PulseAudio/PipeWire di Linux).
 2. **Tidak Ada Bot Mengganggu di Ruang Rapat:** Tidak perlu mengundang bot pihak ketiga (seperti *"Yogurt Notetaker Bot"*) yang sering kali canggung, memicu kecurigaan peserta lain, atau bahkan diblokir oleh admin keamanan IT perusahaan.
 3. **Identifikasi Nama Pembicara Otomatis (*Speaker Diarization*):** Aplikasi desktop memanfaatkan OS Accessibility API untuk membaca langsung nama orang yang sedang berbicara di jendela panggilan Zoom/Meet/Teams tanpa perlu bot.
@@ -43,6 +46,7 @@ Aplikasi desktop adalah jantung penangkap data yang di-download dan di-install d
 5. **Floating Mini Widget:** Widget melayang yang praktis di pojok layar saat rapat untuk kendali Mute, Pause, Resume, Bookmark, atau mengetik catatan kilat.
 
 **Format Distribusi PC:**
+
 * **Windows:** File installer executable `.exe` (Windows 10/11 x64).
 * **macOS:** File installer `.dmg` (Universal binary: Apple Silicon M1-M4 & Intel).
 * **Linux:** File paket `.AppImage` (Ubuntu 22.04+ / distribusi modern).
@@ -50,9 +54,11 @@ Aplikasi desktop adalah jantung penangkap data yang di-download dan di-install d
 ---
 
 ### B. Pilar 2: Website Portal / Cloud Web App (Mirip Fathom) — *"The Cloud Hub & Viewer"*
+
 Website portal cloud (misal `https://app.cakapp.com` atau domain kantor Anda) di-hosting di **Vercel** menggunakan **Next.js (App Router)** sebagai tempat pengguna dan seluruh anggota tim login melalui browser internet apa saja (Chrome, Safari, Edge, Firefox) untuk mengakses hasil rekaman dan mendownload aplikasi.
 
-#### 1. Rekomendasi Framework & Infrastruktur Hosting:
+#### 1. Rekomendasi Framework & Infrastruktur Hosting
+
 * **Framework Utama (Sangat Direkomendasikan): Next.js 15 (App Router, React 19, TypeScript, Tailwind CSS)**
   * **Hosting:** **Vercel** (Edge Network Global, Serverless Functions, 1-Click Git Deployment).
   * **Mengapa Next.js di Vercel adalah Pilihan Terbaik?**
@@ -64,8 +70,10 @@ Website portal cloud (misal `https://app.cakapp.com` atau domain kantor Anda) di
   * *Remix / React Router v7:* Sangat baik untuk penanganan form dan data fetching, namun ekosistem integrasi Vercel dan pembuatan pratinjau sosial (OG preview) jauh lebih matang di Next.js.
   * *Astro / SvelteKit:* Sangat cepat untuk blog/dokumentasi statis, namun untuk aplikasi kaya fitur interaktif (pemutar audio sinkron karaoke, editor teks notulen kaya TipTap, dashboard multi-user terautentikasi), ekosistem React/Next.js jauh lebih unggul dan mudah dipelihara.
 
-#### 2. Fitur Pusat Download Aplikasi Desktop di Website (`/` dan `/download`):
+#### 2. Fitur Pusat Download Aplikasi Desktop di Website (`/` dan `/download`)
+
 Website portal tidak hanya berfungsi sebagai dashboard, tetapi juga sebagai **Pusat Distribusi Resmi Aplikasi Desktop**:
+
 1. **Smart OS Auto-Detection:** Saat pengunjung membuka website dari komputer, sistem otomatis mendeteksi sistem operasi mereka dan menampilkan tombol unduh utama yang tepat:
    * Pengguna Windows $\rightarrow$ Tombol menonjol: **"Download for Windows (.exe)"**
    * Pengguna Mac $\rightarrow$ Tombol menonjol: **"Download for macOS (.dmg / Apple Silicon & Intel)"**
@@ -74,9 +82,10 @@ Website portal tidak hanya berfungsi sebagai dashboard, tetapi juga sebagai **Pu
 3. **Banner Download di Dalam Dashboard:** Pengguna yang sedang membuka web dashboard di browser akan melihat banner cerdas: *"Ingin merekam panggilan Zoom/Teams otomatis tanpa bot? Unduh Aplikasi Desktop Cakapp"* lengkap dengan tautan unduh instan.
 4. **Petunjuk Pemasangan 3 Langkah:** Panduan visual cepat (1. Unduh $\rightarrow$ 2. Buka Installer $\rightarrow$ 3. Masuk ke Panggilan).
 
-#### 3. Fitur Penayangan & Kolaborasi Web Portal (Mirip Fathom):
+#### 3. Fitur Penayangan & Kolaborasi Web Portal (Mirip Fathom)
+
 1. **Login & Akses dari Mana Saja:** Pengguna tidak harus selalu berada di depan laptop kerja utamanya untuk membaca hasil rapat. Cukup buka website di laptop lain, tablet, atau smartphone, lalu login.
-2. **Interactive Audio & Transcript Player (Mirip Fathom):** 
+2. **Interactive Audio & Transcript Player (Mirip Fathom):**
    * Pemutar rekaman audio yang tersinkronisasi langsung dengan teks transkrip.
    * Kata-kata yang sedang diucapkan otomatis tersorot (*karaoke-style auto highlight*).
    * Pengguna cukup mengklik kalimat apa pun di transkrip untuk langsung melompat (*jump to second*) ke momen audio tersebut diputar.
@@ -110,7 +119,7 @@ Untuk pengguna smartphone (Android & iPhone), kita menyediakan pengalaman web mo
 
 Agar pengujian skenario perusahaan Anda berjalan runtut dan sistematis, seluruh fitur dikelompokkan ke dalam 5 fase rantai nilai (*value chain*) rapat bisnis:
 
-```
+```text
 [HARI 1: SELASA] Input & Identitas      --> Siapa yang rapat & bagaimana audio rapat ditangkap di PC?
 [HARI 2: RABU]   Transkripsi & Sinkron  --> Ubah suara jadi teks + simpan lokal & cloud (Neon DB) dua arah
 [HARI 3: KAMIS]  Kecerdasan AI & Notes  --> Rangkum intisari, tugas, keputusan (Local LLM + Cloud AI)
@@ -195,7 +204,8 @@ flowchart TD
 
 > **Alur Logika:** Sebelum rapat dimulai, sistem harus mengenali siapa pengguna yang sedang bekerja (Identitas/Akun) dan siap menangkap audio rapat dari berbagai platform tanpa memerlukan bot pihak ketiga.
 
-#### 1. Fitur Eksisting yang Diuji & Diintegrasikan:
+#### 1. Fitur Eksisting Hari 1 yang Diuji & Diintegrasikan
+
 * **Perekaman Audio Dual-Track (`app/src/main/capture.ts`, `app/src/main/audio.ts`):**
   * Saluran `track: me`: Suara pengguna dari mikrofon input.
   * Saluran `track: them`: Suara lawan bicara dari sistem audio/speaker OS (WASAPI/CoreAudio).
@@ -216,7 +226,8 @@ flowchart TD
 * **Kamus Lokalisasi Bahasa Indonesia (`app/src/shared/locales/id.json`):**
   * 726 baris teks UI lengkap dalam Bahasa Indonesia.
 
-#### 2. Fitur Baru yang Dibangun:
+#### 2. Fitur Baru Hari 1 yang Dibangun
+
 1. **Integrasi SDK Database Pihak Ketiga (BaaS):**
    * Pemasangan library `@supabase/supabase-js`.
    * Konfigurasi koneksi (URL & Anon Key) melalui file `.env`.
@@ -230,7 +241,8 @@ flowchart TD
 4. **Penyambungan Sesi Akun dengan Metadata Rapat:**
    * Setiap sesi perekaman baru otomatis mengaitkan `user_id` pengguna yang sedang login.
 
-#### 3. Skenario Pengujian Perusahaan (Enterprise QA Checklist):
+#### 3. Skenario Pengujian Perusahaan Hari 1 (Enterprise QA Checklist)
+
 * [x] **TC-1.1 (Autentikasi Karyawan):** Daftarkan akun baru menggunakan email kantor. Keluar (*Sign Out*), lalu masuk kembali (*Sign In*). Pastikan sesi login tetap tersimpan saat aplikasi ditutup dan dibuka lagi.
 * [x] **TC-1.2 (Mode Tamu / Offline):** Klik "Mode Tamu". Pastikan aplikasi tetap dapat digunakan untuk merekam tanpa perlu koneksi internet atau login.
 * [x] **TC-1.3 (Deteksi Otomatis & Perekaman Tanpa Bot):** Buka panggilan Zoom atau Google Meet di komputer. Pastikan Yogurt otomatis mendeteksi rapat, Floating Widget muncul, dan tombol rekam aktif tanpa ada bot aneh yang masuk ke room meeting.
@@ -238,7 +250,8 @@ flowchart TD
 * [x] **TC-1.5 (Identifikasi Nama Pembicara):** Periksa apakah nama lawan bicara di Zoom/Teams terbaca otomatis di interface perekaman.
 * [x] **TC-1.6 (Unggah File Audio Manual):** Unggah file rekaman rapat eksternal (MP3/WAV berdurasi 5–10 menit). Pastikan file diterima dan siap diproses ke tahap transkripsi.
 
-#### 4. Hasil Akhir (Deliverable Hari 1):
+#### 4. Hasil Akhir (Deliverable Hari 1)
+
 * [x] Sistem autentikasi pengguna aktif dan aman (Supabase Auth + Session Token terenkripsi `safeStorage`).
 * [x] Mode Tamu / 100% Offline Lokal terpasang jelas dengan konfirmasi privasi.
 * [x] Penyambungan `userId` dengan metadata rapat di database SQLite lokal (`user_id` column).
@@ -250,7 +263,8 @@ flowchart TD
 
 > **Alur Logika:** Setelah audio tertangkap, sistem mengubah audio menjadi teks secara lokal (cepat & privat), lalu menyimpannya ke database lokal (SQLite) serta menyinkronkannya ke Database Cloud pihak ketiga agar tidak hilang dan dapat diakses dari mana saja.
 
-#### 1. Fitur Eksisting yang Diuji & Diintegrasikan:
+#### 1. Fitur Eksisting Hari 2 yang Diuji & Diintegrasikan
+
 * **Mesin Transkripsi Whisper.cpp & Apple SpeechAnalyzer (`app/src/main/asr/`):**
   * Transkripsi suara ke teks (*Speech-to-Text*) 100% lokal di CPU/GPU/NPU tanpa biaya API per menit.
 * **Live Word Streaming (`app/src/shared/liveWords.ts`):**
@@ -266,8 +280,9 @@ flowchart TD
 * **Rapat Lifecycle Hooks (`app/src/main/meeting.ts`):**
   * Event `onMeetingStopSaved` dan `onMeetingChange` yang memicu proses pasca-rapat.
 
-#### 2. Fitur Baru yang Dibangun:
-1. **Skema Database Cloud PostgreSQL (Supabase):**
+#### 2. Fitur Baru Hari 2 yang Dibangun
+
+1. **Skema Database Cloud PostgreSQL (Supabase / Neon):**
    * Tabel `profiles`: `id`, `email`, `full_name`, `avatar_url`, `created_at`.
    * Tabel `workspaces`: `id`, `name`, `owner_id`.
    * Tabel `meetings`: `id`, `user_id`, `workspace_id`, `folder_id`, `title`, `started_at`, `ended_at`, `attendees`, `language`, `sync_version`.
@@ -280,7 +295,8 @@ flowchart TD
    * **Pull Sync:** Saat membuka aplikasi di perangkat lain, data rapat terbaru diunduh otomatis ke SQLite lokal.
    * **Offline Queue & Conflict Handling:** Jika laptop offline saat rapat selesai, data diberi tanda `sync_status = 'pending'`. Saat internet terhubung kembali, sistem langsung menyinkronkan tanpa menduplikasi data.
 
-#### 3. Skenario Pengujian Perusahaan (Enterprise QA Checklist):
+#### 3. Skenario Pengujian Perusahaan Hari 2 (Enterprise QA Checklist)
+
 * [ ] **TC-2.1 (Transkripsi Whisper Bilingual):** Uji coba bicara campuran bahasa Indonesia dan istilah bisnis bahasa Inggris (contoh: *"Tolong follow up action item rapat Q3 ke PIC terkait"*). Pastikan kata-kata tertranskripsi dengan akurat.
 * [ ] **TC-2.2 (Custom Jargon Perusahaan):** Daftarkan 3 istilah unik perusahaan Anda di menu Jargon (misal: nama produk atau singkatan internal). Uji bicara istilah tersebut dan pastikan Whisper tidak salah eja.
 * [ ] **TC-2.3 (Live Word Streaming):** Pastikan teks transkrip mengalir di layar secara *real-time* saat rapat berlangsung tanpa membuat komputer *freeze*.
@@ -288,7 +304,8 @@ flowchart TD
 * [ ] **TC-2.5 (Uji Ketahanan Offline & Auto-Push Sync):** Putuskan koneksi WiFi kantor. Lakukan rapat singkat 1 menit dan simpan. Hubungkan kembali WiFi. Periksa apakah data rapat otomatis terkirim (*synced*) ke Cloud DB tanpa error.
 * [ ] **TC-2.6 (Uji Pull Sync Multi-Device):** Login akun yang sama di Laptop B (atau hapus cache lokal). Pastikan seluruh daftar rapat, transkrip, dan folder dari Laptop A muncul kembali dengan sempurna.
 
-#### 4. Hasil Akhir (Deliverable Hari 2):
+#### 4. Hasil Akhir (Deliverable Hari 2)
+
 * Transkripsi suara lokal Whisper terkalibrasi untuk istilah perusahaan.
 * Database Cloud PostgreSQL aktif dengan pengamanan RLS, dan sinkronisasi dua arah berjalan otomatis di latar belakang.
 
@@ -298,7 +315,8 @@ flowchart TD
 
 > **Alur Logika:** Transkrip yang panjang harus diubah menjadi notulen ringkas dan daftar tugas yang dapat ditindaklanjuti. Pengguna diberi kebebasan: menggunakan AI Lokal (hemat biaya & offline) atau Cloud AI (super cepat & berdaya analitik tinggi menggunakan API Key milik perusahaan/karyawan).
 
-#### 1. Fitur Eksisting yang Diuji & Diintegrasikan:
+#### 1. Fitur Eksisting Hari 3 yang Diuji & Diintegrasikan
+
 * **Engine LLM Lokal (`app/src/engine/llm.ts`, `node-llama-cpp`):**
   * Menjalankan model AI open-weight format GGUF (seperti Qwen 3 dan Gemma 4) yang terdaftar di `catalog/catalog.json`.
 * **Ekstraksi Catatan Terstruktur (`app/src/main/notes/enhance.ts`, `queue.ts`):**
@@ -310,7 +328,8 @@ flowchart TD
 * **Auto Title Generator:**
   * AI otomatis merumuskan judul rapat yang relevan berdasarkan isi percakapan.
 
-#### 2. Fitur Baru yang Dibangun:
+#### 2. Fitur Baru Hari 3 yang Dibangun
+
 1. **Arsitektur Provider AI Terpadu (*Unified AI Engine* - `app/src/engine/providers/`):**
    * Interface `AIProvider`: `generateNotes()`, `streamChat()`, `generateTitle()`.
    * `LocalProvider`: Menjalankan LLM lokal offline via `node-llama-cpp` (Qwen 3 / Gemma 4).
@@ -325,14 +344,16 @@ flowchart TD
 3. **Mekanisme Smart Fallback Otomatis:**
    * Jika pengguna memilih Cloud AI tetapi internet putus atau kuota API habis, sistem memberi peringatan jelas dan menawarkan pemrosesan dialihkan ke Model AI Lokal.
 
-#### 3. Skenario Pengujian Perusahaan (Enterprise QA Checklist):
+#### 3. Skenario Pengujian Perusahaan Hari 3 (Enterprise QA Checklist)
+
 * [ ] **TC-3.1 (Perbandingan Kualitas Notulen Lokal vs Cloud):** Uji ringkasan rapat yang sama menggunakan Local LLM (Qwen 3) dan Cloud AI (Gemini 2.0 / GPT-4o). Periksa ketepatan penangkapan Action Items dan daftar PIC (penanggung jawab).
 * [ ] **TC-3.2 (Penggabungan Catatan Manual Pengguna):** Saat merekam, ketik di editor manual: *"Catatan Direktur: Anggaran disetujui maks 100 juta"*. Selesaikan rapat dan pastikan poin ketikan manual ini masuk dan diprioritaskan oleh AI dalam ringkasan akhir.
 * [ ] **TC-3.3 (Uji Fitur "Write Again"):** Gunakan tombol Write Again dengan instruksi: *"Tulis ulang seringkas mungkin dalam 3 poin bullet saja"*. Pastikan AI merespons instruksi tersebut secara akurat.
 * [ ] **TC-3.4 (Keamanan & Enkripsi API Key):** Masukkan API Key Gemini/OpenAI. Periksa file konfigurasi dan file log (`main.log`): pastikan string API Key tidak pernah tertulis dalam bentuk teks polos (*plain text*).
 * [ ] **TC-3.5 (Uji Smart Fallback):** Setel mode ke Cloud AI, lalu matikan internet. Jalankan peringkasan: pastikan aplikasi tidak *crash*, melainkan menampilkan notifikasi dan menawarkan beralih ke Model AI Lokal.
 
-#### 4. Hasil Akhir (Deliverable Hari 3):
+#### 4. Hasil Akhir (Deliverable Hari 3)
+
 * Opsi *Hybrid AI* aktif: pengguna di laptop spek rendah bisa memanfaatkan Cloud API Key yang super cepat, sementara pengguna yang butuh kerahasiaan 100% tetap bisa memakai LLM Lokal offline.
 
 ---
@@ -341,7 +362,8 @@ flowchart TD
 
 > **Alur Logika:** Pengguna dan tim membutuhkan wadah cloud untuk login, melihat seluruh riwayat rekaman tanpa harus membuka laptop utama, mendengarkan audio rekaman, serta membagikan tautan rapat ke peserta lain persis seperti platform **Fathom Video**. Selain itu, website portal menjadi pusat resmi tempat pengguna dapat mengunduh aplikasi desktop (*Desktop App Download Hub*). Di hari ini, kita meluncurkan Website Portal Next.js di Vercel, halaman unduh multi-OS, interactive playback player, sistem berbagi link publik/tim, dan basis pengetahuan pencarian AI (RAG).
 
-#### 1. Fitur Eksisting yang Diuji & Diintegrasikan:
+#### 1. Fitur Eksisting Hari 4 yang Diuji & Diintegrasikan
+
 * **Chunking & Vector Embeddings Lokal (`app/src/main/library/`):**
   * Transkrip dipecah menjadi potongan teks dan diubah menjadi vektor menggunakan model embedding lokal.
 * **Fitur "Ask" / Tanya-Jawab Lintas Rapat (`app/src/main/library/retrieve.ts`):**
@@ -355,7 +377,8 @@ flowchart TD
 * **Ekspor & Cadangan Data (`backup.ts`, `exportNotes.ts`):**
   * Ekspor catatan ke format Markdown (`.md`), copy ke clipboard, dan ekspor/impor seluruh database ke file ZIP.
 
-#### 2. Fitur Baru yang Dibangun:
+#### 2. Fitur Baru Hari 4 yang Dibangun
+
 1. **Inisialisasi Project Web Portal Next.js (`web/`) & Deploy Vercel:**
    * Membangun aplikasi web modern menggunakan **Next.js 15 (App Router)** di direktori `web/` monorepo.
    * Terhubung langsung dengan **Neon Serverless PostgreSQL** via `@neondatabase/serverless` dan **Supabase Auth**.
@@ -381,7 +404,8 @@ flowchart TD
 7. **Penyimpanan Rekaman Audio Cloud Opsional:**
    * Pengaturan: *"Upload file audio ke Cloud Storage"* (Supabase Storage / S3 / Cloudflare R2) bagi rapat yang ingin didengarkan ulang oleh tim dari browser web.
 
-#### 3. Skenario Pengujian Perusahaan (Enterprise QA Checklist):
+#### 3. Skenario Pengujian Perusahaan Hari 4 (Enterprise QA Checklist)
+
 * [ ] **TC-4.1 (Uji Login & Dashboard Website Portal di Vercel):** Buka Website Portal Next.js yang terdeploy di Vercel. Login dengan akun yang sama. Pastikan seluruh daftar rapat yang baru selesai direkam di PC desktop langsung muncul dengan status *synced*.
 * [ ] **TC-4.2 (Uji Download Aplikasi Desktop dari Website):** Buka halaman `/download` dari browser Windows dan Mac. Pastikan sistem mendeteksi OS dengan benar dan tautan download file installer (`.exe` / `.dmg`) dapat diunduh tanpa kendala.
 * [ ] **TC-4.3 (Uji Pemutar Audio & Transkrip Karaoke Interaktif):** Putar rekaman rapat di web portal. Pastikan teks transkrip tersorot secara otomatis (*highlight*) mengikuti audio yang berbicara. Klik salah satu kata di menit ke-02:15, pastikan pemutaran audio langsung melompat tepat ke detik tersebut.
@@ -390,7 +414,8 @@ flowchart TD
 * [ ] **TC-4.6 (Uji Tanya RAG Lintas Rapat di Web & Desktop):** Buka fitur "Ask". Ajukan pertanyaan spesifik perusahaan: *"Apa saja keputusan terkait timeline proyek X pada rapat 3 hari lalu?"*. Pastikan AI menjawab dengan tepat disertai sitasi tautan rapat terkait.
 * [ ] **TC-4.7 (Uji Integrasi Local MCP Server):** Hubungkan Cursor atau Claude Code ke MCP Server Yogurt lokal. Jalankan perintah untuk membaca ringkasan rapat terakhir dan pastikan AI eksternal dapat mengambil konteksnya.
 
-#### 4. Hasil Akhir (Deliverable Hari 4):
+#### 4. Hasil Akhir (Deliverable Hari 4)
+
 * Website Portal Next.js (mirip Fathom) aktif ter-deploy di Vercel lengkap dengan halaman download aplikasi desktop PC.
 * Pemutar audio karaoke interaktif dan pembagian link rapat publik/tim berfungsi mulus.
 * Pengguna Android dan iOS dapat mengakses dan membaca seluruh hasil rapat melalui browser smartphone.
@@ -402,7 +427,8 @@ flowchart TD
 
 > **Alur Logika:** Sebelum aplikasi diluncurkan ke seluruh karyawan perusahaan, seluruh sistem harus melewati audit keamanan ketat (data privasi tidak bocor antar karyawan), pengujian alur lengkap (*End-to-End Stress Test*), dan dikompilasi menjadi file installer executable desktop PC (.exe/.dmg) yang siap di-install oleh siapa saja.
 
-#### 1. Fitur Eksisting yang Diuji & Diintegrasikan:
+#### 1. Fitur Eksisting Hari 5 yang Diuji & Diintegrasikan
+
 * **Sistem Build & Packaging PC (`app/electron-builder.yml`, `package.json`, skrip `app/scripts/native.mjs`):**
   * Konfigurasi kompilasi native addon (`whisper.cpp`, `node-llama-cpp`, `node:sqlite`).
 * **Test Suite Otomatis (`app/vitest.config.ts`, `app/playwright.config.ts`):**
@@ -412,7 +438,8 @@ flowchart TD
 * **Dukungan Multi-Platform PC:**
   * Windows (`.exe`), macOS (`.dmg`), dan Linux (`.AppImage`).
 
-#### 2. Fitur Baru & Aktivitas Finalisasi:
+#### 2. Fitur Baru Hari 5 & Aktivitas Finalisasi
+
 1. **Audit Keamanan Multi-Tenant & Kebocoran Privasi:**
    * Verifikasi Row-Level Security (RLS) PostgreSQL: Memastikan Karyawan A tidak bisa mengakses catatan rapat Karyawan B dengan memanipulasi UUID meeting.
    * Sanitasi Log: Memastikan token autentikasi, API Key AI, dan transkrip rahasia tidak pernah tercatat di file `main.log`.
@@ -421,9 +448,11 @@ flowchart TD
    * *Simulasi 2:* Kondisi internet kantor mati total $\rightarrow$ Rapat tetap terekam dan diringkas oleh Local LLM $\rightarrow$ Internet menyala kembali $\rightarrow$ Auto-sync berjalan mulus tanpa konflik.
 3. **Kompilasi Installer PC Siap Pakai:**
    * Menjalankan build production multi-platform:
+
      ```bash
      pnpm run build
      ```
+
    * Menghasilkan file installer mandiri:
      * **Windows:** `Yogurt Setup.exe` (x64)
      * **macOS:** `Yogurt.dmg` (Universal / Apple Silicon & Intel)
@@ -432,13 +461,15 @@ flowchart TD
    * Panduan instalasi satu klik untuk karyawan.
    * Panduan setup environment backend database untuk tim IT perusahaan.
 
-#### 3. Skenario Pengujian Perusahaan (Enterprise QA Checklist):
+#### 3. Skenario Pengujian Perusahaan Hari 5 (Enterprise QA Checklist)
+
 * [ ] **TC-5.1 (Clean Install Test):** Ambil laptop Windows standar karyawan yang bersih (tanpa Node.js/tools developer). Jalankan file `Yogurt Setup.exe`. Pastikan aplikasi terpasang sempurna dan langsung dapat digunakan.
 * [ ] **TC-5.2 (Uji Isolasi Data Antar-Karyawan):** Buat 2 akun berbeda (Akun Karyawan & Akun Direktur). Pastikan Akun Karyawan tidak dapat melihat catatan rahasia yang disimpan di Akun Direktur.
 * [ ] **TC-5.3 (Stress Test Rapat Panjang):** Uji perekaman rapat berdurasi panjang (> 90 menit). Pantau penggunaan memori RAM dan CPU: pastikan aplikasi stabil, tidak terjadi *memory leak*, dan tidak crash.
 * [ ] **TC-5.4 (Validasi Skenario Full-Flow):** Uji alur lengkap dari awal hingga akhir: Buka Zoom $\rightarrow$ Deteksi otomatis $\rightarrow$ Rekam $\rightarrow$ Selesai $\rightarrow$ AI generate notulen $\rightarrow$ Sync cloud $\rightarrow$ Buka di browser HP $\rightarrow$ Berbagi link ke rekan kerja.
 
-#### 4. Hasil Akhir (Deliverable Hari 5):
+#### 4. Hasil Akhir (Deliverable Hari 5)
+
 * File installer desktop PC production (`.exe` / `.dmg`) siap dibagikan ke seluruh tim.
 * Web Companion aktif untuk akses mobile.
 * Dokumentasi deployment IT dan checklist kepatuhan privasi lengkap.
@@ -471,14 +502,14 @@ CLOUD_STORAGE_BUCKET=meeting-audio
 
 ## 6. Matriks Kesiapan Rilis Perusahaan (Definition of Done)
 
-- [x] **Identitas & Akses:** Karyawan bisa Register/Login akun kantor, atau memilih Mode Tamu / 100% Offline.
-- [x] **Perekaman Sistem:** Deteksi otomatis Zoom, Meet, Teams, Slack tanpa bot pihak ketiga; audio dual-track jernih tanpa gema.
-- [x] **Konektivitas Cloud Database:** Neon Serverless PostgreSQL terkoneksi aktif dengan skema multi-tabel (`profiles`, `workspaces`, `folders`, `meetings`, `transcripts`, `notes`).
-- [ ] **Transkripsi Cepat:** Whisper STT lokal mendukung Bahasa Indonesia, istilah teknis perusahaan (Custom Jargon), dan live streaming.
-- [ ] **Sinkronisasi Otomatis:** Catatan tersimpan di SQLite lokal dan Cloud PostgreSQL (Neon) dengan ketahanan offline (*offline queue*).
-- [ ] **Fleksibilitas AI (Hybrid):** Pengguna bebas beralih antara Local LLM (gratis & offline) atau Cloud AI (GPT-4o/Gemini/Claude via API Key terenkripsi).
-- [ ] **Website Portal (Mirip Fathom):** Dashboard web cloud tempat login, melihat riwayat meeting, pemutar audio karaoke transkrip interaktif, dan pembagian share link publik/tim.
-- [ ] **Akses Mobile (HP):** Ringkasan rapat dan transkrip dapat dibuka responsif dari HP Android & iOS melalui Web Portal (PWA).
-- [ ] **Kolaborasi & Berbagi:** Notulen rapat dapat dibagikan via tautan shareable aman tanpa penerima harus menginstall aplikasi desktop.
-- [ ] **Basis Pengetahuan (RAG):** Pengguna dapat mencari dan menanyakan isi rapat masa lalu dengan sitasi akurat.
-- [ ] **Distribusi Mandiri:** File installer PC (`.exe` / `.dmg`) berhasil di-build dan berjalan lancar pada komputer pengguna awam.
+* [x] **Identitas & Akses:** Karyawan bisa Register/Login akun kantor, atau memilih Mode Tamu / 100% Offline.
+* [x] **Perekaman Sistem:** Deteksi otomatis Zoom, Meet, Teams, Slack tanpa bot pihak ketiga; audio dual-track jernih tanpa gema.
+* [x] **Konektivitas Cloud Database:** Neon Serverless PostgreSQL terkoneksi aktif dengan skema multi-tabel (`profiles`, `workspaces`, `folders`, `meetings`, `transcripts`, `notes`).
+* [ ] **Transkripsi Cepat:** Whisper STT lokal mendukung Bahasa Indonesia, istilah teknis perusahaan (Custom Jargon), dan live streaming.
+* [ ] **Sinkronisasi Otomatis:** Catatan tersimpan di SQLite lokal dan Cloud PostgreSQL (Neon) dengan ketahanan offline (*offline queue*).
+* [ ] **Fleksibilitas AI (Hybrid):** Pengguna bebas beralih antara Local LLM (gratis & offline) atau Cloud AI (GPT-4o/Gemini/Claude via API Key terenkripsi).
+* [ ] **Website Portal (Mirip Fathom):** Dashboard web cloud tempat login, melihat riwayat meeting, pemutar audio karaoke transkrip interaktif, dan pembagian share link publik/tim.
+* [ ] **Akses Mobile (HP):** Ringkasan rapat dan transkrip dapat dibuka responsif dari HP Android & iOS melalui Web Portal (PWA).
+* [ ] **Kolaborasi & Berbagi:** Notulen rapat dapat dibagikan via tautan shareable aman tanpa penerima harus menginstall aplikasi desktop.
+* [ ] **Basis Pengetahuan (RAG):** Pengguna dapat mencari dan menanyakan isi rapat masa lalu dengan sitasi akurat.
+* [ ] **Distribusi Mandiri:** File installer PC (`.exe` / `.dmg`) berhasil di-build dan berjalan lancar pada komputer pengguna awam.
