@@ -1,0 +1,105 @@
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { isLocale } from '../shared/i18n'
+import { spokenOf, type Spoken } from '../shared/spoken'
+
+/** theme: light or dark regardless of the system; follows the system when left out. language: the interface's, the computer's when left out */
+export type Settings = { theme?: 'light' | 'dark'; language?: string; /** what the person is called in their meetings; their Mac's full name when left out */ myName?: string
+  /** last signed-in account profile; credentials remain in safeStorage */
+  accountProfile?: { id: string; email: string; name: string }
+  /** the first-run questions were shown (answered or put off): never asked again */
+  welcomed?: boolean
+  /** Windows and Linux: private calendar addresses (iCal), sealed with the system's keychain where it has one (calendarLink) */
+  calendarLinks?: Array<{ id: string; name: string; host: string; url: string }>
+  /** the intro screens were read or skipped (kept apart, so a restart halfway through goes on with the permissions) */
+  introSeen?: boolean
+  /** The optional bigger notes model stays off until explicitly downloaded again. */
+  notesUpgradeSkipped?: boolean
+  /** home's Finish setup was put away while these were missing; it comes back only when something else is */
+  setupDismissed?: import('./permissions').PermissionKind[]
+  /** opens when the Mac starts; off unless the person said yes */
+  openAtLogin?: boolean
+  /** the native menu bar icon; on unless turned off */
+  showInMenuBar?: boolean
+  /** Show a meeting title beside the icon or in its tooltip. Defaults on. */
+  showNextMeeting?: boolean
+  /** the floating recording control; on by default */
+  showRecordingPill?: boolean
+  /** the Dock icon; on unless turned off */
+  showInDock?: boolean
+  /** Legacy flag, ignored: it may have come from a different app bundle. Removed after a confirmed post. */
+  notificationsAsked?: boolean
+  /** Designated requirements of app identities that successfully posted the registering notification. Not authorization. */
+  notificationsAskedFor?: string[]
+  /** Accessibility was asked for once (the Mac's prompt shows only the first time; after it, only System Settings) */
+  axAsked?: boolean
+  /** AI apps on this Mac (Claude, Cursor, …) may read meetings through MCP; off unless the person turned it on */
+  aiApps?: boolean
+  /** those AI apps may also change meetings, notes and a few settings (never delete for good); off unless turned on */
+  aiAppChanges?: boolean
+  /** a recording stops by itself when its call ends; on unless turned off (false: ask first) */
+  stopWhenCallEnds?: boolean
+  /** a quiet reminder to ask everyone before recording; on unless turned off */
+  recordingReminder?: boolean
+  /** Credit on copied summaries and saved Markdown; on unless turned off. */
+  includeRecordingCredit?: boolean
+  /** keep audio after its transcript and summary are saved; on unless turned off */
+  keepRecordings?: boolean
+  /** Only meetings ending after this opt-out may lose their audio automatically. */
+  recordingsOffAt?: number
+  /** the mic to record with (its Core Audio UID); Auto, the Mac's own input, when left out or not plugged in */
+  mic?: string
+  /** Calendars excluded from Cakapp's agenda and meeting detection. Others stay visible. */
+  hiddenCalendarIds?: string[]
+  /** Hide events without a call link; off unless enabled. */
+  hideEventsWithoutCallLink?: boolean
+  /** names, products and acronyms to spell right in transcripts and notes (shared/jargon.ts) */
+  jargon?: string[]
+  /** the language people speak in meetings: English only unless 'multi' (shared/spoken.ts) */
+  spoken?: Spoken
+  /** the default for newly written summaries; the meeting's language when left out */
+  summaryLanguage?: string
+  /** new versions download by themselves; on unless turned off */
+  autoUpdate?: boolean }
+
+/** "English only" unless Multi-language was picked */
+export const spokenSetting = (s: Settings): Spoken => spokenOf(s.spoken)
+
+export const summaryLanguageSetting = (s: Settings): string => isLocale(s.summaryLanguage) ? s.summaryLanguage : ''
+
+/** "Stop recording when the call ends": on by default */
+export const stopsWhenCallEnds = (s: Settings): boolean => s.stopWhenCallEnds !== false
+export const includesRecordingCredit = (s: Settings): boolean => s.includeRecordingCredit !== false
+export const recordingReminderOn = (s: Settings): boolean => s.recordingReminder !== false
+/** Old recordings stay, even if their summaries are saved or rewritten after opting out. */
+export const keepsRecording = (s: Settings, endedAt: number | null): boolean =>
+  s.keepRecordings !== false || typeof s.recordingsOffAt !== 'number' || !Number.isFinite(s.recordingsOffAt) || endedAt == null || endedAt <= s.recordingsOffAt
+
+export const autoUpdateOn = (s: Settings): boolean => s.autoUpdate !== false
+
+/** The Dock icon and the menu bar icon, as the person sees them: at least one stays visible, so the app always has an entry point. */
+export type Visibility = { showInMenuBar: boolean; showInDock: boolean; showRecordingPill: boolean }
+/** Restore the Dock if both entry points are hidden. Only the Mac menu bar can replace the recording pill. */
+export function visibilityOf(s: Settings, os: string = process.platform): Visibility {
+  const showInMenuBar = s.showInMenuBar !== false
+  return { showInMenuBar, showInDock: !showInMenuBar || s.showInDock !== false,
+    showRecordingPill: os !== 'darwin' || !showInMenuBar || s.showRecordingPill !== false }
+}
+
+export function loadSettings(path: string): Settings {
+  try { return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {} } catch { return {} }
+}
+export function saveSettings(path: string, s: Settings) {
+  // write-then-rename so a crash mid-save never leaves a half-written file
+  writeFileSync(path + '.tmp', JSON.stringify(s, null, 2))
+  renameSync(path + '.tmp', path)
+}
+
+/** Merge a patch into the saved settings; undefined values remove a key. */
+export function updateSettings(path: string, patch: Partial<Settings>): Settings {
+  const next = { ...loadSettings(path), ...patch }
+  saveSettings(path, next)
+  return next
+}
+
+/** The language picked in Settings; the computer's when none (or one Cakapp no longer has) */
+export const localeOf = (s: Settings, system: string): string => (isLocale(s.language) ? s.language : system)

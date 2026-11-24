@@ -1,0 +1,1271 @@
+import { loadWindowState, placeWindow, saveWindowState } from './windowState'
+import { trustSystemCertificates } from './systemCerts'
+import { createSavedTranscriptions } from './savedTranscription'
+import { transcriptionBusy } from '../shared/transcription'
+import { hookAudioUploads } from './audioUploadIpc'
+import { uploadedAudio } from './audioUpload'
+import { hookRendererErrors } from './rendererErrors'
+import { matchSearchPeople, searchPersonKey } from '../shared/searchPeople'
+import { resolvePeople } from './people'
+import { createFolderSuggestions } from './folderSuggestions'
+import { speakerColor } from '../shared/speakerColors'
+import { createNotificationPermission } from './notificationPermission'
+import { createRecordingReminder } from './recordingReminder'
+import { closeAction, keepMainWindow } from './mainWindow'
+import { setDockVisible } from './dock'
+import { titleBarOverlay, windowChrome } from './windowChrome'
+import { x11Relaunch } from './display'
+import { isAppRoute } from '../shared/routes'
+import { resumesNote } from '../shared/agendaNote'
+import { relaunchOptions, stripAppImageEnv } from './relaunch'
+import { capabilities, micListHelper, platformOf, supportedKinds } from '../shared/platform'
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, protocol, safeStorage, screen, shell } from 'electron'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
+import { basename, join } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { isFake, userDataDir } from './paths'
+import { logToFile } from './log'
+import { includesRecordingCredit, loadSettings, localeOf, keepsRecording, recordingReminderOn, spokenSetting, stopsWhenCallEnds, updateSettings, visibilityOf, summaryLanguageSetting } from './settings'
+import { CALL_GONE_MS, micPids, useCallApps, watchEveryMs, type MicApp } from './detect'
+import { systemLocale } from './locale'
+import { language as uiLanguage, onLanguage, setLanguage, t } from '../shared/i18n'
+import bundledCatalog from '../../../catalog/catalog.json'
+import licenses from '../../../catalog/licenses.json'
+import { loadCatalog } from './catalog'
+import { readSysInfo, toHardware, type GpuProbe } from './hardware'
+import { realDeps } from './downloader'
+import { wavOf } from './fakeCapture'
+import { askFakeNotifications, chatMeetings, fakeAccess, fakeDownloadDeps, fakeHardware, fakeHelper, fakeNow, installFakeHooks, manyMeetings, mediaCalls, waitForFakeAudioMetadata } from './fake'
+import { createPermissions } from './permissions'
+import { hookPreferences, onboardingShowing } from './preferences'
+import { loginItemOn, openedAtLogin, setLoginItem, syncLoginItem } from './loginItem'
+import { createMedia } from './media'
+import { createTray, linuxTrayHost } from './tray'
+import { trayWindowEnd } from './trayMenu'
+import { SetupController } from './setup'
+import { fakeMeasure, measureSpeed, speedClipPath, speedStore } from './asr/speedCheck'
+import { vadModelPath, whisperServerPath } from './asr/server'
+import { openStore, type Store } from './store'
+import { calendars, eventIds, matchesEvent, setCalendarSelection, setCalendarOwnEmail, calendarStatus, createHelperRunner, helperPath, killAllHelpers, refreshCalendarStatus, requestCalendarAccess, runHelper, setCalendarLinkSource, systemCalendarStatus, setCalendarSupported, setHelper, upcoming, type CalEvent } from './calendar'
+import { createCalendarLinks } from './calendarLink'
+import { getCalendar } from './calendarLink/get'
+import { createSignals } from './detectSignals'
+import { Watcher } from './watch'
+import { createPrompts } from './prompts'
+import { activeMeeting, bindMeetingApp, getMeeting, initMeetings, onMeetingBound, onMeetingChange, onMeetingStart, onMeetingStop, onMeetingStopSaved, createFolderNote, refreshEventSnapshots, linkEvent, unlinkEvent, prepareMeeting, startPreparedMeeting, resumeMeeting, pauseMeetingClock, renameMeeting, retryStopSave, setAttendees, setUserIdProvider, startMeeting, stopMeeting, stopSavePending, withStopState } from './meeting'
+import { deleteMeeting } from './deleteMeeting'
+import { emptyTrash, moveToTrash, purgeTrash } from './trash'
+import { isId, text, rewriteNote } from './ipcArgs'
+import { hookMics } from './mics'
+import { activeCapture, audioHelperPath, hookCapture, joinParts, onCaptureStart, onRecordingEvent, prepareAppend, recordingFinished, recordingPaused, recordingSettled, rejoinInterrupted, setRecordingPaused, settleRecording, tell, type WarnCode } from './capture'
+import { createWidget } from './widget'
+import { liveSilentMs, hookTranscription, transcribeRecorded, onWhisperGpuOff, meetingLanguage, settleTranscription, speechLocaleFor, spokenChanged, transcriptionBacklogMs, stopTranscriptionServer, releaseIdleSpeech, transcriptFinished, transcriptOpen, transcriptPartials } from './asr'
+import { hookCallNames, type Watch } from './callNames'
+import { helperWatch, killAllWatches } from './callNames/watch'
+import { macFullName } from './user'
+import { setJargon, setOwnerName } from './vocab'
+import { cleanJargon } from '../shared/jargon'
+import { setGenericTitles } from './titles'
+import { installAppMenu } from './appMenu'
+import { hookAuth } from './auth'
+import { checkNeonHealth, initNeonSchema, isNeonConfigured, syncMeetingToNeon } from './neon'
+import { UtilityEngine } from './engine'
+import { createNotesModel } from './notes/model'
+import dotenv from 'dotenv'
+import { FakeEngine } from './notes/fake'
+import { hookNotes } from './notes'
+import { hookReadAhead, readAheadAllowed } from './notes/readAhead'
+import { createQueue, isSmallMac, notesMemory } from './notes/queue'
+import type { ContextChip } from '../shared/askContext'
+import { Library } from './library/store'
+import { createEmbedder } from './library/embedder'
+import { createIndexer } from './library/indexer'
+import { hookConversations } from './library/conversations'
+import { hookShare } from './share'
+import { hookBackup } from './backupIpc'
+import { hookFolders } from './foldersIpc'
+import { hookMcp } from './mcp'
+import { startedHidden } from './mcp/paths'
+import { deleteRecording } from './deleteRecording'
+import { AUDIO_SCHEME, audioExts, createAudioHandler, trackFile, type AudioExt } from './audio'
+import { helperDecode, wavDecode } from './asr/backfill'
+import { finishQuit, hookUpdates, isPreviewBuild, updatesOn } from './updates'
+import type { NoteSaveResult, StartResult } from '../shared/types'
+
+// the transcript's player streams each meeting's audio from here; seeking needs stream support (before ready)
+protocol.registerSchemesAsPrivileged([{ scheme: AUDIO_SCHEME, privileges: { standard: true, secure: true, stream: true } }])
+for (const envFile of [
+  join(process.cwd(), '.env'),
+  join(process.cwd(), 'app/.env'),
+  join(__dirname, '../../.env'),
+  join(__dirname, '../../../.env'),
+]) {
+  if (existsSync(envFile)) dotenv.config({ path: envFile, quiet: true })
+}
+
+app.setName('Cakapp')
+// Windows shows notifications only for an app with this id (the installer's shortcut carries the same one, electron-builder appId)
+if (process.platform === 'win32') app.setAppUserModelId('so.yogurt.app')
+app.setPath('userData', userDataDir())
+// before anything goes online: a company's own HTTPS certificate, installed in the system, is trusted too (#115)
+const systemCerts = trustSystemCertificates()
+mkdirSync(userDataDir(), { recursive: true })
+logToFile(join(userDataDir(), 'logs', 'main.log'))
+hookRendererErrors()
+// logged, never a dialog: one bad message or a failed promise must not stop a recording
+process.on('unhandledRejection', (err) => console.error('unhandled rejection', err))
+process.on('uncaughtException', (err) => console.error('uncaught exception', err))
+
+// Linux on Wayland: once more through XWayland, so the widget and the card can float (display.ts)
+const x11 = x11Relaunch(process.platform, process.argv, process.env, process.execPath)
+if (x11) { stripAppImageEnv(); app.relaunch(x11); app.exit(0) }
+// One Cakapp at a time: a second launch focuses the existing window
+else if (!app.requestSingleInstanceLock()) app.quit()
+let win: BrowserWindow | undefined
+let allowQuit = false
+let presentMain = (_foreground = false) => {}
+let updateMainMenu = () => {}
+let menuBar: ReturnType<typeof createTray> | undefined
+/** test runs: no window on screen, never takes focus from what the person is doing */
+const BACKGROUND = process.env.YOGURT_BACKGROUND === '1'
+// an AI app's yogurt-mcp starting Cakapp while it was still opening (--hidden) brings no window forward
+app.on('second-instance', (_e, argv) => { if (app.isReady() && !startedHidden(process.platform, argv)) showMain() })
+
+/** Links open in the user's browser, never inside the app window. */
+function openExternally(url: string) {
+  // fake mode opens nothing (tests), unless a person trying it by hand asks for links (YOGURT_FAKE_OPEN_LINKS=1)
+  if ((!isFake() || process.env.YOGURT_FAKE_OPEN_LINKS === '1') && /^https:\/\//.test(url)) void shell.openExternal(url)
+}
+
+let updateWidgetVisibility = () => {}
+let recordingPillChanged = (_on: boolean) => {}
+let sendWidgetTranscript = (_channel: string, _value: unknown) => {}
+function createWindow() {
+  // the size and place it was left at (windowState.ts); test runs (fake mode) always start at the default, so one
+  // test's resize never carries into the next
+  const remember = !isFake()
+  const stateFile = join(userDataDir(), 'window.json')
+  const place = placeWindow(remember ? loadWindowState(stateFile) : null, screen.getAllDisplays().map((d) => d.workArea), { width: 1100, height: 760, minWidth: 720, minHeight: 520 })
+  win = new BrowserWindow({
+    x: place.x, y: place.y, width: place.width, height: place.height, minWidth: 720, minHeight: 520,
+    title: 'Cakapp',
+    ...windowChrome(process.platform, nativeTheme.shouldUseDarkColors),
+    show: false,
+    // hidden pages would otherwise pause timers and animations
+    webPreferences: { preload: join(__dirname, '../preload/index.cjs'), sandbox: false, ...(BACKGROUND ? { backgroundThrottling: false } : {}) },
+  })
+  presentMain = keepMainWindow(win, { background: BACKGROUND, canClose: () => allowQuit, activate: () => app.focus({ steal: true }),
+    closeTo: () => closeAction(process.platform, menuBar?.shown() ?? true), glass: process.platform === 'darwin', lift: process.platform === 'darwin' })
+  if (process.platform !== 'darwin') {
+    win.setMenuBarVisibility(false)
+    // the window buttons follow light and dark mode
+    const recolor = () => { if (win && !win.isDestroyed()) { win.setTitleBarOverlay(titleBarOverlay(nativeTheme.shouldUseDarkColors)); win.setBackgroundColor(titleBarOverlay(nativeTheme.shouldUseDarkColors).color) } }
+    nativeTheme.on('updated', recolor)
+    win.on('closed', () => nativeTheme.off('updated', recolor))
+  }
+  if (place.maximized) win.maximize()
+  if (remember) {
+    // saved a moment after a move or resize settles, and whenever the window is hidden or closed
+    const w = win
+    let timer: NodeJS.Timeout | undefined
+    const save = () => { clearTimeout(timer); if (!w.isDestroyed() && !w.isFullScreen()) saveWindowState(stateFile, { ...w.getNormalBounds(), maximized: w.isMaximized() }) }
+    const later = () => { clearTimeout(timer); timer = setTimeout(save, 500) }
+    w.on('resize', later); w.on('move', later)
+    w.on('hide', save); w.on('close', save)
+  }
+  win.webContents.setWindowOpenHandler(({ url }) => { openExternally(url); return { action: 'deny' } })
+  win.webContents.on('will-navigate', (e, url) => {
+    const ownPage = process.env.ELECTRON_RENDERER_URL ? url.startsWith(process.env.ELECTRON_RENDERER_URL) : url === pathToFileURL(join(__dirname, '../renderer/index.html')).toString()
+    if (ownPage) return
+    e.preventDefault()
+    openExternally(url)
+  })
+  if (process.env.ELECTRON_RENDERER_URL) win.loadURL(process.env.ELECTRON_RENDERER_URL)
+  else win.loadFile(join(__dirname, '../renderer/index.html'))
+  const visibilityChanged = () => { updateWidgetVisibility(); updateMainMenu() }
+  win.on('focus', visibilityChanged)
+  win.on('blur', visibilityChanged)
+  win.on('show', visibilityChanged)
+  win.on('hide', visibilityChanged)
+  win.on('minimize', visibilityChanged)
+  win.on('restore', visibilityChanged)
+  win.on('closed', () => { win = undefined; visibilityChanged() })
+  // a page still loading misses a go-to sent to it: tell it again once it is up
+  win.webContents.on('did-finish-load', () => { if (route) win?.webContents.send('nav:go', route, resumeRequested) })
+  presentMain()
+}
+
+/** First-run downloads: speech, speaker and notes models. Fake mode swaps in instant downloads and a fixed Mac. */
+/** Windows and Linux: what graphics the notes engine can use; null when it can't tell (or crashed checking: it then runs without them) */
+let probeGpu: () => Promise<GpuProbe | null> = async () => null
+function createSetup(): SetupController {
+  const modelsDir = join(userDataDir(), 'models')
+  return new SetupController({
+    modelsDir,
+    upgradePreference: {
+      load: () => loadSettings(join(userDataDir(), 'settings.json')).notesUpgradeSkipped === true,
+      save: (skipped) => { updateSettings(join(userDataDir(), 'settings.json'), { notesUpgradeSkipped: skipped }) },
+    },
+    // Windows and Linux: the notes engine checks the graphics first (a Mac shares its memory with them, no check)
+    getHardware: isFake() ? () => fakeHardware(platform) : async () => toHardware(await readSysInfo(userDataDir()), process.platform === 'darwin' ? undefined : await probeGpu()),
+    // the one in this build: new models come with app updates
+    getCatalog: async () => loadCatalog({ bundled: bundledCatalog, licenses }),
+    download: isFake() ? fakeDownloadDeps({ stepMs: Number(process.env.YOGURT_FAKE_STEP_MS ?? 5), notesMs: Number(process.env.YOGURT_FAKE_NOTES_MODEL_MS ?? 0), notesFailOnce: process.env.YOGURT_FAKE_NOTES_MODEL_FAIL_ONCE === '1' }) : realDeps,
+    ...(isFake() ? { sha256Override: 'FAKE' } : {}),
+    // Windows and Linux: speech models timed on this computer (asr/speedCheck.ts); a Mac never is
+    ...(platform === 'darwin' ? {} : { speed: { ...speedStore(speedFile()), measure: isFake() ? fakeMeasure() : (model: string) => measureSpeed(model, { binary: whisperServerPath(), vadModel: vadModelPath(), clip: speedClipPath() ?? '' }) } }),
+  })
+}
+/** what the speed check found (Windows and Linux) */
+const speedFile = () => join(userDataDir(), 'speech-speed.json')
+
+/** What this computer can do (fake mode can pretend with YOGURT_FAKE_PLATFORM): Windows and Linux read their calendar from a calendar link */
+const platform = platformOf(process.platform, process.env)
+const caps = capabilities(platform)
+setCalendarSupported(caps.calendar)
+// the call apps yogurt-system names on this computer (fake mode's helper speaks in a Mac's ids)
+useCallApps(isFake() ? 'darwin' : process.platform)
+/** Windows and Linux: the recorder lists the mics itself (yogurt-audio mic-devices) */
+const audioHelper = createHelperRunner(audioHelperPath)
+/** Windows: the recorder said the mic is blocked (Privacy & security), until a recording hears it again */
+let micBlocked = false
+onCaptureStart(() => { micBlocked = false })
+onRecordingEvent((e) => { if (e.t === 'warn' && e.code === 'no-mic') micBlocked = true })
+
+/**
+ * Microphone, call audio, calendar and Accessibility (names from calls) through the Mac helper.
+ * Notifications remember a confirmed post for this bundle and signer, never authorization.
+ */
+const notificationPermission = createNotificationPermission(join(userDataDir(), 'settings.json'))
+const permissions = createPermissions({
+  helper: (a) => runHelper(a),
+  // Requested before is not proof that permission was granted.
+  notifications: () => isFake() ? fakeAccess.notifications : notificationPermission.status(),
+  askNotifications: async () => isFake() ? askFakeNotifications() : notificationPermission.request(),
+  open: (url) => { if (isFake()) systemSettings.push(url); else void shell.openExternal(url) },
+  axAsked: () => !!loadSettings(join(userDataDir(), 'settings.json')).axAsked,
+  setAxAsked: () => updateSettings(join(userDataDir(), 'settings.json'), { axAsked: true }),
+  platform, micBlocked: () => micBlocked,
+})
+
+/** Reuse the hidden main window, including its route, scroll, drafts and position. */
+function showMain() {
+  if (!win) { createWindow(); presented++ }
+  presentMain(true)
+}
+
+/** Where the app was last told to go (e.g. /note/<id>); the window asks for it when it opens */
+let route = ''
+let resumeRequested = false
+let pendingAsk = false
+function askFromMenu() {
+  pendingAsk = true
+  showMain()
+  win?.webContents.send('nav:ask')
+}
+function goTo(next: string, resume = false) {
+  route = next
+  resumeRequested = resume
+  if (!win) createWindow()
+  win?.webContents.send('nav:go', route, resumeRequested)
+  presented++
+  // The card and widget never take focus, so their explicit navigation brings Cakapp forward.
+  presentMain(true)
+}
+/** how many times the window was asked to come forward (tests run it hidden, so they check this) */
+let presented = 0
+/** fake mode: how many times the Mac's Calendar settings would have opened */
+let settingsOpened = 0
+let refreshCalendarConsumers = () => {}
+/** a call is on (recording or not): the corner never offers Restart then */
+/** fake mode: the System Settings panes the permission steps and Settings would have opened */
+const systemSettings: string[] = []
+/** fake mode: how many times Cakapp would have quit and opened again for a permission */
+let relaunched = 0
+/** fake mode: how many times Cakapp would have restarted to install a new version */
+let updateRestarts = 0
+
+async function readCalendar(...range: Parameters<typeof upcoming>): Promise<CalEvent[]> {
+  const events = await upcoming(...range)
+  refreshEventSnapshots(events)
+  return events
+}
+
+/** What is still to come today and tomorrow (meetings on now included), soonest first */
+async function comingUp(): Promise<CalEvent[]> {
+  const now = isFake() ? fakeNow() : Date.now()
+  const end = new Date(now); end.setDate(end.getDate() + 2); end.setHours(0, 0, 0, 0)
+  return (await readCalendar(now, end.getTime())).filter((e) => e.end > now && e.start < end.getTime()).sort((a, b) => a.start - b.start)
+}
+
+/** The events on the day of this time, earliest first */
+async function eventsOn(at: number, purpose?: 'link-event', unavailable?: string[]): Promise<CalEvent[]> {
+  const from = new Date(at); from.setHours(0, 0, 0, 0)
+  const to = new Date(from); to.setDate(to.getDate() + 1)
+  return (await readCalendar(from.getTime(), to.getTime(), purpose ?? (event => eventIds(event).some(id => !!storeRef?.meetingForEvent(id))), unavailable)).sort((a, b) => a.start - b.start)
+}
+
+/** the Mac's full name: who "You" is unless Settings says otherwise (fake mode: a fixed one) */
+/** fake mode's call (callNames/fake.ts), loaded only in fake mode */
+const fakeCallWatch: Watch = (ids, onLine) => {
+  let inner: { stop(): void } | undefined, stopped = false
+  void import('./callNames/fake').then((m) => { if (!stopped) inner = m.fakeWatch()(ids, onLine) })
+  return { stop: () => { stopped = true; inner?.stop() } }
+}
+const macName = () => (isFake() ? process.env.YOGURT_FAKE_FULL_NAME ?? 'Sam Rivera' : macFullName())
+
+/** starting and pausing a recording the way home and the widget do, for AI apps (set once detection starts) */
+let recordingControls: { start(o: { eventId?: string; title?: string }): Promise<StartResult>; pause(id: unknown, paused: unknown): boolean } | undefined
+
+/** the processes of a call app on the mic at the last reading (set once detection starts): names come only from them (#98) */
+let micPidsNow: (app: string) => number[] = () => []
+
+/** fake mode's hooks reach the store and the notes through these */
+let storeRef: Store | undefined
+let indexerRef: { schedule(): Promise<unknown> } | undefined
+
+/** Notice calls, offer to take notes, stop when the call ends (or ask, with that setting off). Starts nothing without a click. */
+function startDetection() {
+  if (isFake()) setHelper(fakeHelper)
+  const signals = createSignals({ helper: runHelper, events: readCalendar })
+  refreshCalendarConsumers = () => signals.invalidateCalendar()
+  let lastReading: { micApps: MicApp[]; runningApps?: string[] } | undefined
+  // yogurt-system (Windows, Linux) reads no single process yet; the Mac helper does
+  if (process.platform === 'darwin') micPidsNow = (app) => (lastReading ? micPids(lastReading.micApps, lastReading.runningApps, app) : [])
+  const now = isFake() ? fakeNow : Date.now
+  let fakeSilence: number | undefined
+  const watcher: Watcher = new Watcher({
+    read: async (at) => (lastReading = await signals.read(at)), now, active: activeMeeting, bindApp: bindMeetingApp,
+    offer: (p) => prompts.offer(p), askStop: (m) => prompts.askStop(m), hide: () => prompts.hide(),
+    // the call ended: the same stop as the widget's Stop button, then say so
+    autoStop: (m) => { widget.callEnded(m.id); stopMeeting(m.id); prompts.stopped(m) },
+    silentMs: () => { if (isFake() && fakeSilence !== undefined) return fakeSilence; const m = activeMeeting(); return m ? liveSilentMs(m.id) : 0 },
+    autoStopOn: () => stopsWhenCallEnds(loadSettings(join(userDataDir(), 'settings.json'))),
+    // no "Take notes?" while onboarding is still on screen
+    ready: () => !onboardingShowing(),
+    // fake mode: tests can shorten the grace
+    graceMs: isFake() && process.env.YOGURT_FAKE_CALL_GONE_MS ? Number(process.env.YOGURT_FAKE_CALL_GONE_MS) : CALL_GONE_MS,
+  })
+  onMeetingStop(() => { watcher.cleared() })
+  const prompts = createPrompts({
+    windowVisible: () => !!win && win.isVisible() && !win.isMinimized(),
+    takeNotes: (p) => begin({ title: p.title || t('{app} call', { app: p.app ?? '' }).trim(), event: p.event, app: p.app }),
+    stop: (id) => { stopMeeting(id) },
+    dismissed: (key) => watcher.dismiss(key),
+    keepGoing: () => watcher.keepGoing(),
+    dismissStop: () => watcher.dismissStop(),
+    open: (id) => goTo(`/note/${id}`),
+    os: process.platform,
+  })
+  const preferences = loadSettings(join(userDataDir(), 'settings.json'))
+  const visibility = visibilityOf(preferences, platform)
+  let showRecordingPill = visibility.showRecordingPill
+  const widget = createWidget({
+    showRecordingPill: () => showRecordingPill,
+    os: platform, windowOs: process.platform,
+    open: (id) => goTo(`/note/${id}`),
+    stop: (id) => { stopMeeting(id) },
+    foreground: () => !!win && !win.isDestroyed() && win.isVisible() && !win.isMinimized() && win.isFocused(),
+  })
+  onMeetingStart(() => { prompts.hide(); watcher.cleared() })
+  // Recording needs the mic and the call audio: one never asked is asked now (the Mac's own prompt, as any app does
+  // when it first records); one still off says so under the note, where its button turns it on.
+  onMeetingStart((m) => void (async () => {
+    // Windows and Linux have no prompts: the recorder itself says when the mic is blocked
+    if (!caps.permissionPrompts) return
+    for (const [kind, code] of [['mic', 'no-mic'], ['systemAudio', 'no-system-audio']] as const) {
+      let access = (await permissions.status())[kind]
+      if (access === 'unknown') access = await permissions.request(kind)
+      if (access !== 'granted' && activeMeeting()?.id === m.id) tell({ t: 'warn', code })
+    }
+  })().catch((e) => console.warn("couldn't check what recording needs", e)))
+  updateWidgetVisibility = widget.visibilityChanged
+  sendWidgetTranscript = widget.transcript
+  /** The one way notes start: the card's Take notes, and home's Start notes and New note. Opens the note. */
+  function begin(p: { title: string; event: CalEvent | null; app: string | null; folderId?: string }) {
+    const alreadyRecording = !!activeMeeting()
+    const m = startMeeting(p)
+    const resume = resumesNote(m)
+    prompts.hide(); watcher.cleared(); goTo(`/note/${m.id}`, resume)
+    return { id: m.id, ...(resume ? { resumeRequested: true as const } : {}), ...(alreadyRecording ? { alreadyRecording: true as const } : {}) }
+  }
+  // home: Start notes for a calendar event (looked up here, never taken from the page), or New note with none; an AI
+  // app's start_recording the same way, with its own title if it gave one
+  // gone: the event left the calendar since the page showed it (moved, cancelled); failed: anything else, in plain words on the page
+  const startNotes = async (o: { eventId?: string; title?: string; folderId?: string }): Promise<StartResult> => {
+    try {
+      const cur = activeMeeting()
+      if (cur) { goTo(`/note/${cur.id}`); return { id: cur.id, alreadyRecording: true } }
+      let event: CalEvent | null = null
+      if (o.eventId !== undefined) {
+        event = (await comingUp()).find((e) => matchesEvent(e, o.eventId!)) ?? null
+        if (!event) return { error: 'gone' }
+      }
+      return begin({ title: o.title ?? event?.title ?? '', event, app: null, folderId: o.folderId })
+    } catch (e) {
+      console.error('start notes failed', e)
+      return { error: 'failed' }
+    }
+  }
+  ipcMain.handle('meetings:start', (_e, eventId: unknown, folderId?: unknown): Promise<StartResult> | StartResult => {
+    if (folderId !== undefined && !isId(folderId)) return { error: 'failed' }
+    return startNotes({ eventId: typeof eventId === 'string' ? eventId : undefined, folderId })
+  })
+  ipcMain.handle('meetings:folder-note', (_e, folderId: unknown) => {
+    if (!isId(folderId)) throw new Error('Invalid folder')
+    return createFolderNote(folderId).id
+  })
+  ipcMain.handle('meetings:prepare', async (_e, eventId: unknown, at: unknown): Promise<StartResult> => {
+    if (typeof eventId !== 'string' || typeof at !== 'number' || !Number.isFinite(at) || !Number.isFinite(new Date(at).getTime())) return { error: 'gone' }
+    try {
+      const event = (await eventsOn(at)).find((e) => matchesEvent(e, eventId))
+      if (!event) return { error: 'gone' }
+      const m = prepareMeeting(event)
+      goTo(`/note/${m.id}`)
+      return { id: m.id }
+    } catch (e) {
+      console.error('prepare notes failed', e)
+      return { error: 'failed' }
+    }
+  })
+  ipcMain.handle('meetings:start-prepared', (_e, id: unknown): StartResult => {
+    if (!isId(id)) return { error: 'gone' }
+    try {
+      const m = startPreparedMeeting(id)
+      if (!m) return { error: 'gone' }
+      prompts.hide(); watcher.cleared(); goTo(`/note/${m.id}`)
+      return { id: m.id }
+    } catch (e) {
+      console.error('start prepared notes failed', e)
+      return { error: 'failed' }
+    }
+  })
+  // the note's own Stop button: the same stop as the widget and the menu bar
+  ipcMain.on('meetings:stop', (_e, id: unknown) => { if (isId(id) && activeMeeting()?.id === id) stopMeeting(id) })
+  const pauseRecording = (id: unknown, paused: unknown) => {
+    if (!isId(id) || typeof paused !== 'boolean' || activeMeeting()?.id !== id) return false
+    const changed = setRecordingPaused(id, paused)
+    if (changed) { pauseMeetingClock(id, paused); win?.webContents.send('meetings:changed') }
+    return changed
+  }
+  ipcMain.handle('meetings:set-paused', (_e, id: unknown, paused: unknown) => pauseRecording(id, paused))
+  recordingControls = { start: startNotes, pause: pauseRecording }
+  ipcMain.handle('meetings:retry-stop-save', (_e, id: unknown) => isId(id) && retryStopSave(id))
+  // the menu bar: open, new note or stop, quit; Cakapp stays there with its window closed
+  const tray = createTray({
+    show: !BACKGROUND, visible: visibility.showInMenuBar, showNextMeeting: preferences.showNextMeeting,
+    showRecordingPill: () => showRecordingPill,
+    open: () => { presented++; showMain() },
+    newNote: () => { if (!activeMeeting()) begin({ title: '', event: null, app: null }) },
+    stop: (id) => { stopMeeting(id) },
+    pause: pauseRecording,
+    ask: askFromMenu, settings: () => goTo('/settings'),
+    openNote: (id) => { const note = storeRef?.meeting(id); if (note && note.trashedAt == null) goTo(`/note/${id}`) },
+    recent: () => storeRef?.meetingCards({ limit: 5 }) ?? [],
+    events: () => {
+      const at = now()
+      return readCalendar(at, trayWindowEnd(at), undefined, undefined, { fullRange: true })
+    },
+    now,
+    elapsed: widget.elapsed,
+    os: platform,
+    host: process.platform === 'linux' && !BACKGROUND ? linuxTrayHost : undefined,
+    event: (event, join) => {
+      const m = begin({ title: event.title, event, app: null })
+      if (join && m) watcher.joined(m.id)
+      if (join && event.url) openExternally(event.url.trim())
+    },
+  })
+  refreshCalendarConsumers = () => { signals.invalidateCalendar(); void tray.refreshCalendar() }
+  menuBar = tray
+  recordingPillChanged = (on) => {
+    showRecordingPill = on
+    widget.visibilityChanged()
+    tray.refresh()
+  }
+  // cheap, and only while Cakapp runs; more often while recording, so the end of a quiet call is noticed promptly
+  let timer: NodeJS.Timeout | undefined
+  const watchLoop = () => { timer = setTimeout(() => { void watcher.tick().catch((e) => console.error('detect failed', e)).finally(watchLoop) }, watchEveryMs(!!activeMeeting())) }
+  watchLoop()
+  app.on('will-quit', () => clearTimeout(timer))
+  if (isFake()) {
+    installFakeHooks({
+      silence: async (ms) => { fakeSilence = ms ?? undefined; await watcher.tick() },
+      signals: async (r) => { signals.override(r); await watcher.tick() },
+      advance: () => watcher.tick(),
+      widget: () => widget.snapshot(),
+      main: () => ({ presented, visible: !!win?.isVisible(), route, settingsOpened, systemSettings, mediaCalls, relaunched, updateRestarts }),
+      go: (r) => goTo(r),
+      warn: (code) => tell({ t: 'warn', code: code as WarnCode }),
+      // a long finished meeting: n lines half a second apart, voices taking turns, with quiet low-rate audio to play
+      bigMeeting: (n) => {
+        const store = storeRef!
+        const startedAt = Date.now() - n * 500
+        const m = store.createMeeting({ title: 'Long meeting', startedAt, endedAt: startedAt + n * 500, eventId: null, app: null, attendees: [], state: 'done' })
+        store.addSegments(Array.from({ length: n }, (_, i) => {
+          const track = i % 7 < 3 ? 'me' as const : 'them' as const
+          return { meetingId: m.id, track, startMs: i * 500, endMs: i * 500 + 400, text: `Line ${i + 1} of the long meeting.`, speaker: track === 'them' ? (i % 14 < 7 ? 'Ann Lee' : 'Bo Park') : 'me' }
+        }))
+        const dir = join(userDataDir(), 'meetings', m.id)
+        mkdirSync(dir, { recursive: true })
+        for (const t of ['me', 'them']) writeFileSync(join(dir, `${t}.wav`), wavOf([new Float32Array(Math.ceil(n * 0.5 * 4000))], 4000))
+        return m.id
+      },
+      manyMeetings: (o) => (typeof o === 'number' ? manyMeetings(storeRef!, o) : manyMeetings(storeRef!, o.n, o.clean)),
+      calendarChanged: refreshCalendarConsumers,
+      tray: () => tray.items(),
+      trayClick: (id) => tray.click(id as Parameters<typeof tray.click>[0]),
+      trayAccelerators: () => tray.accelerators(),
+      permissions: () => permissions.status(),
+      notice: () => prompts.notice(),
+      noticeClick: () => prompts.clickNotice(),
+      chatMeetings: async () => { const ids = chatMeetings(storeRef!); await indexerRef?.schedule(); return ids },
+      crashCapture: () => { (activeCapture() as unknown as { proc: { kill(s: NodeJS.Signals): boolean } } | null)?.proc.kill('SIGKILL') },
+    })
+  }
+}
+
+app.whenReady().then(() => {
+  console.info('APP', `trusting ${systemCerts} certificates from the system on top of the built-in ones`)
+  // Local Electron launches need the same Dock icon as the packaged application.
+  if (!app.isPackaged && process.platform === 'darwin') app.dock?.setIcon(join(__dirname, '../../build/icon.png'))
+  const settings = loadSettings(join(userDataDir(), 'settings.json'))
+  // Repair conflicting saved choices before the first window or recording.
+  const visible = visibilityOf(settings, platform)
+  if ((visible.showInDock && settings.showInDock === false) || (visible.showRecordingPill && settings.showRecordingPill === false)) {
+    updateSettings(join(userDataDir(), 'settings.json'), {
+      ...(visible.showInDock && { showInDock: undefined }),
+      ...(visible.showRecordingPill && { showRecordingPill: undefined }),
+    })
+  }
+  setDockVisible(visible.showInDock)
+  // the theme picked in Settings; the system's when none
+  nativeTheme.themeSource = settings.theme ?? 'system'
+  setLanguage(localeOf(settings, systemLocale()))
+  updateMainMenu = installAppMenu(() => win, showMain, process.platform)
+  // the interface language's generic titles, so one Cakapp gave in that language is known as generic
+  const generic = () => setGenericTitles({ meeting: t('Meeting'), appCall: t('{app} call', { app: '\u0000' }) })
+  generic()
+  onLanguage(generic)
+  if (isFake()) setHelper(fakeHelper)
+  // a moved or reinstalled Cakapp loses its login item: put it back if the person wanted it
+  if (!isFake()) syncLoginItem(settings.openAtLogin)
+  // Windows and Linux: the calendar is a pasted private calendar address, kept sealed with the system keychain
+  // a Mac: the same links, next to its own calendars (Settings → Calendars → Add a calendar link)
+  const calendarLinks = caps.calendar ? createCalendarLinks({
+    file: join(userDataDir(), 'settings.json'), get: getCalendar,
+    // no keychain (Linux without a secret service): scrambled, not encrypted, so the address isn't readable at a glance
+    seal: (plain) => (safeStorage.isEncryptionAvailable() ? `k:${safeStorage.encryptString(plain).toString('base64')}` : `b:${Buffer.from(plain).toString('base64')}`),
+    open: (sealed) => (sealed.startsWith('k:') ? safeStorage.decryptString(Buffer.from(sealed.slice(2), 'base64'))
+      : sealed.startsWith('b:') ? Buffer.from(sealed.slice(2), 'base64').toString() : sealed.replace(/^p:/, '')),
+  }) : null
+  if (calendarLinks) setCalendarLinkSource(calendarLinks, { alongside: !caps.calendarLink })
+  const preferences = hookPreferences({
+    recordingPillChanged: on => recordingPillChanged(on),
+    file: join(userDataDir(), 'settings.json'), permissions, kinds: supportedKinds(caps), os: platform,
+    ...(calendarLinks && caps.calendarLink ? { calendarLinked: () => calendarLinks.status() === 'granted' } : {}),
+    // fake mode asks the first-run questions only when a test sets the permissions
+    ask: !isFake() || !!process.env.YOGURT_FAKE_PERMISSIONS,
+    setLogin: (on) => { if (!isFake()) setLoginItem(on) },
+    setTrayVisible: (on) => menuBar?.setVisible(on),
+    setShowNextMeeting: (on) => menuBar?.setShowNextMeeting(on),
+    setDockVisible: (on) => setDockVisible(on, win),
+    loginOn: (saved) => (isFake() ? !!saved : loginItemOn(saved)),
+    macName,
+    // never mid-meeting: quitting would end the recording
+    relaunch: () => {
+      if (activeMeeting()) return false
+      if (isFake()) { relaunched++; return true }
+      stripAppImageEnv()
+      app.relaunch(relaunchOptions(process.platform, app.isPackaged, process.execPath, process.env.APPIMAGE)); app.quit()
+      return true
+    },
+    slowStartMs: isFake() ? Number(process.env.YOGURT_FAKE_BOOT_MS ?? 0) : 0,
+    onSpoken: () => spokenChanged(),
+  })
+  // Music and Spotify pause while a meeting records, and play again after
+  const media = createMedia({ helper: runHelper })
+  // Windows and Linux: no player is paused yet (capabilities.mediaPause); resume() then has nothing to do
+  if (caps.mediaPause) {
+    onMeetingStart(() => void media.pause())
+    onMeetingStop(() => void media.resume())
+  }
+  const setup = createSetup()
+  setup.onState((st) => win?.webContents.send('setup:state', st))
+  ipcMain.handle('setup:state', () => setup.state)
+  ipcMain.handle('setup:retry', () => setup.retry())
+  ipcMain.handle('setup:skip-upgrade', () => setup.skipUpgrade())
+  ipcMain.handle('setup:download-upgrade', () => setup.downloadUpgrade())
+  const store = openStore(join(userDataDir(), 'yogurt.db'))
+  storeRef = store
+  store.markInterrupted()
+  initMeetings(store)
+  if (isNeonConfigured()) {
+    void initNeonSchema().catch(err => console.warn('Neon schema init failed:', err))
+  }
+  // the person's own names, never given to the other side: the one in Settings and the Mac's
+  const settingsFile = join(userDataDir(), 'settings.json')
+  hookAuth({
+    file: settingsFile,
+    safeStorage,
+    openExternal: url => shell.openExternal(url),
+    rememberName: name => {
+      if (!loadSettings(settingsFile).myName?.trim()) updateSettings(settingsFile, { myName: name })
+    },
+    rememberProfile: accountProfile => updateSettings(settingsFile, { accountProfile: accountProfile ?? undefined }),
+  })
+  const getUserId = () => loadSettings(settingsFile).accountProfile?.id ?? null
+  setUserIdProvider(getUserId)
+  setCalendarSelection(() => loadSettings(settingsFile))
+  setCalendarOwnEmail(email => {
+    try { if (store.rememberOwnEmail(email)) win?.webContents.send('meetings:changed') }
+    catch (e) { console.warn('could not save own calendar address', e) }
+  })
+  const me = () => loadSettings(settingsFile).myName?.trim() || macName()
+  setOwnerName(me)
+  setJargon(() => cleanJargon(loadSettings(settingsFile).jargon))
+  // names from the call: the call app is read while a meeting records, and each line of the other side gets the name talking then
+  const callNames = hookCallNames({
+    store, watch: !caps.callNames ? () => ({ stop() {} }) : isFake() ? fakeCallWatch : helperWatch(helperPath), myNames: () => [me(), macName()],
+    transcribed: async (id) => { await recordingFinished(id); await transcriptFinished(id) },
+    // people seen in the call joined the meeting: unedited notes already written get written again for them
+    changed: (id) => { win?.webContents.send('transcript:speakers', id); sendWidgetTranscript('transcript:speakers', id); win?.webContents.send('meetings:changed'); notes.applyPeople(id) },
+    onStart: onMeetingStart, onStop: onMeetingStop, onCapture: onCaptureStart, onBind: onMeetingBound, micPids: (app) => micPidsNow(app),
+  })
+  // Windows and Linux: whisper left the graphics card in a meeting, so the speed check (timed with it) runs again next start
+  onWhisperGpuOff(() => speedStore(speedFile()).forget())
+  hookTranscription({ store, modelPath: () => setup.installed()?.asr, send: (seg) => {
+    const order = seg.track === 'them' && seg.speaker ? store.speakerOrder(seg.meetingId, seg.speaker) : []
+    const colored = { ...seg, speakerColor: speakerColor(seg.track, seg.speaker, order) }
+    win?.webContents.send('transcript:segment', colored); sendWidgetTranscript('transcript:segment', colored)
+  },
+    nameOf: (id, a, b) => callNames.nameFor(id, a, b),
+    refresh: (id) => { win?.webContents.send('transcript:speakers', id); sendWidgetTranscript('transcript:speakers', id) },
+    sendPartial: (part) => { win?.webContents.send('transcript:partial', part); sendWidgetTranscript('transcript:partial', part) },
+    warn: (code) => tell({ t: 'warn', code }), pidFile: join(userDataDir(), 'whisper-server.pid'),
+    // whisper-server went down mid-meeting (#127): the rest is read from the saved recording once the transcript is settled
+    queued: () => { void savedTranscriptions.pump() },
+    // English only (the default) or Multi-language, read on each chunk so the footer's picker counts at once
+    spoken: () => spokenSetting(loadSettings(settingsFile)),
+    // Apple's on-device speech for the live words (macOS 26, Apple Silicon); fake mode has a stand-in when a test asks
+    speech: {
+      host: { platform: process.platform, arch: process.arch, osRelease: isFake() ? (process.env.YOGURT_FAKE_SPEECH === '1' ? '25.4.0' : '24.0.0') : os.release() }, binary: audioHelperPath(),
+      ui: () => localeOf(loadSettings(join(userDataDir(), 'settings.json')), systemLocale()), last: () => store.lastLanguage(),
+      ...(isFake() ? { locales: async () => ({ available: true, supported: ['en-US', 'es-ES'], installed: ['en-US'] }), install: async () => true } : {}),
+    } })
+  ipcMain.handle('transcript:draft',(e,id:unknown)=>{
+    if(e.sender!==win?.webContents||!isId(id)||!store.meeting(id)?.transcriptionAgain)return []
+    const order=store.speakerOrder(id)
+    return store.transcriptionDraft(id).map((s,i)=>({...s,id:-i-1,speakerColor:speakerColor(s.track,s.speaker,order)}))
+  })
+  ipcMain.handle('transcript:get', (_e, id: unknown, o: unknown) => {
+    if (!isId(id)) return []
+    const order = store.speakerOrder(id)
+    const opts = (o && typeof o === 'object' ? o : {}) as { hidden?: unknown; last?: unknown }
+    const last = Number.isInteger(opts.last) && (opts.last as number) > 0 ? Math.min(opts.last as number, 1000) : undefined
+    return store.segments(id, { hidden: opts.hidden === true, last })
+      .map(s => ({ ...s, speakerColor: speakerColor(s.track, s.speaker, order) }))
+  })
+  // Replay through the live channel so a stale async reply cannot overtake newer words or finals.
+  ipcMain.on('transcript:subscribe', (e) => { for (const part of transcriptPartials()) e.sender.send('transcript:partial', part) })
+  // hidden echo lines back into the transcript (and search)
+  ipcMain.handle('transcript:restore', (_e, id: unknown, ids: unknown) => {
+    if (!isId(id)) return
+    store.showSegments(id, Array.isArray(ids) ? ids.filter((x): x is number => Number.isInteger(x)) : undefined)
+    void indexer.schedule()
+    win?.webContents.send('transcript:speakers', id)
+    sendWidgetTranscript('transcript:speakers', id)
+    notes.refresh(id)
+  })
+  // each meeting's audio lives in its own folder; a crash keeps what was recorded up to the last 5 s flush
+  hookCapture({ dirOf: (id) => join(userDataDir(), 'meetings', id), onStart: onMeetingStart, onStop: onMeetingStop, speech: (id) => speechLocaleFor(id),
+    mic: () => loadSettings(settingsFile).mic ?? null,
+    // recording that can't go on ends the meeting, with the notes kept
+    stopMeeting: (id) => { stopMeeting(id) } })
+  // 32 GB and up: the notes model reads each meeting in as it happens (notes/readAhead.ts)
+  const readsAhead = !isFake() && readAheadAllowed(os.totalmem())
+  // the notes model: one job at a time, recording first; loaded when needed, the best one downloaded
+  const engine = isFake() ? new FakeEngine() : new UtilityEngine(join(__dirname, 'engine.js'), { gpuFallback: process.platform !== 'darwin', cpuCrashes: process.platform === 'linux' })
+  if (engine instanceof UtilityEngine) probeGpu = () => engine.probe().then((g) => {
+    console.info('NOTES', `graphics: ${g.gpuType || 'none'}${g.gpuNames.length ? ` (${g.gpuNames.join(', ')})` : ''}, ${g.vramTotalGB.toFixed(1)} GB`)
+    return g
+  }, (e) => { console.warn("couldn't check the graphics", e); return null })
+  // fake mode: the fixed Mac (a bigger one) unless a test asks for a 16 GB one
+  const smallMac = isFake() ? process.env.YOGURT_FAKE_SMALL_MAC === '1' : isSmallMac(os.totalmem())
+  const memory = notesMemory(smallMac)
+  const model = createNotesModel({ engine, modelPath: () => setup.notesPath(), onLoaded: path => setup.notesModelLoaded(path), contextSize: memory.contextSize, ...(memory.releaseSpeech ? { beforeLoad: releaseIdleSpeech } : {}) })
+  // first run: the notes model lands after recording already works; jobs wait in the queue for it
+  // the embedding model (meaning search across meetings) runs in the same worker and is let go with the notes model
+  const embedder = createEmbedder({ engine, modelPath: () => setup.installed()?.embed, id: bundledCatalog.embedding.id, dims: bundledCatalog.embedding.dims })
+  const queue = createQueue({ recording: () => !!activeMeeting(), smallMac, idleMs: memory.idleMs, backlogMs: transcriptionBacklogMs, onIdle: () => { void model.unload().catch(e => console.error('letting the notes model go failed', e)); void embedder.unload() }, modelReady: () => !!setup.notesPath() })
+  ipcMain.handle('setup:remove-upgrade', () => setup.removeUpgrade(remove => queue.enqueue(async () => {
+    await model.unload()
+    remove()
+  }, 'enhance')))
+  setup.onNotesModel(() => { queue.modelArrived(); conversations.refresh() })
+  // chat across meetings: every finished meeting chunked and embedded in the background, last in the queue
+  const library = new Library(store.db)
+  const indexer = createIndexer({ store, library, embedder, queue })
+  indexerRef = indexer
+  setup.onEmbedModel(() => void indexer.schedule())
+  onMeetingStart(() => queue.recordingChanged())
+  onMeetingStop(() => queue.recordingChanged())
+  // the meeting is read into the model as it happens, so its notes start within seconds of stopping
+  const readAhead = hookReadAhead({
+    store, queue, model, live: readsAhead, backlogMs: transcriptionBacklogMs, language: meetingLanguage,
+    transcribed: async (id) => { await recordingFinished(id); await transcriptFinished(id) }, onStart: onMeetingStart, onStop: onMeetingStop,
+  })
+  const folderSuggestions = createFolderSuggestions({ store, queue, model, changed: () => win?.webContents.send('folders:changed') })
+  let resumingId: string | null = null
+  const removeRecording = (id: string, automatic = false) => deleteRecording(id, {
+    store, dirOf: id => join(userDataDir(), 'meetings', id),
+    busy: id => resumingId === id || stopSavePending(id),
+    settle: async id => { await rejoined; await recordingFinished(id); await transcriptFinished(id) },
+    removed: id => { for (const w of BrowserWindow.getAllWindows()) w.webContents.send('audio:deleted', id) },
+    ...(automatic ? { keep: endedAt => keepsRecording(loadSettings(settingsFile), endedAt) } : {}),
+  })
+  const notes = hookNotes({
+    summarized: id => { folderSuggestions.schedule(id); void removeRecording(id, true) },
+    // Windows and Linux: a note waiting while the model loads says so (a Mac shows what it always did)
+    showLoading: platform !== 'darwin',
+    summaryLanguage: () => summaryLanguageSetting(loadSettings(settingsFile)),
+    store, queue, model, language: meetingLanguage, onStop: onMeetingStopSaved, named: (id) => callNames.finished(id), earlier: (id) => readAhead.parts(id), me,
+    transcribed: async (id) => { await recordingFinished(id); await transcriptFinished(id) },
+    send: (v) => win?.webContents.send('notes:changed', v),
+    // the notes are written: the meeting goes into the library for chat across meetings
+    changed: () => { win?.webContents.send('meetings:changed'); void indexer.schedule() },
+  })
+  let finishing = false, discardUnsaved = false
+  const savedTranscriptions = createSavedTranscriptions({
+    store, ready: () => !!setup.installed()?.asr, recording: () => !!activeMeeting() || !!resumingId || finishing, live: transcriptOpen,
+    tracks: async id => {
+      await recordingSettled(id)
+      const tracks: Partial<Record<'me'|'them',AsyncIterable<Float32Array>>> = {}
+      for(const track of ['me','them'] as const) {
+        const file=trackFile(meetingDir(id),track,audioKinds)
+        if(file?.endsWith('.wav'))tracks[track]=uploadedAudio(file)
+        else if(file)tracks[track]=helperDecode(audioHelperPath(),file)
+      }
+      return tracks
+    },
+    transcribe: (id,tracks,options) => transcribeRecorded(id,tracks,undefined,options),
+    draft:id=>win?.webContents.send('transcript:draft',id),
+    changed: (id,replaced) => {win?.webContents.send('meetings:changed');if(replaced){win?.webContents.send('transcript:replaced',id);void indexer.schedule()}},
+    summarize: id => {void notes.writeAgain(id)},
+  })
+  const uploads = hookAudioUploads({
+    root: join(userDataDir(), 'meetings'), store, window: () => win, exiting: () => allowQuit,
+    recording: () => !!activeMeeting() || !!resumingId || finishing,
+    prepared: id => {void savedTranscriptions.start(id)}, changed: () => win?.webContents.send('meetings:changed'),
+    userId: getUserId,
+  })
+  setup.onState(() => {uploads.resume();savedTranscriptions.resume()})
+  onMeetingStart(m => {store.clearTranscriptionState(m.id);savedTranscriptions.pause()})
+  onMeetingStopSaved((m) => {
+    uploads.resume(); savedTranscriptions.resume()
+    if (isNeonConfigured()) {
+      const segs = store.segments(m.id)
+      const notesData = store.notes(m.id)
+      void syncMeetingToNeon(m, segs, notesData).catch(err => console.warn('Neon meeting sync failed:', err))
+    }
+  })
+  ipcMain.handle('neon:status', () => checkNeonHealth())
+  ipcMain.handle('neon:sync', async (_e, id: unknown) => {
+    if (!isId(id)) return false
+    const m = store.meeting(id)
+    if (!m) return false
+    const segs = store.segments(id)
+    const notesData = store.notes(id)
+    return syncMeetingToNeon(m, segs, notesData)
+  })
+  ipcMain.handle('transcript:run', (e,id:unknown,again:unknown) => {
+    if(e.sender!==win?.webContents||!isId(id)||typeof again!=='boolean')return false
+    const meeting=store.meeting(id)
+    if(!meeting||stopSavePending(id)||transcriptionBusy(meeting.transcriptionState))return false
+    return savedTranscriptions.start(id,again)
+  })
+  ipcMain.handle('transcript:stop', async (e,id:unknown) => {
+    if(e.sender!==win?.webContents||!isId(id))return
+    const preparing=uploads.preparing(id)
+    if(preparing){await uploads.cancel(preparing.owner,preparing.file.token);return}
+    savedTranscriptions.stop(id)
+  })
+  ipcMain.handle('meetings:resume', async (_e, id: unknown): Promise<StartResult> => {
+    if (!isId(id)) return { error: 'gone' }
+    const current = activeMeeting()
+    if (current) { goTo(`/note/${current.id}`); return { id: current.id } }
+    const existing = store.meeting(id)
+    // shortcut: imports keep one WAV; add a safe native-recording merge before offering Resume.
+    if (!existing || existing.source === 'audio-file' || uploads.owns(id) || existing.trashedAt != null || (existing.state !== 'stopped' && existing.state !== 'done')) return { error: 'gone' }
+    if (transcriptionBusy(existing.transcriptionState) || resumingId || stopSavePending(id) || finishing || !notes.retryDrafts(id)) return { error: 'failed' }
+    resumingId = id
+    const analysis = notes.suspendForResume(id)
+    let started = false, timer: NodeJS.Timeout | undefined
+    try {
+      await Promise.race([
+        Promise.all([recordingFinished(id), transcriptFinished(id), callNames.finished(id), analysis.settled]),
+        new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error('Previous recording is still finishing')), 30_000) }),
+      ])
+      clearTimeout(timer)
+      await rejoined
+      if (finishing || !store.meeting(id)) return { error: 'failed' }
+      const append = await prepareAppend(join(userDataDir(), 'meetings', id))
+      // Deleted audio must not restart a retained transcript at zero.
+      if (!append.startMs) append.startMs = store.segments(id, { hidden: true }).reduce((end, s) => Math.max(end, s.endMs), Math.max(append.startMs, store.meeting(id)?.durationMs ?? 0))
+      // Another explicit start may have happened while the old files were settling.
+      if (finishing || activeMeeting()) return { error: 'failed' }
+      const m = resumeMeeting(id, append)
+      if (!m) return { error: 'failed' }
+      started = true; goTo(`/note/${id}`)
+      return { id }
+    } catch (e) {
+      console.error('resume recording failed; previous note and recording retained', id, e)
+      return { error: 'failed' }
+    } finally {
+      clearTimeout(timer); resumingId = null; analysis.release(!started)
+    }
+  })
+  const waitsForMeeting = () => smallMac && !!activeMeeting()
+  const askUnavailable = () => platform === 'darwin' && waitsForMeeting()
+  ipcMain.handle('conversations:waits-for-meeting', askUnavailable)
+  if (platform === 'darwin' && smallMac) {
+    const changed = () => win?.webContents.send('conversations:recording-wait', askUnavailable())
+    onMeetingStart(changed)
+    onMeetingStop(changed)
+  }
+  // Both Ask surfaces share saved conversations and the same recording-first model queue.
+  const conversations = hookConversations({
+    store, library, indexer, embedder, queue, model,
+    send: (v) => {
+      win?.webContents.send('conversations:changed', v)
+      if (v.chips.length === 1 && v.chips[0].kind === 'meeting') win?.webContents.send('chat:changed', { ...v, meetingId: v.chips[0].id })
+    }, sendList: (l) => win?.webContents.send('conversations:list', l),
+    waitsForMeeting, waitsForModel: () => !setup.notesPath(),
+    // a meeting read in ahead during a recording only where reading ahead is allowed (32 GB and up; the fake Mac is big)
+    warmAllowed: () => !activeMeeting() || (isFake() ? !smallMac : readAheadAllowed(os.totalmem())),
+  })
+  const validChips = (value: unknown): value is ContextChip[] => Array.isArray(value) && value.length <= 40 && value.every(c =>
+    c && (c.kind === 'meeting' || c.kind === 'folder') && isId(c.id)) && new Set(value.map(c => `${c.kind}:${c.id}`)).size === value.length
+  ipcMain.handle('conversations:current', (_e, chips: unknown, fresh: unknown) => {
+    if (!validChips(chips)) throw new Error('Invalid context')
+    const id = library.current(chips.map(({ kind, id }) => ({ kind, id })), fresh === true)
+    win?.webContents.send('conversations:list', conversations.list())
+    return id
+  })
+  ipcMain.handle('conversations:context', (_e, id: unknown, chips: unknown) => {
+    if (!isId(id) || !validChips(chips)) throw new Error('Invalid context')
+    conversations.context(id, chips.map(({ kind, id }) => ({ kind, id })))
+  })
+  ipcMain.handle('conversations:remove-context', (_e, id: unknown, chip: unknown) => {
+    const chips = [chip]
+    if (!isId(id) || !validChips(chips)) throw new Error('Invalid context')
+    conversations.removeContext(id, { kind: chips[0].kind, id: chips[0].id })
+  })
+  ipcMain.handle('conversations:draft', (_e, id: unknown, text: unknown) => {
+    if (!isId(id) || typeof text !== 'string' || text.length > 4000) throw new Error('Invalid draft')
+    conversations.draft(id, text)
+  })
+  ipcMain.handle('conversations:targets', (_e, query: unknown) => library.targets(typeof query === 'string' ? query.slice(0, 200) : ''))
+  // Compatibility bridge for older renderer clients; all storage and answers now use conversations.
+  const meetingChat = (id: string) => library.current([{ kind: 'meeting', id }])
+  ipcMain.handle('chat:get', (_e, id: unknown) => isId(id) && store.meeting(id) ? { ...conversations.view(meetingChat(id)), meetingId: id } : undefined)
+  ipcMain.handle('chat:ask', (_e, id: unknown, q: unknown) => { if (!askUnavailable() && isId(id) && store.meeting(id) && typeof q === 'string') conversations.ask(meetingChat(id), q) })
+  ipcMain.on('chat:stop', (_e, id: unknown) => { if (isId(id) && store.meeting(id)) conversations.stop(meetingChat(id)) })
+  ipcMain.handle('chat:clear', (_e, id: unknown) => { if (isId(id) && store.meeting(id)) {
+    conversations.stop(meetingChat(id))
+    library.current([{ kind: 'meeting', id }], true); conversations.refresh()
+  } })
+  ipcMain.handle('conversations:list', () => conversations.list())
+  ipcMain.handle('conversations:get', (_e, id: unknown) => (isId(id) ? conversations.view(id) ?? null : null))
+  ipcMain.handle('conversations:ask', (_e, id: unknown, q: unknown) => {
+    if ((id !== null && !isId(id)) || typeof q !== 'string' || !q.trim()) return null
+    if (askUnavailable()) return { waitsForMeeting: true }
+    return conversations.ask(id, q).id
+  })
+  ipcMain.on('conversations:stop', (_e, id: unknown) => { if (isId(id)) conversations.stop(id) })
+  ipcMain.on('conversations:warm', (_e, id: unknown) => { if (isId(id)) conversations.warm(id) })
+  ipcMain.handle('conversations:rename', (_e, id: unknown, title: unknown) => { if (isId(id) && typeof title === 'string') conversations.rename(id, title) })
+  ipcMain.handle('conversations:delete', (_e, id: unknown) => { if (isId(id)) conversations.remove(id) })
+  // a meeting's two tracks, once recording has finished them (fake mode writes wav stand-ins)
+  const audioKinds: AudioExt[] = isFake() && process.env.YOGURT_FAKE_AUDIO_M4A === '1' ? ['m4a'] : audioExts(process.platform, isFake())
+  const meetingDir = (id: string) => join(userDataDir(), 'meetings', id)
+  const finishedMeeting = (id: string) => { const m = store.meeting(id); return !!m && m.state !== 'recording' }
+  protocol.handle(AUDIO_SCHEME, createAudioHandler({ dirOf: meetingDir, known: finishedMeeting, ready: async (id) => { await rejoined; await recordingSettled(id); if (isFake()) await waitForFakeAudioMetadata() }, exts: audioKinds }))
+  ipcMain.handle('audio:delete', (_e, id: unknown) => isId(id) ? removeRecording(id) : 'missing')
+  ipcMain.handle('audio:tracks', async (_e, id: unknown) => {
+    if (!isId(id) || !finishedMeeting(id)) return []
+    // a join (after the meeting, or left over from a crash and redone at launch) rewrites the files: wait for it, 30 s at most
+    await Promise.all([recordingSettled(id), rejoined])
+    return (['me', 'them'] as const).filter((t) => !!trackFile(meetingDir(id), t, audioKinds))
+  })
+  // the mic picker under the note's bar: the mics, the chosen one, and switching while recording
+  hookMics({ helper: micListHelper(process.platform) === 'system' || isFake() ? runHelper : audioHelper.run, settingsFile, send: (channel, payload) => win?.webContents.send(channel, payload) })
+  hookShare({ store, window: () => win, includeRecordingCredit: () => includesRecordingCredit(loadSettings(settingsFile)) })
+  const foldersChanged = () => { win?.webContents.send('folders:changed'); folderSuggestions.refresh() }
+  hookFolders({ store, changed: foldersChanged })
+  // every meeting to one file and back; what an import adds shows up on home
+  hookBackup({ getRecordingPill: () => visibilityOf(loadSettings(settingsFile), platform).showRecordingPill,
+    setRecordingPill: preferences.setRecordingPill, db: store.db, meetingsDir: join(userDataDir(), 'meetings'), window: () => win, recording: () => !!activeMeeting() || !!resumingId,
+    changed: () => { win?.webContents.send('meetings:changed'); win?.webContents.send('conversations:list', conversations.list()); void indexer.refresh(); folderSuggestions.refresh() },
+    beforeExport: () => { notes.retryDrafts(); return notes.pendingDraftId() } })
+  // AI apps change things only through the functions behind the app's own buttons
+  const noteSaved = (id: string, r: ReturnType<typeof notes.replace>) => { if (r === 'saved') win?.webContents.send('meetings:changed'); return r }
+  void hookMcp({
+    store, profile: userDataDir(), me, version: app.getVersion(),
+    enabled: () => !!loadSettings(settingsFile).aiApps, setEnabled: (on) => { updateSettings(settingsFile, { aiApps: on || undefined }) },
+    changesEnabled: () => !!loadSettings(settingsFile).aiAppChanges, setChangesEnabled: (on) => { updateSettings(settingsFile, { aiAppChanges: on || undefined }) },
+    app: {
+      ask: (question, chips) => conversations.askOnce(question, chips),
+      comingUp: () => calendarComingUp(),
+      calendarDay: (at) => calendarDay(at),
+      settings: () => preferences.read(),
+      changed: (what) => { if (what === 'folders') foldersChanged(); else win?.webContents.send('meetings:changed') },
+      // a meeting from another notes app: on home, in the library for Ask, and offered a folder like any other
+      imported: (id) => { win?.webContents.send('meetings:changed'); void indexer.schedule(); folderSuggestions.schedule(id) },
+      rename: (id, title) => !!renameMeeting(id, title),
+      setAttendees: (id, people) => setPeople(id, people),
+      linkEvent: (id, eventId, day) => linkMeetingEvent(id, eventId, day).catch(() => false),
+      unlinkEvent: (id) => !!unlinkEvent(id),
+      trash: (id) => trashMeeting(id),
+      restore: (id) => restoreMeeting(id),
+      setMyNotes: (id, md) => noteSaved(id, notes.replace(id, 'mine', md)),
+      setSummary: (id, md) => noteSaved(id, notes.replace(id, 'enhanced', md)),
+      rewriteSummary: (id, instruction) => (['waiting', 'writing'].includes(notes.view(id).status) || !writeAgain(id, instruction) ? 'busy' : 'queued'),
+      notesReady: () => !!setup.notesPath(),
+      startRecording: (o) => recordingControls?.start(o) ?? Promise.resolve({ error: 'failed' as const }),
+      pauseRecording: (id, paused) => recordingControls?.pause(id, paused) ?? false,
+      stopRecording: (id) => { if (activeMeeting()?.id !== id) return false; stopMeeting(id); return true },
+      recording: () => activeMeeting(),
+      setJargon: (terms) => preferences.setJargon(terms),
+      setSpoken: (v) => preferences.setSpoken(v),
+      setSummaryLanguage: (v) => preferences.setSummaryLanguage(v),
+    },
+    audio: async (id) => {
+      await rejoined; await recordingSettled(id)
+      return (['me', 'them'] as const).flatMap((track) => { const path = trackFile(meetingDir(id), track, audioKinds); return path ? [{ track, path }] : [] })
+    },
+    send: (clients) => win?.webContents.send('mcp:clients', clients),
+  })
+  // notes only for a meeting that exists: saving one for an unknown id would throw (its row must exist)
+  const known = (id: unknown): id is string => isId(id) && !!store.meeting(id)
+  ipcMain.handle('notes:get', (_e, id: unknown) => (isId(id) ? notes.view(id) : undefined))
+  const saveEdit = (id: unknown, side: unknown, md: unknown, revision: unknown): NoteSaveResult => {
+    if (!isId(id) || typeof md !== 'string' || !Number.isSafeInteger(revision) || Number(revision) < 1 || (side !== 'mine' && side !== 'enhanced')) return { revision: Number(revision) || 0, status: 'failed', retained: false }
+    return side === 'mine' ? notes.setMine(id, md, Number(revision)) : notes.setEnhanced(id, md, Number(revision))
+  }
+  ipcMain.handle('notes:set-mine', (_e, id: unknown, md: unknown, revision: unknown) => saveEdit(id, 'mine', md, revision))
+  ipcMain.handle('notes:set-enhanced', (_e, id: unknown, md: unknown, revision: unknown) => saveEdit(id, 'enhanced', md, revision))
+  ipcMain.on('notes:flush-sync', (e, id: unknown, side: unknown, md: unknown, revision: unknown) => { e.returnValue = saveEdit(id, side, md, revision) })
+  ipcMain.on('notes:kept-edits', (_e, id: unknown) => { if (known(id)) notes.keptEdits(id) })
+  ipcMain.handle('notes:stop', (_e, id: unknown) => { if (known(id)) return notes.stop(id) })
+  // "Write again", from the note or an AI app; false when it can't start now
+  const writeAgain = (id: unknown, note: unknown): boolean => {
+    const instruction = rewriteNote(note)
+    if (!known(id) || instruction === undefined || transcriptionBusy(store.meeting(id)?.transcriptionState)) return false
+    void notes.writeAgain(id, instruction, true)
+    return true
+  }
+  ipcMain.handle('notes:write-again', (_e, id: unknown, note: unknown) => { writeAgain(id, note) })
+  app.on('will-quit', () => engine.dispose())
+  // an earlier quit or crash may have left parts unjoined: try again now
+  const rejoined = rejoinInterrupted(join(userDataDir(), 'meetings'), async dir => {
+    const id = basename(dir), meeting = store.meeting(id)
+    if (!meeting || meeting.trashedAt != null || activeMeeting() || resumingId) return
+    await joinParts(dir)
+  })
+  // meetings whose notes a quit or crash cut short: caught up once the models are ready, one at a time
+  let caughtUp = false
+  // and meetings not in the library yet (or changed since) are indexed, once nothing else is waiting
+  const catchUp = () => { if (!caughtUp && setup.state.phase === 'ready') { caughtUp = true; void rejoined.catch(e => console.warn('audio startup repair retained its files', e)).finally(() => { notes.recover(); folderSuggestions.refresh(); void indexer.schedule() }) } }
+  setup.onState(catchUp)
+  // meetings recorded before the speech model was in (#30): transcribed from their saved recording once it is, one at
+  // a time and never while recording (a new recording pauses it; it carries on after)
+  const transcribeWaiting = async () => {await rejoined.catch(()=>{});await savedTranscriptions.pump()}
+  setup.onState(() => void transcribeWaiting())
+  // at launch too, when the model is already in and setup has nothing new to say
+  void transcribeWaiting()
+  // tests: a recorded meeting back to "recorded before the speech model was in", and the catch-up run now
+  if (isFake()) Object.assign(((globalThis as Record<string, unknown>).__fake__ ??= {}) as object, {
+    untranscribe: () => { const id = store.meetings({ limit: 1 })[0].id; store.deleteSegments(store.segments(id).map((x) => x.id)); store.updateMeeting(id, { transcriptionPending: true }); return id },
+    transcribeWaiting: () => transcribeWaiting(),
+  })
+  onMeetingStopSaved(() => void transcribeWaiting())
+  app.on('will-quit', killAllWatches)
+  app.on('will-quit', killAllHelpers)
+  let flushToken = 0
+  const flushRenderer = (): Promise<boolean> => {
+    const window = win
+    if (!window || window.isDestroyed() || window.webContents.isLoadingMainFrame()) return Promise.resolve(true)
+    const token = ++flushToken
+    return new Promise((resolve) => {
+      const done = (saved: boolean) => { clearTimeout(timer); ipcMain.removeListener('notes:flushed', heard); resolve(saved) }
+      const heard = (e: Electron.IpcMainEvent, reply: unknown, saved: unknown) => { if (e.sender === window.webContents && reply === token) done(saved === true) }
+      const timer = setTimeout(() => done(false), 5000)
+      ipcMain.on('notes:flushed', heard)
+      window.webContents.send('notes:flush-request', token)
+    })
+  }
+  // Flush the last keystroke and retained drafts before the existing recording/transcription shutdown.
+  const resumeEditing = () => {
+    finishing = false; allowQuit = false; discardUnsaved = false
+    uploads.resume(); savedTranscriptions.resume()
+    win?.webContents.send('notes:flush-request', null)
+  }
+  app.on('browser-window-created', (_e, window) => {
+    window.webContents.on('will-prevent-unload', (e) => {
+      if (window !== win) return
+      // Only the explicit native discard choice may override the renderer's final handoff veto.
+      if (allowQuit && discardUnsaved) e.preventDefault()
+      else if (finishing || allowQuit) resumeEditing()
+    })
+  })
+  app.on('before-quit', (e) => {
+    if (allowQuit) return
+    e.preventDefault()
+    if (finishing) return
+    finishing = true
+     savedTranscriptions.shutdown()
+    void (async () => {
+      const flushed = await flushRenderer()
+      const saved = notes.retryDrafts()
+      if (!flushed || !saved) {
+        const options = { type: 'warning' as const, title: t("Cakapp couldn't finish saving"),
+          message: t("Cakapp couldn't finish saving"), detail: t('Return to your notes to try again. Quitting now may discard your latest changes.'),
+          buttons: [t('Return to notes'), t('Quit without saving')], defaultId: 0, cancelId: 0, noLink: true }
+        const answer = win && !win.isDestroyed() ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options)
+        if (answer.response !== 1) {
+          const id = notes.pendingDraftId()
+          if (id) goTo(`/note/${id}`); else showMain()
+          return
+        }
+        discardUnsaved = true
+      }
+      // If final unload is vetoed, the resumed UI must describe the same stopped capture.
+      const recording = activeMeeting()
+      if (recording) stopMeeting(recording.id)
+      // Music, recorder files and transcription still receive the same bounded graceful shutdown.
+      await Promise.all([media.resume(), settleRecording().then(() => settleTranscription())])
+      allowQuit = true
+      finishQuit()
+    })().catch((err) => console.error('quit was cancelled because saving or shutdown failed', err)).finally(() => {
+      if (!allowQuit) resumeEditing()
+    })
+  })
+  app.on('will-quit', stopTranscriptionServer)
+  const reminder = createRecordingReminder(() => recordingReminderOn(loadSettings(settingsFile)))
+  onMeetingStart(reminder.started)
+  onMeetingStop(reminder.stopped)
+  ipcMain.handle('meetings:take-recording-reminder', () => reminder.take())
+  onMeetingChange(() => win?.webContents.send('meetings:changed'))
+  ipcMain.handle('meetings:get', (_e, id: unknown) => {
+    const m = isId(id) ? getMeeting(id) : undefined
+    if (m) store.noteOpened(m.id)
+    return m && { ...m, ...(recordingPaused(m.id) ? { paused: true } : {}) }
+  })
+  // the person's own title for a note
+  ipcMain.handle('meetings:rename', (_e, id: unknown, title: unknown) => { if (isId(id) && typeof title === 'string') renameMeeting(id, title) })
+  // who was there, by hand, or from a calendar event picked for the note: unedited notes are written again with them
+  ipcMain.handle('meetings:rename-attendee', (_e, id: unknown, index: unknown, name: unknown, expected: unknown) => {
+    if (!isId(id) || typeof index !== 'number' || typeof name !== 'string') return false
+    const before = store.meeting(id)
+    const person = before?.attendees[index]
+    if (!person || !expected || typeof expected !== 'object') return false
+    const previous = expected as { name?: unknown; email?: unknown }
+    if (person.email ? previous.email !== person.email : previous.email != null || previous.name !== person.name) return false
+    if (!store.renameAttendee(id, index, name)) return false
+    notes.renamed(id, before.attendees, store.meeting(id)!.attendees)
+    win?.webContents.send('meetings:changed')
+    win?.webContents.send('calendar:changed')
+    void indexer.refresh()
+    return true
+  })
+  const setPeople = (id: unknown, people: unknown): boolean => {
+    if (!isId(id) || !setAttendees(id, people)) return false
+    notes.applyPeople(id)
+    return true
+  }
+  ipcMain.handle('meetings:set-attendees', (_e, id: unknown, people: unknown) => { setPeople(id, people) })
+  /** true: linked (null unlinks); an event not on the calendar that day throws */
+  const linkMeetingEvent = async (id: unknown, eventId: unknown, day?: unknown): Promise<boolean> => {
+    const m = isId(id) ? store.meeting(id) : undefined
+    if (!m) return false
+    if (eventId === null) return !!unlinkEvent(m.id)
+    if (typeof eventId !== 'string') return false
+    const at = day ?? m.eventStartedAt ?? m.startedAt
+    if (typeof at !== 'number' || !Number.isFinite(at) || !Number.isFinite(new Date(at).getTime())) throw new Error('Invalid calendar day')
+    const event = (await eventsOn(at, 'link-event')).find((e) => matchesEvent(e, eventId))
+    if (!event) throw new Error('Calendar event unavailable')
+    if (!linkEvent(m.id, event)) return false
+    notes.applyPeople(m.id)
+    return true
+  }
+  ipcMain.handle('meetings:link-event', async (_e, id: unknown, eventId: unknown, day?: unknown) => { await linkMeetingEvent(id, eventId, day) })
+  // gone for good, audio too; never while it records
+  const removeForGood = (id: unknown) => id === resumingId ? Promise.resolve('failed' as const) : isId(id) && stopSavePending(id) ? Promise.resolve('save-pending' as const) : deleteMeeting(id, {
+    store, dirOf: meetingDir,
+    cancel: (id) => { queue.cancel(id); conversations.forgetMeeting(id); indexer.forget(id) },
+    // Actual writer completion: deleteMeeting refuses deletion if this wait times out.
+    settle: async (id) => { await Promise.all([recordingFinished(id), transcriptFinished(id)]) },
+    removed: (id) => {
+      notes.forgetDrafts(id)
+      win?.webContents.send('meetings:changed'); win?.webContents.send('folders:changed')
+      // the note on screen was this one: back home
+      if (route === `/note/${id}`) { route = ''; win?.webContents.send('nav:go', route) }
+    },
+  })
+  ipcMain.handle('meetings:delete', (_e, id: unknown) => removeForGood(id))
+  // Delete in a list or a note: to the Trash, kept until restored or deleted for good there (30 days at most)
+  const trashMeeting = (id: unknown) => id === resumingId ? 'failed' as const : isId(id) && stopSavePending(id) ? 'save-pending' as const : moveToTrash(id, {
+    store,
+    moved: (id) => {
+      indexer.forget(id)
+      win?.webContents.send('meetings:changed'); win?.webContents.send('folders:changed')
+      if (route === `/note/${id}`) { route = ''; win?.webContents.send('nav:go', route) }
+    },
+  })
+  ipcMain.handle('meetings:trash', (_e, id: unknown) => trashMeeting(id))
+  const restoreMeeting = (id: unknown): boolean => {
+    if (!isId(id) || store.meeting(id)?.trashedAt == null) return false
+    store.restoreMeeting(id); indexer.restored(id)
+    win?.webContents.send('meetings:changed'); win?.webContents.send('folders:changed')
+    return true
+  }
+  ipcMain.handle('meetings:restore', (_e, id: unknown) => { restoreMeeting(id) })
+  ipcMain.handle('meetings:trashed', () => store.trashed())
+  ipcMain.handle('meetings:empty-trash', () => emptyTrash({ store, remove: removeForGood }))
+  // a meeting in the Trash for 30 days goes for good: at launch, and twice a day for a Cakapp that stays open
+  const purge = () => void purgeTrash({ store, remove: removeForGood })
+  purge(); setInterval(purge, 12 * 60 * 60 * 1000).unref()
+  const tidyPrepared = () => {
+    try {
+      // Keep on-screen drafts and any on-disk capture, even if its state was never saved.
+      const discussed = new Set(library.conversations().filter(c => c.draft || c.draftChips.length || library.turns(c.id).length)
+        .flatMap(c => [...c.chips, ...c.draftChips, ...(c.firstChips ?? [])].filter(chip => chip.kind === 'meeting').map(chip => chip.id)))
+      if (store.tidyPrepared(Date.now(), id => route === `/note/${id}` || existsSync(meetingDir(id)) || discussed.has(id))) {
+        win?.webContents.send('meetings:changed'); win?.webContents.send('folders:changed')
+      }
+    } catch (e) { console.warn('tidying prepared notes failed', e) }
+  }
+  tidyPrepared(); setInterval(tidyPrepared, 60_000).unref()
+  ipcMain.handle('meetings:cards', (_e, o: { before?: { at: number; id: string }; limit?: number; folder?: string }) => {
+    const limit = Math.max(1, Math.min(1000, Number(o?.limit) || 40))
+    const b = o?.before
+    return store.meetingCards({ limit, before: b && typeof b.at === 'number' && typeof b.id === 'string' ? b : undefined, ...(isId(o?.folder) ? { folder: o.folder } : {}) })
+      .map((m) => ({ ...withStopState(m), ...(recordingPaused(m.id) ? { paused: true } : {}) }))
+  })
+  const calendarList = async () => {
+    const list = await calendars(), settings = loadSettings(settingsFile), hidden = settings.hiddenCalendarIds ?? []
+    const linkIds = new Set(calendarLinks?.list().map((l) => l.id) ?? [])
+    return { status: calendarStatus(), systemStatus: systemCalendarStatus(), hideEventsWithoutCallLink: settings.hideEventsWithoutCallLink === true,
+      calendars: list.map((c) => ({ ...c, enabled: !hidden.includes(c.id), ...(linkIds.has(c.id) ? { link: true } : {}) })) }
+  }
+  ipcMain.handle('calendar:list', calendarList)
+  ipcMain.handle('calendar:set-enabled', async (_e, id: unknown, enabled: unknown) => {
+    if (typeof id !== 'string' || id.length > 1024 || typeof enabled !== 'boolean') return false
+    if (!(await calendars()).some((c) => c.id === id)) return false
+    const hidden = new Set(loadSettings(settingsFile).hiddenCalendarIds ?? [])
+    if (enabled) hidden.delete(id); else hidden.add(id)
+    updateSettings(settingsFile, { hiddenCalendarIds: [...hidden] })
+    refreshCalendarConsumers()
+    win?.webContents.send('calendar:changed')
+    return true
+  })
+  ipcMain.handle('calendar:set-hide-without-link', (_e, hide: unknown) => {
+    if (typeof hide !== 'boolean') return false
+    updateSettings(settingsFile, { hideEventsWithoutCallLink: hide })
+    refreshCalendarConsumers()
+    win?.webContents.send('calendar:changed')
+    return true
+  })
+  const calendarDay = async (at: unknown, purpose?: unknown) => {
+    if (typeof at !== 'number' || !Number.isFinite(at) || !Number.isFinite(new Date(at).getTime())) return { status: 'error' as const, events: [] }
+    const unavailable: string[] = []
+    const events = (await eventsOn(at, purpose === 'link-event' ? 'link-event' : undefined, unavailable)).map((event) => {
+      const meeting = eventIds(event).map((id) => store.meetingForEvent(id)).find(Boolean)
+      const note = meeting && withStopState(meeting)
+      return { ...event, attendees: resolvePeople(store.db, event.attendees), ...(note ? { note: { id: note.id, state: note.state, ...(note.source ? { source: note.source } : {}) } } : {}) }
+    })
+    return { status: calendarStatus(), events, unavailable }
+  }
+  ipcMain.handle('calendar:day', (_e, at: unknown, purpose?: unknown) => calendarDay(at, purpose))
+  const calendarComingUp = async () => {
+    const events = (await comingUp()).map(event => ({ ...event, attendees: resolvePeople(store.db, event.attendees) }))
+    return { status: calendarStatus(), events }
+  }
+  ipcMain.handle('calendar:coming-up', calendarComingUp)
+  // not asked yet: the Mac's own question; turned off: the Mac's settings, where only the person can turn it on
+  ipcMain.handle('calendar:links', () => calendarLinks?.list() ?? [])
+  ipcMain.handle('calendar:add-link', async (_e, url: unknown) => {
+    if (!calendarLinks || typeof url !== 'string' || url.length > 4096) return { ok: false, error: 'bad-url' }
+    const got = await calendarLinks.add(url)
+    if (got.ok) { await refreshCalendarStatus(); refreshCalendarConsumers(); win?.webContents.send('calendar:changed') }
+    return got
+  })
+  ipcMain.handle('calendar:remove-link', async (_e, id: unknown) => {
+    if (!calendarLinks || typeof id !== 'string') return false
+    calendarLinks.remove(id)
+    await refreshCalendarStatus(); refreshCalendarConsumers(); win?.webContents.send('calendar:changed')
+    return true
+  })
+  ipcMain.handle('calendar:connect', async () => {
+    // a calendar link is pasted in Settings' calendars: the same form as the first run's
+    if (calendarLinks && caps.calendarLink) { goTo('/settings/calendar'); return refreshCalendarStatus() }
+    const was = await refreshCalendarStatus()
+    if (was === 'notDetermined') return requestCalendarAccess()
+    if (was === 'denied') {
+      if (isFake()) settingsOpened++
+      else void shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars')
+    }
+    return was
+  })
+  ipcMain.handle('search:people', () => store.searchPeople())
+  ipcMain.handle('search:query', async (_e, q: unknown, folder: unknown, filters: unknown) => {
+    if (typeof q !== 'string') return []
+    const query = q.slice(0, 200)
+    const known = store.searchPeople()
+    if (filters !== undefined && (!Array.isArray(filters) || filters.length > 20 || filters.some(p =>
+      !p || typeof p.name !== 'string' || !(p.email === null || typeof p.email === 'string')))) return []
+    const people = (filters ?? []) as Array<{ name: string; email: string | null }>
+    if (people.some(p => !known.some(k => searchPersonKey(k) === searchPersonKey(p)))) return []
+    const personSearch = people.length > 0 || matchSearchPeople(query, known).matches.length > 0
+    // opened from a folder's page: only its meetings
+    const sp = isId(folder) ? folder : undefined
+    // fake mode: short questions answer late, so a test can see an older answer never replace a newer one
+    if (isFake() && process.env.YOGURT_FAKE_SEARCH_SLOW === '1' && query.trim().length <= 4) await new Promise((r) => setTimeout(r, 1000))
+    const hits = query.trim() || personSearch ? store.search(query, personSearch ? Infinity : 30, sp, { locale: app.getLocale(), language: uiLanguage(), people }) : store.meetingCards({ limit: 3, folder: sp }).map((c) => ({ meetingId: c.id, snippet: '', parts: [] }))
+    return hits.flatMap((h) => {
+      const m = store.meeting(h.meetingId)
+      if (!m) return []
+      const parts = h.parts.length ? h.parts : [{ text: store.preview(m.id), hit: false }]
+      return [{ meetingId: m.id, title: m.title, startedAt: m.startedAt, confident: 'confident' in h ? h.confident : false, parts: parts.filter((p) => p.text) }]
+    })
+  })
+  // the window's own moves (home, a note from the list): remembered here so a reload stays where it was
+  ipcMain.on('nav:go', (_e, r: unknown) => {
+    if (!isAppRoute(r)) return
+    route = r
+    resumeRequested = false
+    win?.webContents.send('nav:go', route)
+  })
+  ipcMain.handle('nav:current', () => route)
+  ipcMain.handle('nav:take-ask', () => { const pending = pendingAsk; pendingAsk = false; return pending })
+  // opened by the Mac at login: just the menu bar, until a call or a click
+  // opened by an AI app's yogurt-mcp off a Mac (--hidden): the same, so no window jumps in front of it
+  if (!openedAtLogin() && !startedHidden(process.platform, process.argv)) createWindow()
+  startDetection()
+  void setup.start()
+  // new versions from GitHub Releases, downloaded in the background and installed on quit
+  const updatesAvailable = updatesOn({ packaged: app.isPackaged, fake: isFake(), profile: !!process.env.YOGURT_USER_DATA, platform: process.platform, appImage: !!process.env.APPIMAGE,
+    feed: app.isPackaged && existsSync(join(process.resourcesPath, 'app-update.yml')),
+    preview: app.isPackaged && isPreviewBuild((() => { try { return readFileSync(join(app.getAppPath(), 'package.json'), 'utf8') } catch { return '' } })()) })
+  hookUpdates({ file: join(userDataDir(), 'settings.json'), available: updatesAvailable, recording: () => !!activeMeeting(),
+    // fake mode: a test pretends a version downloaded
+    fake: isFake() && process.env.YOGURT_FAKE_UPDATE ? { version: process.env.YOGURT_FAKE_UPDATE, restarted: () => { updateRestarts++ } } : undefined })
+    .catch((err) => console.warn("couldn't start looking for new versions", err))
+  // the Dock icon: the main window, even while the widget is up
+  app.on('activate', showMain)
+})
+
+// on a Mac Cakapp lives on in the menu bar, so it still notices calls; Quit is in its menu
+app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })

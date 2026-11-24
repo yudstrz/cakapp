@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="660" height="400" viewBox="0 0 660 400">
+<title>Install Yogurt</title>
+<!-- Finder draws the 128pt icons and their names at (180, 170) and (480, 170): electron-builder.yml, dmg.contents -->
+<defs><linearGradient id="arrow" x1="0" x2="1"><stop offset="0" stop-color="#B49AF5"/><stop offset="1" stop-color="#7142E8"/></linearGradient>
+<marker id="head" viewBox="0 0 12 12" refX="8" refY="6" markerWidth="14" markerHeight="14" markerUnits="userSpaceOnUse" orient="auto"><path d="M2.5 2 L8.5 6 L2.5 10" fill="none" stroke="#7142E8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></marker></defs><rect width="660" height="400" fill="#FFFFFF"/><path d="M276 172 C306 151 352 151 380 170" fill="none" stroke="url(#arrow)" stroke-width="2.75" stroke-linecap="round" marker-end="url(#head)"/></svg>

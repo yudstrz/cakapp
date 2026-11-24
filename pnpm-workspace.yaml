@@ -1,0 +1,14 @@
+packages:
+  - packages/*
+  - app
+  - web
+allowBuilds:
+  electron-winstaller: set this to true or false
+  esbuild: set this to true or false
+  node-llama-cpp: set this to true or false
+onlyBuiltDependencies:
+  - electron
+  - esbuild
+  - node-llama-cpp
+patchedDependencies:
+  node-llama-cpp@3.22.1: patches/node-llama-cpp@3.22.1.patch
