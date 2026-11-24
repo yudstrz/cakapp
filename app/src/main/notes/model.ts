@@ -2,6 +2,7 @@ import { CONTEXT, MIN_CONTEXT, type EngineMessage } from '../../shared/engine-pr
 import { GraphicsGaveUpError, type Engine } from '../engine'
 import type { Llm } from './enhance'
 import { readInSteps } from './readAhead'
+import { createCloudLlm, isCloudAiAvailable } from '../cloudAi'
 
 /**
  * How much of what the model holds a new prompt still starts with, for the log: a long meeting's notes start within
@@ -61,6 +62,9 @@ export function createNotesModel(o: { engine: Engine; modelPath: () => string | 
   return {
     /** the model, loaded; a stopped job's signal stops what it is writing */
     async llm(signal?: AbortSignal): Promise<Llm> {
+      if (isCloudAiAvailable()) {
+        return createCloudLlm(signal)
+      }
       const m = await load()
       return {
         contextSize: m.contextSize,
@@ -92,7 +96,11 @@ export function createNotesModel(o: { engine: Engine; modelPath: () => string | 
     },
     loaded: () => loaded?.path,
     /** the next llm() loads the model first (it isn't loaded, or a better one landed) */
-    needsLoad: () => { const path = o.modelPath(); return !!path && loaded?.path !== path },
+    needsLoad: () => {
+      if (isCloudAiAvailable()) return false
+      const path = o.modelPath()
+      return !!path && loaded?.path !== path
+    },
   }
 }
 export type NotesModel = ReturnType<typeof createNotesModel>

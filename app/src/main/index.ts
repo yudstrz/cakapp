@@ -70,6 +70,7 @@ import { setGenericTitles } from './titles'
 import { installAppMenu } from './appMenu'
 import { hookAuth } from './auth'
 import { checkNeonHealth, initNeonSchema, isNeonConfigured, syncMeetingToNeon } from './neon'
+import { isCloudAiAvailable } from './cloudAi'
 import { UtilityEngine } from './engine'
 import { createNotesModel } from './notes/model'
 import dotenv from 'dotenv'
@@ -698,7 +699,7 @@ app.whenReady().then(() => {
   // first run: the notes model lands after recording already works; jobs wait in the queue for it
   // the embedding model (meaning search across meetings) runs in the same worker and is let go with the notes model
   const embedder = createEmbedder({ engine, modelPath: () => setup.installed()?.embed, id: bundledCatalog.embedding.id, dims: bundledCatalog.embedding.dims })
-  const queue = createQueue({ recording: () => !!activeMeeting(), smallMac, idleMs: memory.idleMs, backlogMs: transcriptionBacklogMs, onIdle: () => { void model.unload().catch(e => console.error('letting the notes model go failed', e)); void embedder.unload() }, modelReady: () => !!setup.notesPath() })
+  const queue = createQueue({ recording: () => !!activeMeeting(), smallMac, idleMs: memory.idleMs, backlogMs: transcriptionBacklogMs, onIdle: () => { void model.unload().catch(e => console.error('letting the notes model go failed', e)); void embedder.unload() }, modelReady: () => isCloudAiAvailable() || !!setup.notesPath() })
   ipcMain.handle('setup:remove-upgrade', () => setup.removeUpgrade(remove => queue.enqueue(async () => {
     await model.unload()
     remove()
