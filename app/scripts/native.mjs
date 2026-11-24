@@ -62,9 +62,9 @@ for (const [crate, name] of CRATES) {
   const dir = join(app, 'native', crate)
   const out = join(bin, exe(name))
   if (existsSync(out) && statSync(out).mtimeMs > newest(dir)) { console.log(`${exe(name)} is up to date`); continue }
-  if (!hasCargo) {
+  if (!hasCargo || !hasCmake || process.env.VERCEL) {
     if (!existsSync(out)) writeFileSync(out, '')
-    console.log(`cargo not found; stub created for ${exe(name)}`)
+    console.log(`cargo or cmake not found or on Vercel; stub created for ${exe(name)}`)
     continue
   }
   // the crate's own pinned toolchain (rust-toolchain.toml), installed when rustup doesn't have it yet
