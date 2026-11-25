@@ -43,7 +43,7 @@ export default function HomePage() {
         </div>
 
         <p className="mt-4 text-xs text-zinc-500">
-          Mendukung Windows 10/11 x64, macOS (Apple Silicon & Intel), dan Linux.
+          Tersedia untuk Windows 10/11 x64 (macOS dan Linux segera hadir).
         </p>
       </section>
 
