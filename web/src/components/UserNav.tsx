@@ -49,13 +49,13 @@ export default function UserNav({ user }: { user: UserProfile | null }) {
         href="/login"
         className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
       >
-        Masuk
+        Login
       </a>
       <a
         href="/register"
         className="rounded-lg bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-white transition-colors"
       >
-        Daftar
+        Register
       </a>
     </div>
   );

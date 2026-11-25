@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   description: 'Perekam rapat otomatis tanpa bot dengan transkripsi suara instan, ringkasan terstruktur, dan pemutar audio interaktif.',
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -31,12 +33,15 @@ export default async function RootLayout({
               <span>Cakapp<span className="text-zinc-400 font-normal">.ai</span></span>
             </a>
 
-            <nav className="flex items-center gap-3 sm:gap-5 text-sm font-medium">
-              <a href="/dashboard" className="text-zinc-400 transition-colors hover:text-zinc-100 py-1">
-                Dashboard
+            <nav className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm font-medium">
+              <a href="/" className="text-zinc-400 transition-colors hover:text-zinc-100 py-1">
+                Home
               </a>
               <a href="/download" className="text-zinc-400 transition-colors hover:text-zinc-100 py-1">
-                Download App
+                Download
+              </a>
+              <a href="/dashboard" className="text-zinc-400 transition-colors hover:text-zinc-100 py-1">
+                Dashboard
               </a>
               <UserNav user={user} />
             </nav>
