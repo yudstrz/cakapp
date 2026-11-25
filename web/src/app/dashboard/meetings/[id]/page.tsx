@@ -4,11 +4,13 @@ import { notFound, redirect } from 'next/navigation';
 import { getDb } from '@/lib/neon';
 import { getCurrentUser } from '@/lib/auth';
 import { SHOWCASE_MEETING } from '@/lib/showcase';
+import AudioPlayer from '@/components/AudioPlayer';
 
 export const revalidate = 0;
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
+  if (totalSeconds < 60) return `${totalSeconds} detik`;
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}m ${seconds}d`;
@@ -143,27 +145,16 @@ export default async function MeetingDetailPage({
             </span>
           )}
         </div>
-
-        {isShowcase && (
-          <div className="mt-5 rounded-xl border border-zinc-800 bg-zinc-950/60 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-zinc-200">
-                <svg className="w-3.5 h-3.5 ml-0.5" viewBox="0 0 24 24" fill="currentColor">
-                  <polygon points="5 3 19 12 5 21 5 3" />
-                </svg>
-              </span>
-              <div>
-                <div className="text-xs font-medium text-zinc-200">Pemutar Audio Rekaman (Simulasi Sinkron Karaoke)</div>
-                <div className="text-[11px] text-zinc-400">Menangkap audio percakapan dual-track langsung dari sistem operasi</div>
-              </div>
-            </div>
-            <span className="text-xs font-mono text-zinc-400 shrink-0">01:08 / 30:00</span>
-          </div>
-        )}
       </div>
 
       {/* Content Section */}
       <div className="mt-8 grid grid-cols-1 gap-8">
+        {/* Interactive Audio Player & Dialogue */}
+        <AudioPlayer
+          audioUrl={meeting.audioUrl || '/audio/showcase.wav'}
+          transcripts={transcriptRows}
+        />
+
         {/* AI Notes Section */}
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-6 sm:p-8">
           <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-800/80">
@@ -190,50 +181,6 @@ export default async function MeetingDetailPage({
             <p className="text-xs text-zinc-500 italic">
               Belum ada ringkasan notulen tersimpan untuk sesi rapat ini.
             </p>
-          )}
-        </div>
-
-        {/* Transcripts Dialogue Section */}
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-6 sm:p-8">
-          <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-800/80">
-            <h2 className="text-sm sm:text-base font-semibold text-zinc-100 flex items-center gap-2">
-              <svg className="w-4 h-4 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              </svg>
-              Transkrip Percakapan ({transcriptRows.length} baris)
-            </h2>
-          </div>
-
-          {transcriptRows.length === 0 ? (
-            <p className="text-xs text-zinc-500 italic">
-              Belum ada baris transkrip tersimpan untuk rapat ini.
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {transcriptRows.map((tr: any) => {
-                const isMe = tr.track === 'me';
-                const speakerLabel = tr.speaker || (isMe ? 'Saya' : 'Lawan Bicara');
-
-                return (
-                  <div key={tr.id} className="flex gap-3 text-xs sm:text-sm">
-                    <span className="font-mono text-[11px] text-zinc-500 pt-0.5 shrink-0 select-none">
-                      {formatTimestamp(Number(tr.start_ms))}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className={`text-xs font-semibold ${isMe ? 'text-zinc-200' : 'text-zinc-400'}`}>
-                          {speakerLabel}
-                        </span>
-                        <span className="text-[10px] text-zinc-600">
-                          ({isMe ? 'Mic' : 'Speaker'})
-                        </span>
-                      </div>
-                      <p className="text-zinc-300 leading-relaxed">{tr.text}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
           )}
         </div>
       </div>

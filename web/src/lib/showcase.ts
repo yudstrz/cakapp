@@ -5,6 +5,8 @@ export type ShowcaseMeeting = {
   ended_at: number;
   app: string;
   language: string;
+  audioUrl?: string;
+  duration_ms: number;
   attendees: Array<{ name: string; email: string }>;
   notes: {
     enhanced: string;
@@ -13,6 +15,7 @@ export type ShowcaseMeeting = {
   transcripts: Array<{
     id: number;
     speaker: string;
+    role?: string;
     track: 'me' | 'them';
     start_ms: number;
     end_ms: number;
@@ -23,70 +26,66 @@ export type ShowcaseMeeting = {
 export const SHOWCASE_MEETING: ShowcaseMeeting = {
   id: 'showcase-demo',
   title: 'Contoh Showcase: Rapat Koordinasi Produk & Sprint Q3',
-  started_at: Date.now() - 3600000 * 2,
-  ended_at: Date.now() - 3600000 * 2 + 1800000, // 30 mins
+  started_at: Date.now() - 3600000,
+  ended_at: Date.now() - 3600000 + 37290,
   app: 'Google Meet',
   language: 'Bilingual (ID & EN)',
+  audioUrl: '/audio/showcase.wav',
+  duration_ms: 37290,
   attendees: [
-    { name: 'Budi Santoso', email: 'budi@cakapp.ai' },
-    { name: 'Sarah Wijaya', email: 'sarah@cakapp.ai' },
-    { name: 'Dimas Pratama', email: 'dimas@cakapp.ai' },
+    { name: 'Budi Santoso (Product Manager)', email: 'budi@cakapp.ai' },
+    { name: 'Sarah Wijaya (Tech Lead)', email: 'sarah@cakapp.ai' },
   ],
   notes: {
     enhanced: `### Ringkasan Eksekutif
-Rapat koordinasi mingguan membahas kesiapan rilis fitur Whisper lokal dan sinkronisasi database cloud dua arah. Tim menyepakati bahwa performa transkripsi di komputer lokal sudah sangat cepat tanpa latensi server, dan integrasi cloud akan fokus pada kenyamanan akses tim.
+Rapat koordinasi mingguan tim produk dan engineering membahas performa transkripsi model Whisper lokal serta alur sinkronisasi cloud dua arah. Evaluasi membuktikan bahwa transkripsi suara di komputer lokal berjalan lancar dan akurat mengenali percakapan campuran (Bahasa Indonesia & Bahasa Inggris).
 
 ### Pokok Keputusan (Key Decisions)
-1. **Fitur Rekam Native Tanpa Bot**: Perekaman audio desktop tetap berfokus pada tangkapan langsung dari OS (WASAPI untuk Windows) agar peserta panggilan tidak merasa terganggu dengan adanya bot meeting.
-2. **Kamus Jargon Bilingual**: Istilah bisnis dan teknis dalam bahasa Inggris diizinkan masuk ke kamus jargon internal agar transkripsi Whisper tetap akurat saat percakapan bercampur bahasa (code-switching).
-3. **Penyimpanan Transkrip**: Notulen dan ringkasan eksekutif disinkronkan ke cloud, sementara rekaman audio mentah tetap tersimpan privat di perangkat lokal masing-masing pengguna.
+1. **Model Whisper Lokal Bilingual**: Mode multi-bahasa terbukti efektif menangkap istilah teknis bahasa Inggris ("Whisper local transcription", "action items", "deployment to production") tanpa kesalahan eja.
+2. **Sinkronisasi Otomatis**: Semua data notulen dan transkrip per pembicara langsung disinkronkan ke portal cloud Neon secara instan setelah panggilan selesai.
+3. **Penyajian Web Responsif**: Dasbor web menyajikan intisari notulen dan transkrip interaktif yang tersinkron langsung dengan rekaman audio asli.
 
 ### Daftar Tugas & Tindak Lanjut (Action Items)
-- [ ] **Sarah (Tech Lead)**: Finalisasi skema database PostgreSQL di Neon dan pastikan Row-Level Security aktif sebelum deployment ke staging.
-- [ ] **Dimas (Frontend)**: Selesaikan penampil notulen di web portal agar anggota tim bisa langsung membaca rangkuman tanpa perlu menginstall aplikasi desktop.
-- [ ] **Budi (PM)**: Follow up jadwal testing dengan tim sales dan finance untuk uji coba transkripsi bilingual di panggilan Zoom besok pagi.`,
-    mine: 'Rapat koordinasi mingguan sprint Q3. Fokus utama: akurasi Whisper bilingual dan sinkronisasi notulen ke portal web.',
+- [ ] **Sarah (Tech Lead)**: Siapkan jadwal deployment to production untuk rilis model Whisper lokal dan modul sinkronisasi database.
+- [ ] **Budi (Product Manager)**: Monitor keterbacaan ringkasan eksekutif dan validasi akurasi pembagian track pembicara (Mic vs Speaker).`,
+    mine: 'Rapat koordinasi produk Q3: Uji Whisper bilingual, sinkronisasi cloud, dan penampil notulen web.',
   },
   transcripts: [
     {
       id: 1,
-      speaker: 'Budi Santoso (Product Manager)',
+      speaker: 'Budi Santoso',
+      role: 'Product Manager',
       track: 'me',
       start_ms: 0,
-      end_ms: 12500,
-      text: 'Halo selamat pagi semuanya. Terima kasih sudah join di sync meeting hari ini. Agenda kita ada dua: pertama review hasil evaluasi Whisper lokal, dan kedua follow up integrasi cloud sync untuk notulen.',
+      end_ms: 10500,
+      text: 'Halo selamat pagi tim. Welcome to our weekly product sync meeting. Agenda kita adalah review Whisper local transcription dan follow up action items.',
     },
     {
       id: 2,
-      speaker: 'Sarah Wijaya (Tech Lead)',
+      speaker: 'Sarah Wijaya',
+      role: 'Tech Lead',
       track: 'them',
-      start_ms: 13000,
-      end_ms: 27500,
-      text: 'Pagi Mas Budi. Dari tim engineering, performa Whisper di lokal sudah stabil banget. Kita uji coba percakapan campuran bahasa Indonesia dan istilah teknis bahasa Inggris, transkripsinya tetap akurat berkat custom jargon prompt yang kita pasang.',
+      start_ms: 10500,
+      end_ms: 22000,
+      text: 'Morning Budi. From engineering, the bilingual Whisper model is running smoothly on local CPU. All transcripts and executive notes sync directly to our cloud portal.',
     },
     {
       id: 3,
-      speaker: 'Dimas Pratama (Frontend Engineer)',
-      track: 'them',
-      start_ms: 28000,
-      end_ms: 41000,
-      text: 'Betul, kemarin kita test kata-kata seperti "action items", "deployment ke production", dan "standup mingguan", semuanya tertranskrip sempurna tanpa salah eja.',
+      speaker: 'Budi Santoso',
+      role: 'Product Manager',
+      track: 'me',
+      start_ms: 22000,
+      end_ms: 30500,
+      text: 'Sangat bagus. Tolong pastikan web dashboard menampilkan action items dan transkrip per pembicara dengan akurat.',
     },
     {
       id: 4,
-      speaker: 'Budi Santoso (Product Manager)',
-      track: 'me',
-      start_ms: 41500,
-      end_ms: 54000,
-      text: 'Bagus sekali. Nah, untuk portal web, tolong pastikan notulen dan action items bisa dibaca rekan kerja lewat browser tanpa mereka harus download app desktop ya. Itu jadi killer feature kita.',
-    },
-    {
-      id: 5,
-      speaker: 'Sarah Wijaya (Tech Lead)',
+      speaker: 'Sarah Wijaya',
+      role: 'Tech Lead',
       track: 'them',
-      start_ms: 54500,
-      end_ms: 68000,
-      text: 'Siap Mas. Data rapat otomatis ter-push ke Neon PostgreSQL dengan enkripsi aman. Begitu rapat ditutup di PC, notulen langsung muncul di dashboard web dalam hitungan detik.',
+      start_ms: 30500,
+      end_ms: 37290,
+      text: 'Understood Budi. All action items and deployment to production are scheduled.',
     },
   ],
 };

@@ -199,9 +199,9 @@ export default async function DashboardPage() {
               <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-400">
                 <span>{showcaseDateStr}</span>
                 <span className="text-zinc-600">•</span>
-                <span>Durasi: 30 menit</span>
+                <span>Durasi: 37 detik</span>
                 <span className="text-zinc-600">•</span>
-                <span>{SHOWCASE_MEETING.attendees.length} Peserta (Budi, Sarah, Dimas)</span>
+                <span>{SHOWCASE_MEETING.attendees.length} Peserta (Budi Santoso, Sarah Wijaya)</span>
               </div>
             </div>
 
