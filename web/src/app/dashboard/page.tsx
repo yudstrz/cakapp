@@ -1,9 +1,12 @@
 import React from 'react';
+import Link from 'next/link';
 import { getDb } from '@/lib/neon';
+import { getCurrentUser } from '@/lib/auth';
 
 export const revalidate = 0;
 
 export default async function DashboardPage() {
+  const user = await getCurrentUser();
   let meetings: any[] = [];
   let isConfigured = true;
   let statusNotice = '';
@@ -14,30 +17,24 @@ export default async function DashboardPage() {
     statusNotice = 'DATABASE_URL belum ditambahkan di menu Environment Variables Vercel.';
   } else {
     try {
-      // Pastikan tabel meetings sudah siap
-      await sql`
-        CREATE TABLE IF NOT EXISTS meetings (
-          id TEXT PRIMARY KEY,
-          user_id TEXT,
-          workspace_id TEXT,
-          folder_id TEXT,
-          title TEXT,
-          started_at BIGINT,
-          ended_at BIGINT,
-          attendees JSONB DEFAULT '[]'::jsonb,
-          language TEXT DEFAULT 'id',
-          sync_version INT DEFAULT 1,
-          created_at TIMESTAMPTZ DEFAULT NOW(),
-          updated_at TIMESTAMPTZ DEFAULT NOW()
-        );
-      `;
-
-      meetings = (await sql`
-        SELECT id, title, started_at, attendees, language, sync_version 
-        FROM meetings 
-        ORDER BY started_at DESC 
-        LIMIT 20;
-      `) as any[];
+      if (user) {
+        // Query user's meetings (or unassigned meetings for demonstration)
+        meetings = (await sql`
+          SELECT id, user_id, title, started_at, attendees, language, sync_version 
+          FROM meetings 
+          WHERE user_id = ${user.id} OR user_id IS NULL
+          ORDER BY started_at DESC 
+          LIMIT 30;
+        `) as any[];
+      } else {
+        // Guest mode / public preview
+        meetings = (await sql`
+          SELECT id, user_id, title, started_at, attendees, language, sync_version 
+          FROM meetings 
+          ORDER BY started_at DESC 
+          LIMIT 20;
+        `) as any[];
+      }
     } catch (err: any) {
       statusNotice = err.message || 'Gagal memuat data dari database cloud.';
     }
@@ -48,27 +45,65 @@ export default async function DashboardPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-zinc-800">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-100">
-            Riwayat Rapat Cloud
-          </h1>
-          <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-            Notulen dan rekaman yang terekam dari aplikasi desktop tersinkron ke sini.
+          <div className="flex items-center gap-2 mb-1">
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-100">
+              Riwayat Rapat Cloud
+            </h1>
+            {user && (
+              <span className="rounded-full bg-emerald-950/80 border border-emerald-800/60 px-2.5 py-0.5 text-[10px] font-medium text-emerald-300">
+                Terhubung: {user.email}
+              </span>
+            )}
+          </div>
+          <p className="text-xs sm:text-sm text-zinc-400">
+            {user
+              ? `Selamat datang, ${user.full_name}. Notulen rapat Anda tersimpan rapi dan aman di cloud.`
+              : 'Notulen dan rekaman yang terekam dari aplikasi desktop tersinkron ke sini.'}
           </p>
         </div>
-        <a
-          href="/download"
-          className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800/80 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-zinc-700 hover:text-white transition-colors"
-        >
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          Unduh Recorder Desktop
-        </a>
+
+        <div className="flex items-center gap-3">
+          <Link
+            href="/download"
+            className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800/80 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-zinc-700 hover:text-white transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Unduh Recorder PC
+          </Link>
+        </div>
       </div>
 
-      {/* Notice if not configured or query error */}
+      {/* Guest notice banner */}
+      {!user && isConfigured && (
+        <div className="mt-6 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="text-xs text-zinc-300">
+            <span className="font-semibold text-zinc-100 block sm:inline mr-2">
+              Mode Tamu / Pratinjau Publik
+            </span>
+            Masuk atau buat akun baru agar hasil rekaman panggilan di laptop Anda tersimpan eksklusif di ruang rapat pribadi Anda.
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Link
+              href="/login"
+              className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-zinc-700 hover:text-white transition-colors"
+            >
+              Masuk
+            </Link>
+            <Link
+              href="/register"
+              className="rounded-lg bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-white transition-colors"
+            >
+              Daftar Akun
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Database warning notice */}
       {!isConfigured && (
         <div className="mt-6 rounded-lg border border-amber-800/60 bg-amber-950/30 p-4 text-xs text-amber-200">
           <div className="font-medium mb-1">Perhatian Konfigurasi Database:</div>
@@ -97,14 +132,14 @@ export default async function DashboardPage() {
           </div>
           <h2 className="text-sm sm:text-base font-semibold text-zinc-200">Belum Ada Sesi Rapat</h2>
           <p className="mt-1.5 text-xs text-zinc-400 max-w-sm mx-auto">
-            Jalankan aplikasi desktop Cakapp di PC Anda saat panggilan Zoom atau Google Meet untuk mulai merekam.
+            Jalankan aplikasi desktop Cakapp di PC Anda saat panggilan Zoom atau Google Meet untuk mulai merekam. Notulen akan otomatis tersinkron ke sini.
           </p>
-          <a
+          <Link
             href="/download"
             className="mt-5 inline-flex items-center gap-2 rounded-lg bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-white transition-colors"
           >
             Unduh Aplikasi Desktop
-          </a>
+          </Link>
         </div>
       )}
 
@@ -148,12 +183,12 @@ export default async function DashboardPage() {
                 </div>
 
                 <div className="flex items-center gap-2 mt-2 sm:mt-0">
-                  <button
-                    type="button"
-                    className="w-full sm:w-auto rounded-md bg-zinc-800 border border-zinc-700 px-3.5 py-1.5 text-xs font-medium text-zinc-200 hover:bg-zinc-700 hover:text-white transition-colors"
+                  <Link
+                    href={`/dashboard/meetings/${m.id}`}
+                    className="w-full sm:w-auto text-center rounded-md bg-zinc-800 border border-zinc-700 px-3.5 py-1.5 text-xs font-medium text-zinc-200 hover:bg-zinc-700 hover:text-white transition-colors"
                   >
                     Buka Notulen
-                  </button>
+                  </Link>
                 </div>
               </div>
             );

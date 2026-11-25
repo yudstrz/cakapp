@@ -1,16 +1,22 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { getCurrentUser } from '@/lib/auth';
+import UserNav from '@/components/UserNav';
+
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Cakapp — AI Meeting Recorder & Smart Intelligence',
   description: 'Perekam rapat otomatis tanpa bot dengan transkripsi suara instan, ringkasan terstruktur, dan pemutar audio interaktif.',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const user = await getCurrentUser();
+
   return (
     <html lang="id">
       <body className="min-h-screen bg-[#09090b] text-zinc-100 antialiased selection:bg-zinc-800 selection:text-white">
@@ -27,19 +33,14 @@ export default function RootLayout({
               <span>Cakapp<span className="text-zinc-400 font-normal">.ai</span></span>
             </a>
 
-            <nav className="flex items-center gap-3 sm:gap-6 text-sm font-medium">
+            <nav className="flex items-center gap-3 sm:gap-5 text-sm font-medium">
               <a href="/dashboard" className="text-zinc-400 transition-colors hover:text-zinc-100 py-1">
                 Dashboard
               </a>
               <a href="/download" className="text-zinc-400 transition-colors hover:text-zinc-100 py-1">
                 Download App
               </a>
-              <a
-                href="/download"
-                className="hidden sm:inline-flex items-center justify-center rounded-lg bg-zinc-100 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition-colors hover:bg-white"
-              >
-                Unduh Desktop
-              </a>
+              <UserNav user={user} />
             </nav>
           </div>
         </header>
