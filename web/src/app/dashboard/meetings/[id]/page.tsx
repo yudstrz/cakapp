@@ -1,8 +1,9 @@
 import React from 'react';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { getDb } from '@/lib/neon';
 import { getCurrentUser } from '@/lib/auth';
+import { SHOWCASE_MEETING } from '@/lib/showcase';
 
 export const revalidate = 0;
 
@@ -26,41 +27,59 @@ export default async function MeetingDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const sql = getDb();
-  if (!sql) {
-    return (
-      <div className="mx-auto max-w-4xl px-4 py-16 text-center text-sm text-zinc-400">
-        Database cloud tidak tersedia.
-      </div>
-    );
+  const user = await getCurrentUser();
+
+  let meeting: any;
+  let notes: any = null;
+  let transcriptRows: any[] = [];
+  const isShowcase = id === 'showcase-demo';
+
+  if (isShowcase) {
+    meeting = SHOWCASE_MEETING;
+    notes = SHOWCASE_MEETING.notes;
+    transcriptRows = SHOWCASE_MEETING.transcripts;
+  } else {
+    if (!user) {
+      redirect('/login');
+    }
+
+    const sql = getDb();
+    if (!sql) {
+      return (
+        <div className="mx-auto max-w-4xl px-4 py-16 text-center text-sm text-zinc-400">
+          Database cloud tidak tersedia.
+        </div>
+      );
+    }
+
+    const meetingRows = (await sql`
+      SELECT id, user_id, title, started_at, ended_at, attendees, language, app, state
+      FROM meetings
+      WHERE id = ${id} AND (user_id = ${user.id} OR user_id IS NULL)
+      LIMIT 1
+    `) as any[];
+
+    if (meetingRows.length === 0) {
+      notFound();
+    }
+
+    meeting = meetingRows[0];
+
+    const noteRows = (await sql`
+      SELECT mine, enhanced, updated_at
+      FROM notes
+      WHERE meeting_id = ${id}
+      LIMIT 1
+    `) as any[];
+    notes = noteRows[0] || null;
+
+    transcriptRows = (await sql`
+      SELECT id, track, start_ms, end_ms, text, speaker
+      FROM transcripts
+      WHERE meeting_id = ${id}
+      ORDER BY start_ms ASC
+    `) as any[];
   }
-
-  const meetingRows = (await sql`
-    SELECT id, user_id, title, started_at, ended_at, attendees, language, app, state
-    FROM meetings
-    WHERE id = ${id}
-    LIMIT 1
-  `) as any[];
-
-  if (meetingRows.length === 0) {
-    notFound();
-  }
-
-  const meeting = meetingRows[0];
-  const noteRows = (await sql`
-    SELECT mine, enhanced, updated_at
-    FROM notes
-    WHERE meeting_id = ${id}
-    LIMIT 1
-  `) as any[];
-  const notes = noteRows[0] || null;
-
-  const transcriptRows = (await sql`
-    SELECT id, track, start_ms, end_ms, text, speaker
-    FROM transcripts
-    WHERE meeting_id = ${id}
-    ORDER BY start_ms ASC
-  `) as any[];
 
   const dateStr = meeting.started_at
     ? new Date(Number(meeting.started_at)).toLocaleDateString('id-ID', {
@@ -94,11 +113,16 @@ export default async function MeetingDetailPage({
       {/* Header Card */}
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 sm:p-8 backdrop-blur-sm">
         <div className="flex flex-wrap items-center gap-2 mb-3">
+          {isShowcase && (
+            <span className="rounded bg-amber-950/80 border border-amber-800/60 px-2.5 py-0.5 text-[10px] font-medium text-amber-300">
+              Showcase Demo
+            </span>
+          )}
           <span className="rounded bg-zinc-800 px-2.5 py-0.5 text-[10px] font-medium text-zinc-300 uppercase tracking-wider">
             {meeting.app || 'Panggilan'}
           </span>
           <span className="rounded bg-zinc-800/80 px-2 py-0.5 text-[10px] text-zinc-400">
-            Bahasa: {(meeting.language || 'id').toUpperCase()}
+            Bahasa: {meeting.language || 'ID'}
           </span>
           {durationMs && (
             <span className="rounded bg-zinc-800/80 px-2 py-0.5 text-[10px] text-zinc-400">
@@ -119,6 +143,23 @@ export default async function MeetingDetailPage({
             </span>
           )}
         </div>
+
+        {isShowcase && (
+          <div className="mt-5 rounded-xl border border-zinc-800 bg-zinc-950/60 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-zinc-200">
+                <svg className="w-3.5 h-3.5 ml-0.5" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
+              </span>
+              <div>
+                <div className="text-xs font-medium text-zinc-200">Pemutar Audio Rekaman (Simulasi Sinkron Karaoke)</div>
+                <div className="text-[11px] text-zinc-400">Menangkap audio percakapan dual-track langsung dari sistem operasi</div>
+              </div>
+            </div>
+            <span className="text-xs font-mono text-zinc-400 shrink-0">01:08 / 30:00</span>
+          </div>
+        )}
       </div>
 
       {/* Content Section */}

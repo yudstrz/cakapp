@@ -3,8 +3,6 @@ import './globals.css';
 import { getCurrentUser } from '@/lib/auth';
 import UserNav from '@/components/UserNav';
 
-export const dynamic = 'force-dynamic';
-
 export const metadata: Metadata = {
   title: 'Cakapp — AI Meeting Recorder & Smart Intelligence',
   description: 'Perekam rapat otomatis tanpa bot dengan transkripsi suara instan, ringkasan terstruktur, dan pemutar audio interaktif.',
