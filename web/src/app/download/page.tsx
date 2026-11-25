@@ -101,21 +101,6 @@ export default function DownloadPage() {
           </div>
         </div>
       </div>
-
-      {/* Local Development & Build Instruction (Ponytail practical utility) */}
-      <div className="mt-12 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 sm:p-6 text-left max-w-xl mx-auto">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-2">
-          Jalankan Langsung dari Source Code
-        </h3>
-        <p className="text-xs text-zinc-400 leading-relaxed mb-3">
-          Jika file rilis binary belum dipublikasikan di GitHub Releases, Anda dapat langsung menjalankan recorder desktop di laptop Anda dengan perintah:
-        </p>
-        <div className="rounded bg-black/50 border border-zinc-800 p-3 font-mono text-xs text-zinc-200 overflow-x-auto">
-          <code>git clone https://github.com/yudstrz/cakapp.git</code><br />
-          <code>pnpm install</code><br />
-          <code>pnpm --filter @cakapp/app run dev</code>
-        </div>
-      </div>
     </div>
   );
 }
