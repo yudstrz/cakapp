@@ -46,6 +46,19 @@ export type Meeting = {
   transcriptionAgain?: boolean
   /** when it was moved to the Trash; there it is out of every list, search and chat until restored */
   trashedAt?: number
+  syncStatus?: 'pending' | 'synced' | 'failed'
+  syncVersion?: number
+  updatedAt?: number
+}
+export type SyncQueueItem = {
+  id: number
+  entityType: 'meeting' | 'folder' | 'notes'
+  entityId: string
+  action: 'upsert' | 'delete'
+  payload: string | null
+  attempts: number
+  lastError: string | null
+  createdAt: number
 }
 /** speaker: 'me' on the mic; on the other side the name the call app showed talking (callNames), null for Them */
 export type Segment = { id: number; meetingId: string; track: 'me' | 'them'; startMs: number; endMs: number; text: string; speaker: string | null
@@ -77,6 +90,9 @@ const toMeeting = (r: Row): Meeting => ({
   ...(r.event_calendar_source == null ? {} : { eventCalendarSource: String(r.event_calendar_source) }),
   ...(r.duration_ms == null ? {} : { durationMs: Number(r.duration_ms) }),
   ...(r.trashed_at == null ? {} : { trashedAt: Number(r.trashed_at) }),
+  ...(r.sync_status ? { syncStatus: r.sync_status as Meeting['syncStatus'] } : {}),
+  ...(r.sync_version != null ? { syncVersion: Number(r.sync_version) } : {}),
+  ...(r.updated_at != null ? { updatedAt: Number(r.updated_at) } : {}),
 })
 const toSegment = (r: Row): Segment => ({
   id: Number(r.id), meetingId: String(r.meeting_id), track: r.track as Segment['track'], startMs: Number(r.start_ms), endMs: Number(r.end_ms),
@@ -233,6 +249,22 @@ export class Store {
     if (!meetingCols.includes('duration_ms')) this.db.exec('ALTER TABLE meetings ADD COLUMN duration_ms INTEGER')
     if (!meetingCols.includes('language')) this.db.exec('ALTER TABLE meetings ADD COLUMN language TEXT')
     if (!meetingCols.includes('trashed_at')) this.db.exec('ALTER TABLE meetings ADD COLUMN trashed_at INTEGER')
+    if (!meetingCols.includes('sync_status')) this.db.exec("ALTER TABLE meetings ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'pending'")
+    if (!meetingCols.includes('sync_version')) this.db.exec('ALTER TABLE meetings ADD COLUMN sync_version INTEGER NOT NULL DEFAULT 1')
+    if (!meetingCols.includes('updated_at')) this.db.exec('ALTER TABLE meetings ADD COLUMN updated_at INTEGER')
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS sync_queue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        payload TEXT,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS sync_queue_created ON sync_queue(created_at);
+    `)
     // Existing notes and older backups have no attendee edit history, including lists cleared by hand.
     if (!meetingCols.includes('keep_attendees')) this.db.exec('ALTER TABLE meetings ADD COLUMN keep_attendees INTEGER NOT NULL DEFAULT 1')
     if (!meetingCols.includes('title_source')) {
@@ -339,8 +371,8 @@ export class Store {
       this.rememberOwnEmail(ownEmail)
       const titleSource = m.titleSource ?? sourceOf(m.title, m.eventId)
       const userId = m.userId ?? null
-      this.db.prepare('INSERT INTO meetings (id, title, started_at, ended_at, event_id, app, attendees, state, language, title_source, duration_ms, event_started_at, event_ended_at, event_title, event_calendar_name, event_calendar_source, source, source_id, transcription_pending, own_email, keep_attendees, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        .run(id, m.title, m.startedAt, m.endedAt, m.eventId, m.app, JSON.stringify(m.attendees), m.state, language, titleSource, m.durationMs ?? null, m.eventStartedAt ?? null, m.eventEndedAt ?? null, m.eventTitle ?? null, m.eventCalendarName ?? null, m.eventCalendarSource ?? null, m.source ?? null, m.sourceId ?? null, Number(!!m.transcriptionPending), ownEmail, Number(!!m.keepAttendees), userId)
+      this.db.prepare('INSERT INTO meetings (id, title, started_at, ended_at, event_id, app, attendees, state, language, title_source, duration_ms, event_started_at, event_ended_at, event_title, event_calendar_name, event_calendar_source, source, source_id, transcription_pending, own_email, keep_attendees, user_id, sync_status, sync_version, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(id, m.title, m.startedAt, m.endedAt, m.eventId, m.app, JSON.stringify(m.attendees), m.state, language, titleSource, m.durationMs ?? null, m.eventStartedAt ?? null, m.eventEndedAt ?? null, m.eventTitle ?? null, m.eventCalendarName ?? null, m.eventCalendarSource ?? null, m.source ?? null, m.sourceId ?? null, Number(!!m.transcriptionPending), ownEmail, Number(!!m.keepAttendees), userId, 'pending', 1, Date.now())
       rememberPeople(this.db, m.attendees)
       if (m.folderId !== undefined) this.addToFolder(m.folderId, id)
       return this.meeting(id)!
@@ -818,6 +850,105 @@ export class Store {
   /** After a crash or quit mid-recording: those meetings are stopped, not still recording. */
   markInterrupted(): number {
     return Number(this.db.prepare("UPDATE meetings SET state = 'stopped' WHERE state = 'recording'").run().changes)
+  }
+
+  enqueueSync(entityType: 'meeting' | 'folder' | 'notes', entityId: string, action: 'upsert' | 'delete', payload?: unknown): void {
+    const json = payload !== undefined ? JSON.stringify(payload) : null
+    this.db.prepare('INSERT INTO sync_queue (entity_type, entity_id, action, payload, created_at) VALUES (?, ?, ?, ?, ?)')
+      .run(entityType, entityId, action, json, Date.now())
+  }
+  peekSyncQueue(limit = 20): SyncQueueItem[] {
+    const rows = this.db.prepare('SELECT id, entity_type, entity_id, action, payload, attempts, last_error, created_at FROM sync_queue ORDER BY created_at ASC LIMIT ?').all(limit) as Row[]
+    return rows.map((r) => ({
+      id: Number(r.id),
+      entityType: r.entity_type as SyncQueueItem['entityType'],
+      entityId: String(r.entity_id),
+      action: r.action as SyncQueueItem['action'],
+      payload: r.payload == null ? null : String(r.payload),
+      attempts: Number(r.attempts),
+      lastError: r.last_error == null ? null : String(r.last_error),
+      createdAt: Number(r.created_at),
+    }))
+  }
+  dequeueSync(id: number): void {
+    this.db.prepare('DELETE FROM sync_queue WHERE id = ?').run(id)
+  }
+  updateSyncAttempt(id: number, error: string): void {
+    this.db.prepare('UPDATE sync_queue SET attempts = attempts + 1, last_error = ? WHERE id = ?').run(error, id)
+  }
+  syncQueueCount(): number {
+    const r = this.db.prepare('SELECT count(*) as c FROM sync_queue').get() as Row | undefined
+    return Number(r?.c ?? 0)
+  }
+  setMeetingSyncStatus(id: string, status: 'pending' | 'synced' | 'failed', version?: number) {
+    if (version !== undefined) {
+      this.db.prepare('UPDATE meetings SET sync_status = ?, sync_version = ? WHERE id = ?').run(status, version, id)
+    } else {
+      this.db.prepare('UPDATE meetings SET sync_status = ? WHERE id = ?').run(status, id)
+    }
+  }
+  meetingSyncStatus(id: string): { status: 'pending' | 'synced' | 'failed'; version: number; updatedAt: number } | undefined {
+    const r = this.db.prepare('SELECT sync_status, sync_version, updated_at FROM meetings WHERE id = ?').get(id) as Row | undefined
+    if (!r) return undefined
+    return {
+      status: (r.sync_status as 'pending' | 'synced' | 'failed') ?? 'pending',
+      version: Number(r.sync_version ?? 1),
+      updatedAt: Number(r.updated_at ?? 0),
+    }
+  }
+  upsertMeetingFromCloud(m: Meeting, segments: Segment[] = [], notes?: Notes | null, cloudUpdatedAt?: number): boolean {
+    return this.writeAtomically(() => {
+      const existing = this.db.prepare('SELECT updated_at FROM meetings WHERE id = ?').get(m.id) as Row | undefined
+      const cloudTime = cloudUpdatedAt ?? m.startedAt
+      if (existing && existing.updated_at != null && Number(existing.updated_at) > cloudTime) {
+        // Local is newer than cloud (Last-Write-Wins)
+        return false
+      }
+      if (existing) {
+        this.db.prepare(`
+          UPDATE meetings SET
+            title = ?, started_at = ?, ended_at = ?, event_id = ?, app = ?, attendees = ?,
+            state = ?, language = ?, user_id = ?, sync_status = 'synced', updated_at = ?
+          WHERE id = ?
+        `).run(m.title, m.startedAt, m.endedAt, m.eventId, m.app, JSON.stringify(m.attendees), m.state, m.language, m.userId ?? null, cloudTime, m.id)
+      } else {
+        this.db.prepare(`
+          INSERT INTO meetings (
+            id, title, started_at, ended_at, event_id, app, attendees, state, language,
+            title_source, user_id, sync_status, sync_version, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', ?, 'synced', 1, ?)
+        `).run(m.id, m.title, m.startedAt, m.endedAt, m.eventId, m.app, JSON.stringify(m.attendees), m.state, m.language, m.userId ?? null, cloudTime)
+      }
+
+      if (segments.length > 0) {
+        this.db.prepare('DELETE FROM segments WHERE meeting_id = ?').run(m.id)
+        const insertSeg = this.db.prepare('INSERT INTO segments (meeting_id, track, start_ms, end_ms, text, speaker) VALUES (?, ?, ?, ?, ?, ?)')
+        for (const seg of segments) {
+          insertSeg.run(m.id, seg.track, seg.startMs, seg.endMs, seg.text, seg.speaker ?? null)
+        }
+      }
+
+      if (notes) {
+        this.db.prepare(`
+          INSERT INTO notes (meeting_id, mine, enhanced, edited) VALUES (?, ?, ?, 0)
+          ON CONFLICT(meeting_id) DO UPDATE SET mine = excluded.mine, enhanced = excluded.enhanced
+        `).run(m.id, notes.mine ?? '', notes.enhanced ?? null)
+      }
+      return true
+    })
+  }
+  upsertFolderFromCloud(folder: Folder): boolean {
+    return this.writeAtomically(() => {
+      const existing = this.db.prepare('SELECT id FROM folders WHERE id = ?').get(folder.id)
+      if (existing) {
+        this.db.prepare('UPDATE folders SET name = ?, icon = ?, color = ? WHERE id = ?')
+          .run(folder.name, folder.icon, folder.color, folder.id)
+      } else {
+        this.db.prepare('INSERT INTO folders (id, name, created_at, icon, color) VALUES (?, ?, ?, ?, ?)')
+          .run(folder.id, folder.name, folder.createdAt, folder.icon, folder.color)
+      }
+      return true
+    })
   }
 }
 

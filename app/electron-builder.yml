@@ -6,8 +6,8 @@ copyright: Copyright © 2026 Cakapp
 # Installed copies update from the same release (latest-mac.yml, latest.yml, latest-linux.yml; src/main/updates.ts).
 publish:
   provider: github
-  owner: FrigadeHQ
-  repo: yogurt
+  owner: yudstrz
+  repo: cakapp
   releaseType: release
 extraMetadata:
   name: cakapp

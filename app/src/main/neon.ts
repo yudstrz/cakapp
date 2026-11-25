@@ -2,7 +2,7 @@ import { neon, type NeonQueryFunction } from '@neondatabase/serverless'
 import dotenv from 'dotenv'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Meeting, Notes, Segment } from './store'
+import type { Folder, Meeting, Notes, Segment } from './store'
 
 for (const envPath of [
   join(process.cwd(), '.env'),
@@ -61,6 +61,7 @@ export async function initNeonSchema(): Promise<void> {
       id TEXT PRIMARY KEY,
       email TEXT,
       full_name TEXT,
+      avatar_url TEXT,
       created_at TIMESTAMPTZ DEFAULT now()
     )
   `
@@ -121,6 +122,35 @@ export async function initNeonSchema(): Promise<void> {
   `
   await sql`CREATE INDEX IF NOT EXISTS idx_meetings_user ON meetings(user_id)`
   await sql`CREATE INDEX IF NOT EXISTS idx_transcripts_meeting ON transcripts(meeting_id)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_folders_user ON folders(user_id)`
+
+  // Enable Row Level Security (RLS) on all user data tables
+  await sql`ALTER TABLE profiles ENABLE ROW LEVEL SECURITY`
+  await sql`ALTER TABLE workspaces ENABLE ROW LEVEL SECURITY`
+  await sql`ALTER TABLE folders ENABLE ROW LEVEL SECURITY`
+  await sql`ALTER TABLE meetings ENABLE ROW LEVEL SECURITY`
+  await sql`ALTER TABLE transcripts ENABLE ROW LEVEL SECURITY`
+  await sql`ALTER TABLE notes ENABLE ROW LEVEL SECURITY`
+
+  // Create default permissive policies for authenticated access if not present
+  try {
+    await sql`CREATE POLICY profiles_all ON profiles FOR ALL USING (true)`
+  } catch { /* already exists */ }
+  try {
+    await sql`CREATE POLICY workspaces_all ON workspaces FOR ALL USING (true)`
+  } catch { /* already exists */ }
+  try {
+    await sql`CREATE POLICY folders_all ON folders FOR ALL USING (true)`
+  } catch { /* already exists */ }
+  try {
+    await sql`CREATE POLICY meetings_all ON meetings FOR ALL USING (true)`
+  } catch { /* already exists */ }
+  try {
+    await sql`CREATE POLICY transcripts_all ON transcripts FOR ALL USING (true)`
+  } catch { /* already exists */ }
+  try {
+    await sql`CREATE POLICY notes_all ON notes FOR ALL USING (true)`
+  } catch { /* already exists */ }
   schemaInitialized = true
 }
 
@@ -172,5 +202,148 @@ export async function syncMeetingToNeon(m: Meeting, segments: Segment[] = [], no
   } catch (err) {
     console.error('Failed to sync meeting to Neon:', err)
     return false
+  }
+}
+
+export async function syncFolderToNeon(folder: Folder, userId?: string | null): Promise<boolean> {
+  if (!isNeonConfigured()) return false
+  try {
+    await initNeonSchema()
+    const sql = getNeonClient()
+    await sql`
+      INSERT INTO folders (id, user_id, name, color, icon, created_at)
+      VALUES (${folder.id}, ${userId ?? null}, ${folder.name}, ${folder.color}, ${folder.icon}, to_timestamp(${folder.createdAt / 1000}))
+      ON CONFLICT (id) DO UPDATE SET
+        name = EXCLUDED.name,
+        color = EXCLUDED.color,
+        icon = EXCLUDED.icon
+    `
+    return true
+  } catch (err) {
+    console.error('Failed to sync folder to Neon:', err)
+    return false
+  }
+}
+
+export async function deleteFolderFromNeon(id: string): Promise<boolean> {
+  if (!isNeonConfigured()) return false
+  try {
+    await initNeonSchema()
+    const sql = getNeonClient()
+    await sql`DELETE FROM folders WHERE id = ${id}`
+    return true
+  } catch (err) {
+    console.error('Failed to delete folder from Neon:', err)
+    return false
+  }
+}
+
+export async function fetchFoldersFromNeon(userId?: string | null): Promise<Folder[]> {
+  if (!isNeonConfigured()) return []
+  try {
+    await initNeonSchema()
+    const sql = getNeonClient()
+    const rows = userId
+      ? await sql`SELECT id, name, color, icon, EXTRACT(EPOCH FROM created_at) * 1000 AS created_at FROM folders WHERE user_id = ${userId} OR user_id IS NULL ORDER BY created_at ASC`
+      : await sql`SELECT id, name, color, icon, EXTRACT(EPOCH FROM created_at) * 1000 AS created_at FROM folders ORDER BY created_at ASC`
+    return (rows as Array<Record<string, unknown>>).map((r) => ({
+      id: String(r.id),
+      name: String(r.name),
+      color: (r.color as Folder['color']) ?? 'default',
+      icon: (r.icon as Folder['icon']) ?? 'folder',
+      createdAt: Number(r.created_at) || Date.now(),
+      count: 0,
+    }))
+  } catch (err) {
+    console.error('Failed to fetch folders from Neon:', err)
+    return []
+  }
+}
+
+export async function fetchMeetingsFromNeon(userId?: string | null, since?: number): Promise<Array<{
+  meeting: Meeting
+  segments: Segment[]
+  notes: Notes | null
+  updatedAt: number
+}>> {
+  if (!isNeonConfigured()) return []
+  try {
+    await initNeonSchema()
+    const sql = getNeonClient()
+    const sinceTimestamp = since ? new Date(since).toISOString() : new Date(0).toISOString()
+    const meetingRows = userId
+      ? await sql`
+          SELECT id, user_id, title, started_at, ended_at, event_id, app, attendees, state, language, sync_version,
+                 EXTRACT(EPOCH FROM updated_at) * 1000 AS updated_at_ms
+          FROM meetings
+          WHERE (user_id = ${userId} OR user_id IS NULL) AND updated_at >= ${sinceTimestamp}::timestamptz
+          ORDER BY started_at DESC
+        `
+      : await sql`
+          SELECT id, user_id, title, started_at, ended_at, event_id, app, attendees, state, language, sync_version,
+                 EXTRACT(EPOCH FROM updated_at) * 1000 AS updated_at_ms
+          FROM meetings
+          WHERE updated_at >= ${sinceTimestamp}::timestamptz
+          ORDER BY started_at DESC
+        `
+
+    const results: Array<{ meeting: Meeting; segments: Segment[]; notes: Notes | null; updatedAt: number }> = []
+
+    for (const r of meetingRows as Array<Record<string, unknown>>) {
+      const meetingId = String(r.id)
+      const transcriptRows = await sql`
+        SELECT id, track, start_ms, end_ms, text, speaker
+        FROM transcripts
+        WHERE meeting_id = ${meetingId}
+        ORDER BY start_ms ASC
+      `
+      const noteRows = await sql`
+        SELECT mine, enhanced
+        FROM notes
+        WHERE meeting_id = ${meetingId}
+      `
+
+      const attendees = Array.isArray(r.attendees) ? r.attendees : []
+      const meeting: Meeting = {
+        id: meetingId,
+        title: String(r.title ?? 'Untitled'),
+        startedAt: Number(r.started_at),
+        endedAt: r.ended_at ? Number(r.ended_at) : null,
+        eventId: r.event_id ? String(r.event_id) : null,
+        app: r.app ? String(r.app) : null,
+        attendees,
+        state: r.state as Meeting['state'],
+        language: r.language ? String(r.language) : null,
+        titleSource: 'user',
+        userId: r.user_id ? String(r.user_id) : null,
+      }
+
+      const segments: Segment[] = (transcriptRows as Array<Record<string, unknown>>).map((tr) => ({
+        id: Number(tr.id),
+        meetingId,
+        track: tr.track as Segment['track'],
+        startMs: Number(tr.start_ms),
+        endMs: Number(tr.end_ms),
+        text: String(tr.text),
+        speaker: tr.speaker ? String(tr.speaker) : null,
+      }))
+
+      const notes: Notes | null = noteRows.length > 0 ? {
+        mine: String((noteRows[0] as Record<string, unknown>).mine ?? ''),
+        enhanced: (noteRows[0] as Record<string, unknown>).enhanced ? String((noteRows[0] as Record<string, unknown>).enhanced) : null,
+        edited: false,
+      } : null
+
+      results.push({
+        meeting,
+        segments,
+        notes,
+        updatedAt: Number(r.updated_at_ms) || Date.now(),
+      })
+    }
+    return results
+  } catch (err) {
+    console.error('Failed to fetch meetings from Neon:', err)
+    return []
   }
 }

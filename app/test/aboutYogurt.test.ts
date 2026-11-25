@@ -1,7 +1,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, expect, it, vi } from 'vitest'
-import { AboutCakapp } from '../src/renderer/src/components/AboutCakapp'
+import { AboutCakapp } from '../src/renderer/src/components/AboutYogurt'
 import { setLanguage } from '../src/shared/i18n'
 
 afterEach(() => { vi.unstubAllGlobals(); setLanguage('en') })

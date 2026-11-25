@@ -89,6 +89,7 @@ import { hookFolders } from './foldersIpc'
 import { hookMcp } from './mcp'
 import { startedHidden } from './mcp/paths'
 import { deleteRecording } from './deleteRecording'
+import { SyncEngine } from './syncEngine'
 import { AUDIO_SCHEME, audioExts, createAudioHandler, trackFile, type AudioExt } from './audio'
 import { helperDecode, wavDecode } from './asr/backfill'
 import { finishQuit, hookUpdates, isPreviewBuild, updatesOn } from './updates'
@@ -763,22 +764,24 @@ app.whenReady().then(() => {
   })
   setup.onState(() => {uploads.resume();savedTranscriptions.resume()})
   onMeetingStart(m => {store.clearTranscriptionState(m.id);savedTranscriptions.pause()})
+  const syncEngine = new SyncEngine(store, getUserId, () => win?.webContents.send('meetings:changed'))
   onMeetingStopSaved((m) => {
     uploads.resume(); savedTranscriptions.resume()
-    if (isNeonConfigured()) {
-      const segs = store.segments(m.id)
-      const notesData = store.notes(m.id)
-      void syncMeetingToNeon(m, segs, notesData).catch(err => console.warn('Neon meeting sync failed:', err))
-    }
+    void syncEngine.pushMeeting(m.id).catch(err => console.warn('[syncEngine] push meeting failed:', err))
   })
-  ipcMain.handle('neon:status', () => checkNeonHealth())
+  ipcMain.handle('sync:status', () => syncEngine.getStatus())
+  ipcMain.handle('sync:push', async (_e, id: unknown) => {
+    if (!isId(id)) return false
+    return syncEngine.pushMeeting(id)
+  })
+  ipcMain.handle('sync:pull', () => syncEngine.pullMeetings())
+  ipcMain.handle('sync:pull-folders', () => syncEngine.pullFolders())
+  ipcMain.handle('sync:flush', () => syncEngine.flushQueue())
+  ipcMain.handle('sync:all', () => syncEngine.syncAll())
+  ipcMain.handle('neon:status', () => syncEngine.getStatus())
   ipcMain.handle('neon:sync', async (_e, id: unknown) => {
     if (!isId(id)) return false
-    const m = store.meeting(id)
-    if (!m) return false
-    const segs = store.segments(id)
-    const notesData = store.notes(id)
-    return syncMeetingToNeon(m, segs, notesData)
+    return syncEngine.pushMeeting(id)
   })
   ipcMain.handle('transcript:run', (e,id:unknown,again:unknown) => {
     if(e.sender!==win?.webContents||!isId(id)||typeof again!=='boolean')return false
@@ -904,7 +907,7 @@ app.whenReady().then(() => {
   hookMics({ helper: micListHelper(process.platform) === 'system' || isFake() ? runHelper : audioHelper.run, settingsFile, send: (channel, payload) => win?.webContents.send(channel, payload) })
   hookShare({ store, window: () => win, includeRecordingCredit: () => includesRecordingCredit(loadSettings(settingsFile)) })
   const foldersChanged = () => { win?.webContents.send('folders:changed'); folderSuggestions.refresh() }
-  hookFolders({ store, changed: foldersChanged })
+  hookFolders({ store, changed: foldersChanged, onFolderSync: (id) => void syncEngine.pushFolder(id) })
   // every meeting to one file and back; what an import adds shows up on home
   hookBackup({ getRecordingPill: () => visibilityOf(loadSettings(settingsFile), platform).showRecordingPill,
     setRecordingPill: preferences.setRecordingPill, db: store.db, meetingsDir: join(userDataDir(), 'meetings'), window: () => win, recording: () => !!activeMeeting() || !!resumingId,
@@ -994,6 +997,7 @@ app.whenReady().then(() => {
   onMeetingStopSaved(() => void transcribeWaiting())
   app.on('will-quit', killAllWatches)
   app.on('will-quit', killAllHelpers)
+  app.on('will-quit', () => syncEngine.destroy())
   let flushToken = 0
   const flushRenderer = (): Promise<boolean> => {
     const window = win

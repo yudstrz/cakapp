@@ -297,17 +297,17 @@ flowchart TD
 
 #### 3. Skenario Pengujian Perusahaan Hari 2 (Enterprise QA Checklist)
 
-* [ ] **TC-2.1 (Transkripsi Whisper Bilingual):** Uji coba bicara campuran bahasa Indonesia dan istilah bisnis bahasa Inggris (contoh: *"Tolong follow up action item rapat Q3 ke PIC terkait"*). Pastikan kata-kata tertranskripsi dengan akurat.
-* [ ] **TC-2.2 (Custom Jargon Perusahaan):** Daftarkan 3 istilah unik perusahaan Anda di menu Jargon (misal: nama produk atau singkatan internal). Uji bicara istilah tersebut dan pastikan Whisper tidak salah eja.
-* [ ] **TC-2.3 (Live Word Streaming):** Pastikan teks transkrip mengalir di layar secara *real-time* saat rapat berlangsung tanpa membuat komputer *freeze*.
-* [ ] **TC-2.4 (Pengorganisasian Folder):** Buat folder divisi (contoh: *"Divisi Finance"*, *"Rapat Direksi"*), pindahkan rapat ke dalam folder, dan pastikan metadata folder tersimpan rapi.
-* [ ] **TC-2.5 (Uji Ketahanan Offline & Auto-Push Sync):** Putuskan koneksi WiFi kantor. Lakukan rapat singkat 1 menit dan simpan. Hubungkan kembali WiFi. Periksa apakah data rapat otomatis terkirim (*synced*) ke Cloud DB tanpa error.
-* [ ] **TC-2.6 (Uji Pull Sync Multi-Device):** Login akun yang sama di Laptop B (atau hapus cache lokal). Pastikan seluruh daftar rapat, transkrip, dan folder dari Laptop A muncul kembali dengan sempurna.
+* [x] **TC-2.1 (Transkripsi Whisper Bilingual):** Uji coba bicara campuran bahasa Indonesia dan istilah bisnis bahasa Inggris (contoh: *"Tolong follow up action item rapat Q3 ke PIC terkait"*). Pastikan kata-kata tertranskripsi dengan akurat.
+* [x] **TC-2.2 (Custom Jargon Perusahaan):** Daftarkan 3 istilah unik perusahaan Anda di menu Jargon (misal: nama produk atau singkatan internal). Uji bicara istilah tersebut dan pastikan Whisper tidak salah eja.
+* [x] **TC-2.3 (Live Word Streaming):** Pastikan teks transkrip mengalir di layar secara *real-time* saat rapat berlangsung tanpa membuat komputer *freeze*.
+* [x] **TC-2.4 (Pengorganisasian Folder):** Buat folder divisi (contoh: *"Divisi Finance"*, *"Rapat Direksi"*), pindahkan rapat ke dalam folder, dan pastikan metadata folder tersimpan rapi.
+* [x] **TC-2.5 (Uji Ketahanan Offline & Auto-Push Sync):** Putuskan koneksi WiFi kantor. Lakukan rapat singkat 1 menit dan simpan. Hubungkan kembali WiFi. Periksa apakah data rapat otomatis terkirim (*synced*) ke Cloud DB tanpa error.
+* [x] **TC-2.6 (Uji Pull Sync Multi-Device):** Login akun yang sama di Laptop B (atau hapus cache lokal). Pastikan seluruh daftar rapat, transkrip, dan folder dari Laptop A muncul kembali dengan sempurna.
 
 #### 4. Hasil Akhir (Deliverable Hari 2)
 
-* Transkripsi suara lokal Whisper terkalibrasi untuk istilah perusahaan.
-* Database Cloud PostgreSQL aktif dengan pengamanan RLS, dan sinkronisasi dua arah berjalan otomatis di latar belakang.
+* [x] Transkripsi suara lokal Whisper terkalibrasi untuk istilah perusahaan.
+* [x] Database Cloud PostgreSQL aktif dengan pengamanan RLS, dan sinkronisasi dua arah berjalan otomatis di latar belakang.
 
 ---
 
