@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import AudioPlayer from '@/components/AudioPlayer';
+import MeetingNotesView from '@/components/MeetingNotesView';
 import { SHOWCASE_MEETING } from '@/lib/showcase';
 
 export default function HomePage() {
@@ -105,7 +106,7 @@ export default function HomePage() {
 
           {/* AI Structured Notes Card */}
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-6 sm:p-8">
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-800/80">
+            <div className="flex items-center justify-between mb-6 pb-3 border-b border-zinc-800/80">
               <h3 className="text-sm sm:text-base font-semibold text-zinc-100 flex items-center gap-2">
                 <svg className="w-4 h-4 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -120,9 +121,7 @@ export default function HomePage() {
               </span>
             </div>
 
-            <div className="prose prose-invert max-w-none text-xs sm:text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">
-              {SHOWCASE_MEETING.notes.enhanced}
-            </div>
+            <MeetingNotesView content={SHOWCASE_MEETING.notes.enhanced} />
           </div>
         </div>
       </section>
