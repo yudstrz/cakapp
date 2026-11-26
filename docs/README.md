@@ -4,10 +4,10 @@ Cakapp records your microphone and call audio, transcribes the meeting, and writ
 
 ## Install
 
-Download Cakapp from [GitHub Releases](https://github.com/FrigadeHQ/yogurt/releases/latest). Every computer needs at least 8 GB of memory.
+Download Cakapp from [GitHub Releases](https://github.com/yudstrz/cakapp/releases/latest). Every computer needs at least 8 GB of memory.
 
 - **Mac:** Apple Silicon, macOS 14.4 or later. Open the DMG, drag Cakapp into Applications, then open it from Applications.
-- **Windows:** Windows 10 version 2004 or later, x64. Run the `.exe` installer. It's signed by Frigade Inc.
+- **Windows:** Windows 10 version 2004 or later, x64. Run the `.exe` installer published by Maxy Academy.
 - **Linux:** x64, Ubuntu 22.04 or a compatible newer system, with PulseAudio or PipeWire. Make the `.AppImage` executable in its file properties, then open it. If it doesn't open, install FUSE 2 first: `sudo apt install libfuse2` on Ubuntu 22.04, `sudo apt install libfuse2t64` on 24.04 and newer. GNOME needs the AppIndicator extension to show the tray icon.
 
 On first run, Cakapp downloads the models it needs. Windows and Linux also check transcription speed and stop setup if the computer cannot keep up. Recording works as soon as setup finishes. The notes model keeps downloading in the background, and notes and questions work offline once it's in. Calendar access and speaker names from calls are available on Mac only.
@@ -62,4 +62,4 @@ Removing the app keeps your data. To remove that too, export a backup if you wan
 
 ## Report a problem
 
-[Open a GitHub issue](https://github.com/FrigadeHQ/yogurt/issues) with your operating system, Cakapp version, what you did, what you expected and what happened. Leave private meeting content out of screenshots and reports.
+[Open a GitHub issue](https://github.com/yudstrz/cakapp/issues) with your operating system, Cakapp version, what you did, what you expected and what happened. Leave private meeting content out of screenshots and reports.
