@@ -1,12 +1,12 @@
-<p align="center"><a href="https://yogurt.so?utm_source=github&utm_medium=readme&utm_campaign=yogurt"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme-banner-app-dark.webp"><img src="docs/assets/readme-banner-app-light.webp" width="880" alt="Cakapp. AI meeting notes without a bot. The app showing a launch planning meeting with Ask open."></picture></a></p>
+<p align="center"><a href="https://maxy.academy"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme-banner-app-dark.webp"><img src="docs/assets/readme-banner-app-light.webp" width="880" alt="Cakapp. AI meeting notes without a bot. The app showing a launch planning meeting with Ask open."></picture></a></p>
 
 <div align="center"><strong>Cakapp</strong></div>
-<div align="center">Just talk. We'll take notes.<br />Private meeting notes, with no bot in your call.</div>
+<div align="center">Cakapp AI Note Taker.<br />Private meeting notes, with no bot in your call.</div>
 <br />
 <div align="center">
-<a href="https://yogurt.so?utm_source=github&utm_medium=readme&utm_campaign=yogurt">Website</a>
+<a href="https://maxy.academy">Website</a>
 <span> · </span>
-<a href="https://github.com/FrigadeHQ/yogurt">GitHub</a>
+<a href="https://github.com/yudstrz/cakapp">GitHub</a>
 </div>
 
 ## Introduction
@@ -19,13 +19,7 @@ Our conversations should be our own business. Good notes shouldn't need third-pa
 
 ## Download
 
-Cakapp is free for [Mac](https://github.com/FrigadeHQ/yogurt/releases/latest/download/Cakapp-mac-arm64.dmg), [Windows](https://github.com/FrigadeHQ/yogurt/releases/latest/download/Cakapp-windows-x64.exe) and [Linux](https://github.com/FrigadeHQ/yogurt/releases/latest/download/Cakapp-linux-x86_64.AppImage).
-
-On a Mac you can also use [Homebrew](https://brew.sh).
-
-```sh
-brew install --cask frigadehq/yogurt/yogurt
-```
+Cakapp is available for [Mac](https://github.com/yudstrz/cakapp/releases/latest/download/Cakapp-mac-arm64.dmg), [Windows](https://github.com/yudstrz/cakapp/releases/latest/download/Cakapp-windows-x64.exe) and [Linux](https://github.com/yudstrz/cakapp/releases/latest/download/Cakapp-linux-x86_64.AppImage).
 
 ## What it does
 
@@ -221,8 +215,7 @@ Meeting data stays local; Cakapp goes online for model downloads and update chec
 ## Support
 
 - [Help](docs/README.md)
-- [Discord](https://yogurt.so/discord)
-- [Report a bug](https://github.com/FrigadeHQ/yogurt/issues)
+- [Report a bug](https://github.com/yudstrz/cakapp/issues)
 
 ## Development
 
@@ -230,4 +223,4 @@ Meeting data stays local; Cakapp goes online for model downloads and update chec
 
 ---
 
-Made by [Frigade](https://frigade.com?utm_source=github&utm_medium=readme&utm_campaign=yogurt), [MIT license](LICENSE).
+Made by [Maxy Academy](https://maxy.academy), [MIT license](LICENSE).

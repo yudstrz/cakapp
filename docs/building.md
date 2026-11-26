@@ -17,8 +17,8 @@ On Linux, clone into a folder whose path has no spaces: Electron's sandbox can't
 ## Run it
 
 ```sh
-git clone https://github.com/FrigadeHQ/yogurt.git
-cd yogurt
+git clone https://github.com/yudstrz/cakapp.git
+cd cakapp
 pnpm install --frozen-lockfile
 pnpm -C app native   # builds the audio, system and transcription helpers (first time, and after they change)
 pnpm dev             # opens Cakapp from source
