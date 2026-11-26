@@ -95,5 +95,11 @@ if (!existsSync(words) || sha(words) !== WORDS_SHA256) {
   }
 }
 
-if (process.env.YOGURT_NO_WHISPER === '1' || !hasCmake || !hasCompiler) console.log('whisper-server left out (no compiler/cmake or YOGURT_NO_WHISPER=1)')
-else run(process.execPath, [join(here, 'whisper-build.mjs'), ...process.argv.slice(2)])
+if (process.env.YOGURT_NO_WHISPER === '1') {
+  console.log('whisper-server omitted via YOGURT_NO_WHISPER=1')
+} else if (hasCmake && hasCompiler) {
+  run(process.execPath, [join(here, 'whisper-build.mjs'), ...process.argv.slice(2)])
+} else {
+  console.log('Compiler not found; downloading prebuilt whisper-server binary and VAD model...')
+  run(process.execPath, [join(here, 'setup-whisper-bin.mjs')])
+}
