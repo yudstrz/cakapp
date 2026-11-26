@@ -70,6 +70,7 @@ import { setGenericTitles } from './titles'
 import { installAppMenu } from './appMenu'
 import { hookAuth } from './auth'
 import { hookAiIpc } from './aiIpc'
+import { aiKeyStore } from './aiKeyStore'
 import { checkNeonHealth, initNeonSchema, isNeonConfigured, syncMeetingToNeon } from './neon'
 import { isCloudAiAvailable } from './cloudAi'
 import { UtilityEngine } from './engine'
@@ -209,6 +210,10 @@ function createSetup(): SetupController {
     upgradePreference: {
       load: () => loadSettings(join(userDataDir(), 'settings.json')).notesUpgradeSkipped === true,
       save: (skipped) => { updateSettings(join(userDataDir(), 'settings.json'), { notesUpgradeSkipped: skipped }) },
+    },
+    notesPreference: {
+      load: () => loadSettings(join(userDataDir(), 'settings.json')).localAiSkipped === true || aiKeyStore.getPublicConfig().mode === 'cloud',
+      save: (skipped) => { updateSettings(join(userDataDir(), 'settings.json'), { localAiSkipped: skipped }) },
     },
     // Windows and Linux: the notes engine checks the graphics first (a Mac shares its memory with them, no check)
     getHardware: isFake() ? () => fakeHardware(platform) : async () => toHardware(await readSysInfo(userDataDir()), process.platform === 'darwin' ? undefined : await probeGpu()),
@@ -598,6 +603,8 @@ app.whenReady().then(() => {
   setup.onState((st) => win?.webContents.send('setup:state', st))
   ipcMain.handle('setup:state', () => setup.state)
   ipcMain.handle('setup:retry', () => setup.retry())
+  ipcMain.handle('setup:skip-notes', () => setup.skipNotesDownload())
+  ipcMain.handle('setup:download-notes', () => setup.downloadNotesModel())
   ipcMain.handle('setup:skip-upgrade', () => setup.skipUpgrade())
   ipcMain.handle('setup:download-upgrade', () => setup.downloadUpgrade())
   const store = openStore(join(userDataDir(), 'yogurt.db'))
@@ -708,6 +715,13 @@ app.whenReady().then(() => {
     remove()
   }, 'enhance')))
   setup.onNotesModel(() => { queue.modelArrived(); conversations.refresh() })
+  aiKeyStore.onChange((cfg) => {
+    if (cfg.mode === 'cloud') {
+      void setup.skipNotesDownload().then(() => { queue.modelArrived(); conversations.refresh() })
+    } else {
+      setup.downloadNotesModel()
+    }
+  })
   // chat across meetings: every finished meeting chunked and embedded in the background, last in the queue
   const library = new Library(store.db)
   const indexer = createIndexer({ store, library, embedder, queue })

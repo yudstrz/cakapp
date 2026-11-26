@@ -3,7 +3,7 @@ import type { AuthState } from '../../../shared/types'
 import { t } from '../../../shared/i18n'
 import { Check, Globe, Lock } from './Icons'
 
-export function AuthSettings() {
+export function AuthSettings({ onDone }: { onDone?: () => void } = {}) {
   const [state, setState] = useState<AuthState>()
   const [register, setRegister] = useState(false)
   const [email, setEmail] = useState('')
@@ -23,8 +23,10 @@ export function AuthSettings() {
     setError('')
     if (!result.ok) { setMessage(''); setError(t(result.error)); return }
     setState(result.state)
+    window.dispatchEvent(new CustomEvent('cakapp:auth-changed', { detail: result.state }))
     setPassword('')
     setMessage(result.message === 'check-email' ? t('auth-check-email') : '')
+    if (result.state.user) onDone?.()
   }
 
   const submit = async (event: FormEvent) => {
@@ -60,6 +62,7 @@ export function AuthSettings() {
   const confirmGuest = () => {
     setError('')
     setMessage(t('auth-guest-confirmed'))
+    onDone?.()
   }
 
   return (
@@ -187,14 +190,14 @@ export function AuthSettings() {
               </button>
             </form>
 
-            <button
+            {state.google && <button
               type="button"
               className="workspace-button auth-google"
               disabled={busy || !state.configured || !state.secureStorage}
               onClick={() => void google()}
             >
               {t('auth-google')}
-            </button>
+            </button>}
           </div>
         )}
 

@@ -40,6 +40,22 @@ export function NotesSetup({ go }: { go: (route: string) => void }) {
       })
     } catch { setSkipFailed(true) }
   }
+  const useCloudInstead = async () => {
+    setSkipFailed(false)
+    try {
+      const cfg = await window.yogurt.ai.setConfig({ mode: 'cloud' })
+      await window.yogurt.setup.skipNotesDownload()
+      setOpen(false)
+      const hasAnyKey = Object.entries(cfg.hasKey || {}).some(([k, v]) => k !== 'local' && Boolean(v))
+      toasts.add({
+        title: hasAnyKey ? 'Mode Cloud AI aktif — download AI offline dilewati' : 'Download AI offline dilewati — silakan isi API Key Cloud',
+        timeout: 6000,
+      })
+      if (!hasAnyKey) go('/settings')
+    } catch {
+      setSkipFailed(true)
+    }
+  }
   if (!setup || !notesDownloadVisible(setup)) return null
   const upgrading = notesUpgradeActive(setup)
   const error = upgrading ? setup.notesUpgradeError : setup.notesError
@@ -72,10 +88,11 @@ export function NotesSetup({ go }: { go: (route: string) => void }) {
               <p className="notes-download-support">{failed
                 ? error
                 : upgrading ? t("Once this model is ready, we'll remove the old one.") : t('You can record meetings. AI summaries and Ask work when this finishes.')}</p>
-              {(failed || upgrading) && <div className="notes-download-actions">
+              <div className="notes-download-actions">
                 {failed && <button data-testid="notes-setup-retry" className="workspace-button" disabled={retrying} onClick={() => void retry()}>{retrying ? t('Retrying…') : t('Try again')}</button>}
                 {upgrading && <button data-testid="notes-setup-skip" className="text-action" disabled={setup.notesUpgradeChanging} onClick={() => void skip()}>{t('Skip')}</button>}
-              </div>}
+                {!upgrading && <button data-testid="notes-setup-use-cloud" type="button" className="text-action" onClick={() => void useCloudInstead()}>Pakai Cloud AI</button>}
+              </div>
             </div>
             {retryFailed && <p role="alert">{t("Cakapp couldn't restart the download.")}</p>}
             {skipFailed && <p role="alert">{t("Cakapp couldn't change the notes model.")}</p>}

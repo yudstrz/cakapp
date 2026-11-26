@@ -740,7 +740,7 @@
   "auth-password": "Kata sandi",
   "auth-working": "Mohon tunggu…",
   "auth-check-email": "Periksa email Anda untuk mengonfirmasi akun.",
-  "auth-not-configured": "Login cloud belum dikonfigurasi. Tambahkan SUPABASE_URL dan SUPABASE_ANON_KEY ke app/.env.",
+  "auth-not-configured": "Login cloud belum dikonfigurasi. Tambahkan DATABASE_URL di file .env.",
   "auth-secure-storage-unavailable": "Penyimpanan login aman tidak tersedia di komputer ini. Mode tamu tetap bisa digunakan.",
   "auth-invalid-input": "Masukkan email yang valid, nama, dan kata sandi minimal 8 karakter.",
   "auth-invalid-credentials": "Email dan kata sandi tidak cocok.",

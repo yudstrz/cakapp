@@ -37,6 +37,8 @@ const api: CakappApi = {
       return () => { ipcRenderer.removeListener('setup:state', on) }
     },
     retry: () => ipcRenderer.invoke('setup:retry'),
+    skipNotesDownload: () => ipcRenderer.invoke('setup:skip-notes'),
+    downloadNotesModel: () => ipcRenderer.invoke('setup:download-notes'),
     skipUpgrade: () => ipcRenderer.invoke('setup:skip-upgrade'),
     downloadUpgrade: () => ipcRenderer.invoke('setup:download-upgrade'),
     removeUpgrade: () => ipcRenderer.invoke('setup:remove-upgrade'),

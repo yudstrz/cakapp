@@ -148,6 +148,10 @@ export function Settings({ revision = 0, focus }: { revision?: number; focus?: s
         <div className="settings-content">
           <h1 data-testid="settings-heading" className="settings-heading">{t('Settings')}</h1>
 
+          <AuthSettings />
+
+          <AiSettings />
+
           <h2 className="settings-section-heading">{t('General')}</h2>
           <div className="settings-group"><LoadingContent pending={!prefs} testId="settings-loading" onReady={() => setGeneralReady(true)}>
             <div className="settings-row">
@@ -270,10 +274,6 @@ export function Settings({ revision = 0, focus }: { revision?: number; focus?: s
           <Backup onImported={() => { void window.yogurt.settings.get().then(setPrefs) }} />
 
           <AiApps />
-
-          <AuthSettings />
-
-          <AiSettings />
 
           <Updates />
           <AboutCakapp />

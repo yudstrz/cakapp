@@ -23,7 +23,7 @@ export type DeleteRecordingResult = 'deleted' | 'missing' | 'recording' | 'not-t
 export type Theme = 'light' | 'dark' | 'system'
 export type AppVisibility = 'both' | 'menu-bar' | 'dock'
 export type AuthUser = { id: string; email: string; name: string }
-export type AuthState = { configured: boolean; secureStorage: boolean; user: AuthUser | null }
+export type AuthState = { configured: boolean; secureStorage: boolean; user: AuthUser | null; google?: boolean }
 export type AuthResult = { ok: true; state: AuthState; message?: 'check-email' } | { ok: false; error: string }
 /** The capture has stopped, but its final database state may still need an explicit retry. */
 export type MeetingView = Meeting & { stopSavePending?: true; paused?: true }
@@ -70,6 +70,8 @@ export type CakappApi = {
     /** called with each change; returns the way to stop listening */
     onState(cb: (s: SetupState) => void): () => void
     retry(): Promise<void>
+    skipNotesDownload(): Promise<void>
+    downloadNotesModel(): Promise<void>
     skipUpgrade(): Promise<void>
     downloadUpgrade(): Promise<void>
     removeUpgrade(): Promise<void>

@@ -2,6 +2,7 @@ import { safeStorage } from 'electron'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { userDataDir } from './paths'
+import { loadAppEnv } from './env'
 import { globalAiManager } from '../engine/providers/manager'
 import type { AIProviderId, ProviderManagerConfig } from '../engine/providers/types'
 
@@ -90,11 +91,18 @@ export class AiKeyStore {
   private configPath: string
   private cachedConfig: StoredAiConfig
   private decryptedKeys: Partial<Record<AIProviderId, string>> = {}
+  private listeners = new Set<(cfg: PublicAiConfig) => void>()
 
   constructor(customPath?: string) {
     this.configPath = customPath || join(userDataDir(), 'ai_config.json')
+    if (this.configPath !== ':memory:') loadAppEnv()
     this.cachedConfig = this.loadFromDisk()
     this.syncToGlobalManager()
+  }
+
+  onChange(cb: (cfg: PublicAiConfig) => void): () => void {
+    this.listeners.add(cb)
+    return () => this.listeners.delete(cb)
   }
 
   private loadFromDisk(): StoredAiConfig {
@@ -114,6 +122,17 @@ export class AiKeyStore {
       return defaultConfig
     }
 
+    // Load environment variable fallbacks
+    const envGemini = process.env.GEMINI_API_KEY || ''
+    const envOpenai = process.env.OPENAI_API_KEY || ''
+    const envClaude = process.env.CLAUDE_API_KEY || ''
+    const envAgnes = process.env.AGENT_API_KEY || process.env.FLASH_MODEL_API_KEY || ''
+
+    if (envGemini) this.decryptedKeys.gemini = envGemini
+    if (envOpenai) this.decryptedKeys.openai = envOpenai
+    if (envClaude) this.decryptedKeys.claude = envClaude
+    if (envAgnes) this.decryptedKeys.agnes = envAgnes
+
     try {
       if (existsSync(this.configPath)) {
         const raw = readFileSync(this.configPath, 'utf8')
@@ -125,7 +144,7 @@ export class AiKeyStore {
           models: { ...defaultConfig.models, ...parsed.models },
         }
 
-        // Decrypt keys into memory
+        // Decrypt saved keys into memory (overrides env fallbacks)
         for (const [p, enc] of Object.entries(merged.encryptedKeys)) {
           if (enc) {
             this.decryptedKeys[p as AIProviderId] = decryptApiKey(enc)
@@ -134,18 +153,15 @@ export class AiKeyStore {
 
         return merged
       }
-    } catch (err: unknown) {
+    } catch {
       console.warn('Failed to read ai_config.json, using defaults')
     }
 
-    // Check environment variables as initial defaults if keys not configured
-    const envGemini = process.env.GEMINI_API_KEY || ''
-    const envOpenai = process.env.OPENAI_API_KEY || ''
-    const envClaude = process.env.CLAUDE_API_KEY || ''
-
-    if (envGemini) this.decryptedKeys.gemini = envGemini
-    if (envOpenai) this.decryptedKeys.openai = envOpenai
-    if (envClaude) this.decryptedKeys.claude = envClaude
+    // Default to Cloud AI automatically when user provided Cloud API keys in .env
+    if (envGemini || envOpenai || envClaude || envAgnes) {
+      defaultConfig.mode = 'cloud'
+      defaultConfig.activeProvider = envGemini ? 'gemini' : envOpenai ? 'openai' : envClaude ? 'claude' : 'gemini'
+    }
 
     return defaultConfig
   }
@@ -172,6 +188,8 @@ export class AiKeyStore {
       keys: { ...this.decryptedKeys },
       models: { ...this.cachedConfig.models },
     })
+    const pub = this.getPublicConfig()
+    for (const cb of this.listeners) cb(pub)
   }
 
   getPublicConfig(): PublicAiConfig {

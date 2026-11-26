@@ -310,7 +310,7 @@
   "auth-password": "Password",
   "auth-working": "Please wait…",
   "auth-check-email": "Check your email to confirm your account.",
-  "auth-not-configured": "Cloud sign-in is not configured yet. Add SUPABASE_URL and SUPABASE_ANON_KEY to app/.env.",
+  "auth-not-configured": "Cloud sign-in is not configured yet. Add DATABASE_URL to .env.",
   "auth-secure-storage-unavailable": "Secure sign-in storage is unavailable on this computer. Guest mode is still available.",
   "auth-invalid-input": "Enter a valid email, a name, and a password with at least 8 characters.",
   "auth-invalid-credentials": "That email and password did not match.",

@@ -174,6 +174,24 @@ export function AiSettings() {
             <p className="settings-description">
               Notulen dan ringkasan rapat diproses 100% di komputer lokal menggunakan model AI offline (Qwen 3 / Gemma 4). Tidak ada teks percakapan yang dikirim ke internet.
             </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="workspace-button"
+                disabled={busy}
+                onClick={() => void window.yogurt.setup.downloadNotesModel()}
+              >
+                Unduh / Lanjutkan Model Offline
+              </button>
+              <button
+                type="button"
+                className="workspace-button"
+                disabled={busy}
+                onClick={() => void switchMode('cloud')}
+              >
+                Beralih ke Cloud AI (Tanpa Download)
+              </button>
+            </div>
           </div>
         )}
 

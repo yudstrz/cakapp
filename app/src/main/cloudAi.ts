@@ -1,20 +1,8 @@
-import dotenv from 'dotenv'
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { loadAppEnv } from './env'
 import type { Llm } from './notes/enhance'
 import { globalAiManager } from '../engine/providers/manager'
 
-// Load environment configuration
-for (const envPath of [
-  join(process.cwd(), '.env'),
-  join(process.cwd(), '.env.local'),
-  join(process.cwd(), 'app/.env'),
-  join(process.cwd(), 'app/.env.local'),
-  join(__dirname, '../../.env'),
-  join(__dirname, '../../../.env'),
-]) {
-  if (existsSync(envPath)) dotenv.config({ path: envPath, quiet: true })
-}
+loadAppEnv()
 
 export function getCloudAiKeys() {
   const cfg = globalAiManager.getConfig()

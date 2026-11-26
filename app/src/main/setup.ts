@@ -30,6 +30,7 @@ export type SetupDeps = {
   /** the first notes model downloads after ready: the waits between tries when it fails (the last one repeats) */
   notesRetryMs?: number[]
   upgradePreference?: { load(): boolean; save(skipped: boolean): void }
+  notesPreference?: { load(): boolean; save(skipped: boolean): void }
   /** Windows and Linux: the speed check picks the speech model (a Mac never has it: turbo, as always) */
   speed?: SpeedDeps
 }
@@ -65,6 +66,8 @@ export class SetupController {
   private background: Promise<void> | undefined
   private backgroundItem: Item | undefined
   private firstItem: Item | undefined
+  private embedItem: Item | undefined
+  private notesAbort: AbortController | undefined
   private upgradeAbort: AbortController | undefined
   private upgradeDownload: Promise<void> | undefined
   private upgradeChange: Promise<void> | undefined
@@ -110,6 +113,38 @@ export class SetupController {
 
   private removeFiles(path: string) {
     for (const suffix of ['.ok', '.part', '']) rmSync(path + suffix, { force: true })
+  }
+
+  downloadNotesModel() {
+    this.deps.notesPreference?.save(false)
+    if (this.firstItem && this.embedItem && !this.notesAbort && !this.paths?.llm) {
+      this.startNotes(this.firstItem, this.embedItem)
+    }
+  }
+
+  async skipNotesDownload(): Promise<void> {
+    this.deps.notesPreference?.save(true)
+    this.notesAbort?.abort()
+    this.notesAbort = undefined
+    this.retryNotes?.()
+    this.upgradeAbort?.abort()
+    if (this.firstItem) rmSync(join(this.firstItem.dir, this.firstItem.fileName + '.part'), { force: true })
+    if (this.backgroundItem) rmSync(join(this.backgroundItem.dir, this.backgroundItem.fileName + '.part'), { force: true })
+    this.set({
+      ...this._state,
+      notesDownloading: undefined,
+      notesFraction: undefined,
+      notesTotalBytes: undefined,
+      notesEtaSec: undefined,
+      notesError: undefined,
+      notesUpgradePending: undefined,
+      notesUpgradeDownloading: undefined,
+      notesUpgradeFraction: undefined,
+      notesUpgradeTotalBytes: undefined,
+      notesUpgradeEtaSec: undefined,
+      notesUpgradeError: undefined,
+    })
+    await this.background?.catch(() => {})
   }
 
   downloadUpgrade() {
@@ -320,27 +355,37 @@ export class SetupController {
    * meanwhile get their notes then). The bigger one follows.
    */
   private startNotes(first: Item, embed: Item) {
+    this.embedItem = embed
+    const already = isVerified(first.dir, first.fileName, this.sha(first))
+    if (!already && !this.paths?.recommendedLlm && this.deps.notesPreference?.load()) {
+      console.info('NOTES', 'skipping local notes model download (Cloud AI mode active)')
+      return
+    }
+    const abort = new AbortController()
+    this.notesAbort = abort
     this.background = (async () => {
       const waits = this.deps.notesRetryMs ?? NOTES_RETRY_MS
       // Waiting notes show whole percents; every 10% goes in the log.
       let shown = -1, logged = -1
       const progress = (p: { fraction: number; etaSec: number }) => {
+        if (abort.signal.aborted) return
         const pct = Math.floor(p.fraction * 100)
         if (Math.floor(pct / 10) > logged) { logged = Math.floor(pct / 10); console.info('NOTES', `notes model download ${pct}%`) }
         if (pct !== shown) { shown = pct; this.set({ ...this._state, notesFraction: p.fraction, notesEtaSec: p.etaSec > 0 && Number.isFinite(p.etaSec) ? p.etaSec : undefined }) }
       }
-      const already = isVerified(first.dir, first.fileName, this.sha(first))
       if (!already && !this.paths?.recommendedLlm) console.info('NOTES', `downloading the notes model ${first.fileName}`)
-      for (let i = 0; !this.paths?.recommendedLlm; i++) {
+      for (let i = 0; !this.paths?.recommendedLlm && !abort.signal.aborted; i++) {
         shown = -1
         this.set({ ...this._state, notesError: undefined, ...(already ? {} : { notesDownloading: true, notesFraction: 0, notesTotalBytes: first.bytes, notesEtaSec: undefined }) })
         try {
-          const path = await this.fetch(first, already ? undefined : progress)
+          const path = await this.fetch(first, already ? undefined : progress, abort.signal)
+          if (abort.signal.aborted) return
           if (this.paths) this.paths = { ...this.paths, llm: path }
           if (!already) console.info('NOTES', 'the notes model is in')
           this.set({ ...this._state, notesFraction: undefined, notesDownloading: undefined, notesTotalBytes: undefined, notesEtaSec: undefined, notesUpgradePending: !!this.backgroundItem && !this._state.notesUpgradeSkipped })
           break
         } catch (err) {
+          if (abort.signal.aborted) return
           console.warn('the notes model did not download yet, trying again', err)
           await new Promise<void>((resolve) => {
             const wake = () => { clearTimeout(timer); this.retryNotes = undefined; resolve() }
@@ -350,10 +395,13 @@ export class SetupController {
           })
         }
       }
-      for (const l of this.notesListeners) { try { l() } catch (e) { console.error('notes model listener failed', e) } }
+      if (this.notesAbort === abort) this.notesAbort = undefined
+      if (!abort.signal.aborted) {
+        for (const l of this.notesListeners) { try { l() } catch (e) { console.error('notes model listener failed', e) } }
+      }
     })()
-    this.background = this.background.then(() => this.startEmbedding(embed))
-    this.background = this.background.then(() => { if (this.backgroundItem) return this.startBackground(this.backgroundItem) })
+    this.background = this.background.then(() => { if (!abort.signal.aborted) return this.startEmbedding(embed) })
+    this.background = this.background.then(() => { if (!abort.signal.aborted && this.backgroundItem) return this.startBackground(this.backgroundItem) })
   }
 
   /**

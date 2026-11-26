@@ -7,8 +7,8 @@ import { ActionTooltipPopup } from './ActionTooltipPopup'
 import { useSidebarPeek } from '../useSidebarPeek'
 import * as Sidebar from '@animate-ui/react/primitives/sidebar'
 import { useEffect, useState, type ReactNode } from 'react'
-import { ChevronLeft, ChevronRight, MeetingFile, AskBubble, Search, SidebarToggle } from './Icons'
-import type { MeetingView, Folder, WidgetView } from '../../../shared/types'
+import { ChevronLeft, ChevronRight, MeetingFile, AskBubble, Search, SidebarToggle, UserRound } from './Icons'
+import type { AuthState, MeetingView, Folder, WidgetView } from '../../../shared/types'
 import { t } from '../../../shared/i18n'
 import { command, keys, onMac } from '../keys'
 import { LevelBars } from './LevelBars'
@@ -17,6 +17,8 @@ import { FoldersNav } from './FoldersNav'
 import { FinishSetup } from './FinishSetup'
 import { NotesSetup } from './NotesSetup'
 import { CornerMenu } from './CornerMenu'
+import { Modal, ModalClose } from './Modal'
+import { AuthSettings } from './AuthSettings'
 
 export function Workspace({ route, meeting, folders, go, back, forward, search, shortcuts, collapsed, sidebarMotion, toggleSidebar, children }: {
   meeting?: Pick<MeetingView, 'id' | 'title'>
@@ -25,6 +27,19 @@ export function Workspace({ route, meeting, folders, go, back, forward, search, 
   collapsed: boolean; sidebarMotion: boolean; toggleSidebar: (animate?: boolean) => void
 }) {
   const [recording, setRecording] = useState<WidgetView | null>(null)
+  const [auth, setAuth] = useState<AuthState>()
+  const [authModalOpen, setAuthModalOpen] = useState(false)
+  useEffect(() => {
+    let active = true
+    void window.yogurt.auth.state().then(s => { if (active) setAuth(s) }).catch(() => {})
+    const onAuthChanged = (e: Event) => {
+      const next = (e as CustomEvent<AuthState>).detail
+      if (next) setAuth(next)
+      else void window.yogurt.auth.state().then(setAuth).catch(() => {})
+    }
+    window.addEventListener('cakapp:auth-changed', onAuthChanged)
+    return () => { active = false; window.removeEventListener('cakapp:auth-changed', onAuthChanged) }
+  }, [])
   useEffect(() => {
     let active = true, updated = false
     const off = window.yogurt.widget.onState((view) => { updated = true; setRecording(view) })
@@ -99,10 +114,37 @@ export function Workspace({ route, meeting, folders, go, back, forward, search, 
       </div>
       <div className="workspace-sidebar-footer">
         <FinishSetup />
+        <button
+          type="button"
+          data-testid="sidebar-auth-button"
+          className="workspace-nav no-drag w-full justify-between"
+          onClick={() => setAuthModalOpen(true)}
+        >
+          <span className="flex items-center gap-2 min-w-0">
+            <UserRound size={16} aria-hidden="true" className="shrink-0" />
+            <span className="truncate">{auth?.user ? (auth.user.name || auth.user.email) : 'Masuk / Daftar'}</span>
+          </span>
+          <span className="text-[11px] text-muted shrink-0">{auth?.user ? 'Cloud' : 'Tamu'}</span>
+        </button>
         <CornerMenu visible={sidebarVisible} section={section} recording={recording?.kind === 'recording'} go={navigate} shortcuts={shortcuts} />
       </div>
       </div>
     </div>
+    {authModalOpen && (
+      <Modal
+        testId="auth-modal"
+        title={auth?.user ? 'Akun Cloud Cakapp' : 'Masuk atau Daftar Akun'}
+        description={auth?.user ? 'Akun terhubung ke Neon Cloud Portal.' : 'Sinkronkan rapat dan notulen Anda ke Cloud Web Portal, atau lanjutkan secara offline dengan Mode Tamu.'}
+        onCancel={() => setAuthModalOpen(false)}
+      >
+        <div className="max-h-[70vh] overflow-y-auto pr-1">
+          <AuthSettings onDone={() => setAuthModalOpen(false)} />
+        </div>
+        <div className="modal-actions mt-4">
+          <ModalClose data-dialog-cancel className="workspace-button">Tutup</ModalClose>
+        </div>
+      </Modal>
+    )}
     <div className="workspace-content" {...peek.edgeHandlers}>
       <header className="workspace-toolbar" data-note={note} data-recording-return={returnToRecording}>
         <div className="workspace-breadcrumb drag">
@@ -113,6 +155,16 @@ export function Workspace({ route, meeting, folders, go, back, forward, search, 
           <span data-testid="workspace-heading" aria-current="page" title={label}>{label}</span>
         </div>
       <NotesSetup go={go} />
+      <button
+        type="button"
+        data-testid="toolbar-auth-button"
+        className="bar-btn no-drag flex items-center gap-1.5"
+        title={auth?.user ? `${auth.user.name || auth.user.email} (Cloud Aktif)` : 'Masuk atau Daftar Akun'}
+        onClick={() => setAuthModalOpen(true)}
+      >
+        <UserRound size={14} aria-hidden="true" />
+        <span className="truncate max-w-[140px]">{auth?.user ? (auth.user.name || auth.user.email) : 'Masuk / Daftar'}</span>
+      </button>
       {returnToRecording && <button className="workspace-recording-link no-drag" data-testid="recording-return" data-paused={recording.paused}
         aria-label={t('Open {title}', { title: recording.title })} title={t('Open {title}', { title: recording.title })} onClick={() => go(`/note/${recording.meetingId}`)}>
         <LevelBars testId="recording-return-wave" height={16} paused={recording.paused} />
