@@ -6,17 +6,19 @@ import { ipcMain, type SafeStorage } from 'electron'
 import { loadAppEnv } from './env'
 import { getNeonClient, isNeonConfigured } from './neon'
 
+const loadBetterAuth = () => import('./betterAuthClient')
+
 export type AccountUser = { id: string; email: string; name: string }
-export type AuthState = { configured: boolean; secureStorage: boolean; user: AccountUser | null; google?: boolean }
-export type AuthResult = { ok: true; state: AuthState; message?: 'check-email' } | { ok: false; error: string }
+export type AuthState = { configured: boolean; secureStorage: boolean; user: AccountUser | null; google?: boolean; webPortalUrl?: string }
+export type AuthResult = { ok: true; state: AuthState; message?: 'check-email' | 'browser-opened' } | { ok: false; error: string }
 
 const callbackPort = 48217
 const callbackUrl = `http://127.0.0.1:${callbackPort}/auth/callback`
 const NEON_SESSION_KEY = 'neon_session'
 
-function accountUser(user: { id: string; email?: string; user_metadata?: Record<string, unknown> } | null): AccountUser | null {
+function accountUser(user: { id: string; email?: string; name?: string; user_metadata?: Record<string, unknown> } | null): AccountUser | null {
   if (!user) return null
-  const name = user.user_metadata?.full_name
+  const name = user.name ?? user.user_metadata?.full_name
   return { id: user.id, email: user.email ?? '', name: typeof name === 'string' ? name : '' }
 }
 
@@ -63,7 +65,7 @@ async function ensureNeonAuthSchema(): Promise<void> {
 
 export function authError(error: unknown): string {
   const message = error instanceof Error ? error.message.toLowerCase() : ''
-  if (message.includes('invalid login credentials')) return 'auth-invalid-credentials'
+  if (message.includes('invalid login credentials') || message.includes('invalid email or password')) return 'auth-invalid-credentials'
   if (message.includes('already registered') || message.includes('already exists')) return 'auth-email-registered'
   if (message.includes('password') && (message.includes('length') || message.includes('weak') || message.includes('least') || message.includes('character') || message.includes('short'))) return 'auth-password-policy'
   if (message.includes('email') && message.includes('valid')) return 'auth-email-invalid'
@@ -80,14 +82,22 @@ export function validCredentials(email: unknown, password: unknown): boolean {
     typeof password === 'string' && password.length >= 8 && password.length <= 128
 }
 
-export function hookAuth(d: { file: string; safeStorage: SafeStorage; openExternal(url: string): Promise<void>; rememberName(name: string): void; rememberProfile(user: AccountUser | null): void }) {
+export function hookAuth(d: {
+  file: string
+  safeStorage: SafeStorage
+  openExternal(url: string): Promise<void>
+  rememberName(name: string): void
+  rememberProfile(user: AccountUser | null): void
+  onChange?: (state: AuthState) => void
+}) {
   loadAppEnv()
   const sessionFile = d.file.replace(/settings\.json$/, 'auth-session.bin')
   const getSupabaseUrl = () => process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || ''
   const getSupabaseAnonKey = () => process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || ''
   const hasSupabase = () => !!getSupabaseUrl() && !!getSupabaseAnonKey()
+  const hasBetterAuth = () => !!(process.env.BETTER_AUTH_URL || process.env.WEB_PORTAL_URL)
   const hasNeon = () => isNeonConfigured()
-  const configured = () => hasNeon() || hasSupabase()
+  const configured = () => hasBetterAuth() || hasNeon() || hasSupabase()
   const secureStorage = () => d.safeStorage.isEncryptionAvailable() &&
     (process.platform !== 'linux' || d.safeStorage.getSelectedStorageBackend() !== 'basic_text')
   let client: SupabaseClient | undefined
@@ -125,15 +135,35 @@ export function hookAuth(d: { file: string; safeStorage: SafeStorage; openExtern
       auth: { storage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
     })
   }
-  const state = async (): Promise<AuthState> => {
-    const isConfigured = configured(), canStoreSecurely = secureStorage(), google = hasSupabase()
-    if (!isConfigured || !canStoreSecurely) return { configured: isConfigured, secureStorage: canStoreSecurely, user: null, google }
 
+  const state = async (): Promise<AuthState> => {
+    const isConfigured = configured(), canStoreSecurely = secureStorage()
+    const webPortalUrl = (process.env.BETTER_AUTH_URL || process.env.WEB_PORTAL_URL || 'http://localhost:3000').replace(/\/+$/, '')
+    const google = hasSupabase() || hasBetterAuth()
+    if (!isConfigured || !canStoreSecurely) return { configured: isConfigured, secureStorage: canStoreSecurely, user: null, google, webPortalUrl }
+
+    // 1. Check Better Auth session (handles both web browser deep-link login and email/password)
+    if (hasBetterAuth()) {
+      try {
+        const { getBetterAuthClient } = await loadBetterAuth()
+        const res = await getBetterAuthClient().getSession()
+        if (res?.data?.user) {
+          const user = accountUser(res.data.user)
+          d.rememberProfile(user)
+          if (user?.name) d.rememberName(user.name)
+          return { configured: true, secureStorage: true, user, google: true, webPortalUrl }
+        }
+      } catch {
+        // Fallback to cached Neon session if offline or server unreachable
+      }
+    }
+
+    // 2. Check direct Neon session fallback
     if (hasNeon()) {
       const raw = await storage.getItem(NEON_SESSION_KEY)
       if (!raw) {
         d.rememberProfile(null)
-        return { configured: true, secureStorage: true, user: null, google }
+        return { configured: true, secureStorage: true, user: null, google, webPortalUrl }
       }
       try {
         const parsed = JSON.parse(raw) as { token: string; user: AccountUser }
@@ -160,10 +190,10 @@ export function hookAuth(d: { file: string; safeStorage: SafeStorage; openExtern
         }
         d.rememberProfile(user)
         if (user?.name) d.rememberName(user.name)
-        return { configured: true, secureStorage: true, user, google }
+        return { configured: true, secureStorage: true, user, google, webPortalUrl }
       } catch {
         d.rememberProfile(null)
-        return { configured: true, secureStorage: true, user: null, google }
+        return { configured: true, secureStorage: true, user: null, google, webPortalUrl }
       }
     }
 
@@ -171,15 +201,38 @@ export function hookAuth(d: { file: string; safeStorage: SafeStorage; openExtern
     const user = accountUser(result.data.session?.user ?? null)
     d.rememberProfile(user)
     if (user?.name) d.rememberName(user.name)
-    return { configured: true, secureStorage: true, user, google: true }
+    return { configured: true, secureStorage: true, user, google: true, webPortalUrl }
   }
   const failed = (error: unknown): AuthResult => ({ ok: false, error: authError(error) })
+
+  if (d.onChange && hasBetterAuth()) {
+    void loadBetterAuth().then(({ getBetterAuthClient }) => {
+      const ba = getBetterAuthClient()
+      ba.$store?.listen?.('$sessionSignal', () => {
+        void state().then(st => d.onChange?.(st)).catch(() => {})
+      })
+    }).catch(() => {})
+  }
 
   const signUp = async (email: unknown, password: unknown, name: unknown): Promise<AuthResult> => {
     const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : ''
     const cleanName = typeof name === 'string' ? name.replace(/\s+/g, ' ').trim() : ''
     if (!validCredentials(cleanEmail, password) || !cleanName || cleanName.length > 80) return { ok: false, error: 'auth-invalid-input' }
     try {
+      if (hasBetterAuth()) {
+        try {
+          const { getBetterAuthClient } = await loadBetterAuth()
+          const res = await getBetterAuthClient().signUp.email({ email: cleanEmail, password: password as string, name: cleanName })
+          if (res.error) throw new Error(res.error.message || 'Sign-up failed')
+          const next = await state()
+          if (next.user?.name) d.rememberName(next.user.name)
+          d.onChange?.(next)
+          return { ok: true, state: next }
+        } catch (err) {
+          if (!hasNeon() || err instanceof Error && /already|password|email/i.test(err.message)) throw err
+        }
+      }
+
       if (hasNeon()) {
         if (!secureStorage()) throw new Error('secure storage unavailable')
         await ensureNeonAuthSchema()
@@ -203,6 +256,7 @@ export function hookAuth(d: { file: string; safeStorage: SafeStorage; openExtern
         await storage.setItem(NEON_SESSION_KEY, JSON.stringify({ token, user }))
         const next = await state()
         if (next.user?.name) d.rememberName(next.user.name)
+        d.onChange?.(next)
         return { ok: true, state: next }
       }
 
@@ -218,6 +272,20 @@ export function hookAuth(d: { file: string; safeStorage: SafeStorage; openExtern
     const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : ''
     if (!validCredentials(cleanEmail, password)) return { ok: false, error: 'auth-invalid-input' }
     try {
+      if (hasBetterAuth()) {
+        try {
+          const { getBetterAuthClient } = await loadBetterAuth()
+          const res = await getBetterAuthClient().signIn.email({ email: cleanEmail, password: password as string })
+          if (res.error) throw new Error(res.error.message || 'Invalid login credentials')
+          const next = await state()
+          if (next.user?.name) d.rememberName(next.user.name)
+          d.onChange?.(next)
+          return { ok: true, state: next }
+        } catch (err) {
+          if (!hasNeon() || err instanceof Error && /invalid|credentials|password/i.test(err.message)) throw err
+        }
+      }
+
       if (hasNeon()) {
         if (!secureStorage()) throw new Error('secure storage unavailable')
         await ensureNeonAuthSchema()
@@ -243,6 +311,7 @@ export function hookAuth(d: { file: string; safeStorage: SafeStorage; openExtern
         await storage.setItem(NEON_SESSION_KEY, JSON.stringify({ token, user }))
         const next = await state()
         if (next.user?.name) d.rememberName(next.user.name)
+        d.onChange?.(next)
         return { ok: true, state: next }
       }
 
@@ -254,7 +323,21 @@ export function hookAuth(d: { file: string; safeStorage: SafeStorage; openExtern
     } catch (error) { return failed(error) }
   }
 
-  const signInWithGoogle = async (): Promise<AuthResult> => {
+  const signInWithBrowser = async (provider?: 'google'): Promise<AuthResult> => {
+    try {
+      if (hasBetterAuth()) {
+        const { getBetterAuthClient } = await loadBetterAuth()
+        await getBetterAuthClient().requestAuth(provider ? { provider } : undefined)
+        return { ok: true, state: await state(), message: 'browser-opened' }
+      }
+      if (provider === 'google' && hasSupabase()) return signInWithSupabaseGoogle()
+      return { ok: false, error: 'auth-not-configured' }
+    } catch (error) {
+      return failed(error)
+    }
+  }
+
+  const signInWithSupabaseGoogle = async (): Promise<AuthResult> => {
     let server: ReturnType<typeof createServer> | undefined
     let timeout: ReturnType<typeof setTimeout> | undefined
     try {
@@ -295,6 +378,10 @@ export function hookAuth(d: { file: string; safeStorage: SafeStorage; openExtern
 
   const signOut = async (): Promise<AuthResult> => {
     try {
+      if (hasBetterAuth()) {
+        const { getBetterAuthClient } = await loadBetterAuth()
+        await getBetterAuthClient().signOut().catch(() => {})
+      }
       if (hasNeon()) {
         const raw = await storage.getItem(NEON_SESSION_KEY)
         if (raw) {
@@ -304,27 +391,31 @@ export function hookAuth(d: { file: string; safeStorage: SafeStorage; openExtern
           } catch { /* ignore */ }
         }
         await storage.removeItem(NEON_SESSION_KEY)
-        return { ok: true, state: await state() }
       }
-
-      const supabase = getClient()
-      const { error } = await supabase.auth.signOut({ scope: 'local' })
-      if (error) throw error
-      return { ok: true, state: await state() }
+      if (!hasBetterAuth() && !hasNeon() && hasSupabase()) {
+        const supabase = getClient()
+        const { error } = await supabase.auth.signOut({ scope: 'local' })
+        if (error) throw error
+      }
+      const next = await state()
+      d.onChange?.(next)
+      return { ok: true, state: next }
     } catch (error) { return failed(error) }
   }
 
   ipcMain?.handle?.('auth:state', state)
   ipcMain?.handle?.('auth:sign-up', (_event, email: unknown, password: unknown, name: unknown) => signUp(email, password, name))
   ipcMain?.handle?.('auth:sign-in', (_event, email: unknown, password: unknown) => signIn(email, password))
-  ipcMain?.handle?.('auth:google', signInWithGoogle)
+  ipcMain?.handle?.('auth:google', () => signInWithBrowser('google'))
+  ipcMain?.handle?.('auth:browser', () => signInWithBrowser())
   ipcMain?.handle?.('auth:sign-out', signOut)
 
   return {
     state,
     signUp,
     signIn,
-    signInWithGoogle,
+    signInWithGoogle: () => signInWithBrowser('google'),
+    signInWithBrowser,
     signOut,
   }
 }

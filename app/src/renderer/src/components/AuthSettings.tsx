@@ -16,8 +16,14 @@ export function AuthSettings({ onDone }: { onDone?: () => void } = {}) {
   useEffect(() => {
     let active = true
     void window.yogurt.auth.state().then(value => { if (active) setState(value) })
-    return () => { active = false }
-  }, [])
+    const off = window.yogurt.auth.onChanged(next => {
+      if (!active) return
+      setState(next)
+      window.dispatchEvent(new CustomEvent('cakapp:auth-changed', { detail: next }))
+      if (next.user) onDone?.()
+    })
+    return () => { active = false; off() }
+  }, [onDone])
 
   const finish = (result: Awaited<ReturnType<typeof window.yogurt.auth.signIn>>) => {
     setError('')
@@ -25,7 +31,13 @@ export function AuthSettings({ onDone }: { onDone?: () => void } = {}) {
     setState(result.state)
     window.dispatchEvent(new CustomEvent('cakapp:auth-changed', { detail: result.state }))
     setPassword('')
-    setMessage(result.message === 'check-email' ? t('auth-check-email') : '')
+    setMessage(
+      result.message === 'check-email'
+        ? t('auth-check-email')
+        : result.message === 'browser-opened'
+          ? 'Browser dibuka. Selesaikan login di browser lalu kembali ke Cakapp.'
+          : ''
+    )
     if (result.state.user) onDone?.()
   }
 
@@ -48,6 +60,14 @@ export function AuthSettings({ onDone }: { onDone?: () => void } = {}) {
     if (busy) return
     setBusy(true); setError(''); setMessage('')
     try { finish(await window.yogurt.auth.signInWithGoogle()) }
+    catch { setError(t('auth-generic-error')) }
+    finally { setBusy(false) }
+  }
+
+  const browser = async () => {
+    if (busy) return
+    setBusy(true); setError(''); setMessage('')
+    try { finish(await window.yogurt.auth.signInWithBrowser()) }
     catch { setError(t('auth-generic-error')) }
     finally { setBusy(false) }
   }
@@ -197,6 +217,15 @@ export function AuthSettings({ onDone }: { onDone?: () => void } = {}) {
               onClick={() => void google()}
             >
               {t('auth-google')}
+            </button>}
+
+            {state.webPortalUrl && <button
+              type="button"
+              className="workspace-button auth-google"
+              disabled={busy || !state.configured || !state.secureStorage}
+              onClick={() => void browser()}
+            >
+              Masuk lewat Browser
             </button>}
           </div>
         )}

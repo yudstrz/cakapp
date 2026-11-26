@@ -16,7 +16,13 @@ const api: CakappApi = {
     signUp: (email, password, name) => ipcRenderer.invoke('auth:sign-up', email, password, name),
     signIn: (email, password) => ipcRenderer.invoke('auth:sign-in', email, password),
     signInWithGoogle: () => ipcRenderer.invoke('auth:google'),
+    signInWithBrowser: () => ipcRenderer.invoke('auth:browser'),
     signOut: () => ipcRenderer.invoke('auth:sign-out'),
+    onChanged: (cb) => {
+      const on = (_e: unknown, state: Parameters<typeof cb>[0]) => cb(state)
+      ipcRenderer.on('auth:changed', on)
+      return () => { ipcRenderer.removeListener('auth:changed', on) }
+    },
   },
   neon: {
     status: () => ipcRenderer.invoke('neon:status'),

@@ -11,6 +11,10 @@ publish:
   releaseType: release
 extraMetadata:
   name: cakapp
+protocols:
+  - name: Cakapp Protocol
+    schemes:
+      - com.cakapp.app
 directories:
   # dist/ only: with another output folder electron-builder packs the whole project
   output: dist

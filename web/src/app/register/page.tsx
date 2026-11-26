@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { authClient } from '@/lib/auth-client';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -15,16 +16,14 @@ export default function RegisterPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
-
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ full_name: fullName, email, password }),
+      const res = await authClient.signUp.email({
+        name: fullName.trim(),
+        email: email.trim().toLowerCase(),
+        password,
       });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        setError(data.error || 'Pendaftaran gagal. Periksa data Anda.');
+      if (res.error) {
+        setError(res.error.message || 'Pendaftaran gagal. Periksa data Anda.');
         return;
       }
       router.push('/dashboard');
@@ -87,13 +86,13 @@ export default function RegisterPage() {
 
           <div>
             <label className="block text-xs font-medium text-zinc-300 mb-1.5" htmlFor="password">
-              Password (Minimal 6 karakter)
+              Password (Minimal 8 karakter)
             </label>
             <input
               id="password"
               type="password"
               required
-              minLength={6}
+              minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { UserProfile } from '@/lib/auth';
+import { authClient } from '@/lib/auth-client';
 
 export default function UserNav({ user }: { user: UserProfile | null }) {
   const router = useRouter();
@@ -11,7 +12,7 @@ export default function UserNav({ user }: { user: UserProfile | null }) {
   async function handleLogout() {
     setLoggingOut(true);
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await authClient.signOut();
       router.push('/');
       router.refresh();
     } catch {

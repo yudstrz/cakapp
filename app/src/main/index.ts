@@ -69,6 +69,7 @@ import { cleanJargon } from '../shared/jargon'
 import { setGenericTitles } from './titles'
 import { installAppMenu } from './appMenu'
 import { hookAuth } from './auth'
+import { setupBetterAuthMain } from './betterAuthClient'
 import { hookAiIpc } from './aiIpc'
 import { aiKeyStore } from './aiKeyStore'
 import { checkNeonHealth, initNeonSchema, isNeonConfigured, syncMeetingToNeon } from './neon'
@@ -127,6 +128,7 @@ if (x11) { stripAppImageEnv(); app.relaunch(x11); app.exit(0) }
 // One Cakapp at a time: a second launch focuses the existing window
 else if (!app.requestSingleInstanceLock()) app.quit()
 let win: BrowserWindow | undefined
+setupBetterAuthMain(() => win)
 let allowQuit = false
 let presentMain = (_foreground = false) => {}
 let updateMainMenu = () => {}
@@ -624,6 +626,7 @@ app.whenReady().then(() => {
       if (!loadSettings(settingsFile).myName?.trim()) updateSettings(settingsFile, { myName: name })
     },
     rememberProfile: accountProfile => updateSettings(settingsFile, { accountProfile: accountProfile ?? undefined }),
+    onChange: st => win?.webContents.send('auth:changed', st),
   })
   hookAiIpc()
   const getUserId = () => loadSettings(settingsFile).accountProfile?.id ?? null

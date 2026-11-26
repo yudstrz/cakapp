@@ -23,8 +23,8 @@ export type DeleteRecordingResult = 'deleted' | 'missing' | 'recording' | 'not-t
 export type Theme = 'light' | 'dark' | 'system'
 export type AppVisibility = 'both' | 'menu-bar' | 'dock'
 export type AuthUser = { id: string; email: string; name: string }
-export type AuthState = { configured: boolean; secureStorage: boolean; user: AuthUser | null; google?: boolean }
-export type AuthResult = { ok: true; state: AuthState; message?: 'check-email' } | { ok: false; error: string }
+export type AuthState = { configured: boolean; secureStorage: boolean; user: AuthUser | null; google?: boolean; webPortalUrl?: string }
+export type AuthResult = { ok: true; state: AuthState; message?: 'check-email' | 'browser-opened' } | { ok: false; error: string }
 /** The capture has stopped, but its final database state may still need an explicit retry. */
 export type MeetingView = Meeting & { stopSavePending?: true; paused?: true }
 export type FolderMeetingChoice = Pick<Meeting, 'id' | 'title' | 'startedAt'> & { inFolder: boolean }
@@ -45,7 +45,9 @@ export type CakappApi = {
     signUp(email: string, password: string, name: string): Promise<AuthResult>
     signIn(email: string, password: string): Promise<AuthResult>
     signInWithGoogle(): Promise<AuthResult>
+    signInWithBrowser(): Promise<AuthResult>
     signOut(): Promise<AuthResult>
+    onChanged(cb: (state: AuthState) => void): () => void
   }
   neon: {
     status(): Promise<{ ok: boolean; timestamp?: string; version?: string; error?: string }>

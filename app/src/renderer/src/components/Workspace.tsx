@@ -32,13 +32,14 @@ export function Workspace({ route, meeting, folders, go, back, forward, search, 
   useEffect(() => {
     let active = true
     void window.yogurt.auth.state().then(s => { if (active) setAuth(s) }).catch(() => {})
+    const offIpc = window.yogurt.auth.onChanged(next => { if (active) setAuth(next) })
     const onAuthChanged = (e: Event) => {
       const next = (e as CustomEvent<AuthState>).detail
       if (next) setAuth(next)
       else void window.yogurt.auth.state().then(setAuth).catch(() => {})
     }
     window.addEventListener('cakapp:auth-changed', onAuthChanged)
-    return () => { active = false; window.removeEventListener('cakapp:auth-changed', onAuthChanged) }
+    return () => { active = false; offIpc(); window.removeEventListener('cakapp:auth-changed', onAuthChanged) }
   }, [])
   useEffect(() => {
     let active = true, updated = false
