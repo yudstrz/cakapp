@@ -2,7 +2,7 @@ import React from 'react';
 import Link from 'next/link';
 import { getDb } from '@/lib/neon';
 import { getCurrentUser } from '@/lib/auth';
-import { SHOWCASE_MEETING } from '@/lib/showcase';
+import WebAudioStudioCard from '@/components/WebAudioStudioCard';
 
 export const revalidate = 0;
 
@@ -120,9 +120,10 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* LOGGED IN USER VIEW: Personal Meetings */}
       {user && (
         <div className="mt-8">
+          <WebAudioStudioCard />
+
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
               Rapat Pribadi Saya ({userMeetings.length})

@@ -81,6 +81,7 @@ vi.mock('@upstash/ratelimit', () => {
 });
 
 import { POST as generatePost, OPTIONS as generateOptions } from '@/app/api/ai/generate/route';
+import { POST as transcribePost } from '@/app/api/ai/transcribe/route';
 import { GET as modelsGet } from '@/app/api/ai/models/route';
 import { GET as usageGet } from '@/app/api/ai/usage/route';
 import { GET as healthGet } from '@/app/api/ai/health/route';
@@ -437,5 +438,54 @@ describe('AI Backend Proxy & Protections', () => {
     });
     expect(seenTasks).toEqual(['ringkasan', 'ringkasan', 'notulen']);
     expect(mapRed.text).toBe('Notulen akhir');
+  });
+
+  it('transcribes audio chunks via Gemini and OpenAI (with whisper-1 fallback) and enforces STT size & quota', async () => {
+    globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
+      const u = String(url);
+      if (u.includes('/models?')) {
+        return new Response(
+          JSON.stringify({ models: [{ name: 'models/gemini-3.5-flash-lite', supportedGenerationMethods: ['generateContent'] }] }),
+          { status: 200 },
+        );
+      }
+      if (u.includes('generativelanguage.googleapis.com')) {
+        return new Response(
+          JSON.stringify({
+            candidates: [{ content: { parts: [{ text: 'Halo tim rapat dimulai' }] } }],
+            usageMetadata: { promptTokenCount: 120, candidatesTokenCount: 6 },
+          }),
+          { status: 200 },
+        );
+      }
+      if (u.includes('/audio/transcriptions')) {
+        return new Response(JSON.stringify({ text: 'Transkrip OpenAI berhasil' }), { status: 200 });
+      }
+      return new Response('Not found', { status: 404 });
+    }) as unknown as typeof fetch;
+
+    const formGemini = new FormData();
+    formGemini.set('file', new Blob([new Uint8Array(256)], { type: 'audio/wav' }), 'chunk.wav');
+    formGemini.set('provider', 'gemini');
+    const reqGemini = new NextRequest('http://localhost:3000/api/ai/transcribe', { method: 'POST', body: formGemini });
+    const resGemini = await transcribePost(reqGemini);
+    expect(resGemini.status).toBe(200);
+    expect((await resGemini.json()).text).toBe('Halo tim rapat dimulai');
+
+    const formOpenAi = new FormData();
+    formOpenAi.set('file', new Blob([new Uint8Array(256)], { type: 'audio/wav' }), 'chunk.wav');
+    formOpenAi.set('provider', 'openai');
+    const reqOpenAi = new NextRequest('http://localhost:3000/api/ai/transcribe', { method: 'POST', body: formOpenAi });
+    const resOpenAi = await transcribePost(reqOpenAi);
+    expect(resOpenAi.status).toBe(200);
+    expect((await resOpenAi.json()).text).toBe('Transkrip OpenAI berhasil');
+
+    const { dayKey } = getWibDayInfo();
+    mockRedisStore.set(`ai:daily:stt:${dayKey}:user-1`, 180);
+    const formQuota = new FormData();
+    formQuota.set('file', new Blob([new Uint8Array(128)], { type: 'audio/wav' }), 'chunk.wav');
+    formQuota.set('provider', 'gemini');
+    const resQuota = await transcribePost(new NextRequest('http://localhost:3000/api/ai/transcribe', { method: 'POST', body: formQuota }));
+    expect(resQuota.status).toBe(429);
   });
 });

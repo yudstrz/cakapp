@@ -7,6 +7,7 @@ Dokumen ini menjelaskan arsitektur proxy Cloud AI terpusat di Vercel (`web/`), k
 Seluruh panggilan Cloud AI dari aplikasi desktop Electron (`app/`, file `.exe`) maupun portal web (`web/`) dialihkan ke backend Next.js App Router (runtime Node.js) di Vercel:
 
 - **`POST /api/ai/generate`**: Validasi body dengan Zod, injeksi prompt sistem di sisi server (`notulen` dan `ringkasan`), verifikasi model aktif, penegakan rate limit dan anggaran global, streaming SSE (`text/event-stream`), serta auto-fallback ke model default provider saat terjadi `404` atau model dihentikan.
+- **`POST /api/ai/transcribe`**: Menerima potongan suara pendek (`multipart/form-data`, maks 2,5 MB per potongan; dipecah 20 detik di client agar jauh di bawah batas 4,5 MB Vercel) untuk diubah menjadi teks melalui **Google Gemini Audio Multimodal** atau **OpenAI Audio Transcriptions** (`gpt-4o-mini-transcribe` dengan fallback `whisper-1`), lengkap dengan kuota harian per akun dan pencatatan anggaran global.
 - **`GET /api/ai/models`**: Mengembalikan irisan antara daftar kurasi manual (`MODEL_SEED` di `web/src/lib/ai/models.ts`) dan respons langsung *List Models API* tiap provider, di-cache di Upstash Redis selama 1 jam.
 - **`GET /api/ai/usage`**: Mengembalikan sisa kuota request dan token input harian pengguna (reset setiap pukul `00:00 WIB`).
 - **`GET /api/ai/health`**: Memeriksa status autentikasi, kill switch, konfigurasi kunci provider, dan ketersediaan model default di *List Models API* tanpa memakai token berbayar.

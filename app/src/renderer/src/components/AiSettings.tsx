@@ -14,6 +14,8 @@ interface VerifiedModelItem {
 interface AiConfigState {
   mode: 'local' | 'cloud'
   activeProvider: CloudProvider
+  sttMode: 'local' | 'cloud'
+  sttProvider: 'gemini' | 'openai'
   models: Record<CloudProvider | 'local', string>
   baseUrl: string
   byok: {
@@ -30,6 +32,9 @@ interface UsageInfo {
   usedInputTokens: number
   limitInputTokens: number
   remainingInputTokens: number
+  usedSttChunks?: number
+  limitSttChunks?: number
+  remainingSttChunks?: number
   resetAt: string
 }
 
@@ -89,7 +94,7 @@ export function AiSettings() {
     void window.yogurt.ai.getConfig().then((cfg) => {
       if (!active) return
       setConfig(cfg)
-      if (cfg.mode === 'cloud') {
+      if (cfg.mode === 'cloud' || cfg.sttMode === 'cloud') {
         void loadCloudData(false, cfg.activeProvider)
       }
     }).catch(() => {})
@@ -98,7 +103,7 @@ export function AiSettings() {
       void window.yogurt.ai.getConfig().then((cfg) => {
         if (!active) return
         setConfig(cfg)
-        if (cfg.mode === 'cloud') {
+        if (cfg.mode === 'cloud' || cfg.sttMode === 'cloud') {
           void loadCloudData(true, cfg.activeProvider)
         }
       }).catch(() => {})
@@ -139,6 +144,43 @@ export function AiSettings() {
       await loadCloudData(false, provider)
     } catch {
       setError('Gagal memilih provider Cloud AI.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const switchSttMode = async (sttMode: 'local' | 'cloud') => {
+    setBusy(true)
+    setMessage('')
+    setError('')
+    try {
+      const updated = (await window.yogurt.ai.setConfig({ sttMode })) as AiConfigState
+      setConfig(updated)
+      setMessage(
+        sttMode === 'local'
+          ? 'Default transkripsi suara disetel ke Whisper Lokal (Offline).'
+          : 'Default transkripsi suara disetel ke Cloud AI (Server Bersama).'
+      )
+      if (sttMode === 'cloud') {
+        await loadCloudData(false, updated.activeProvider)
+      }
+    } catch {
+      setError('Gagal mengubah mode transkripsi suara.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const switchSttProvider = async (sttProvider: 'gemini' | 'openai') => {
+    setBusy(true)
+    setMessage('')
+    setError('')
+    try {
+      const updated = (await window.yogurt.ai.setConfig({ sttProvider })) as AiConfigState
+      setConfig(updated)
+      setMessage(`Provider transkripsi suara disetel ke ${sttProvider === 'gemini' ? 'Google Gemini' : 'OpenAI'}.`)
+    } catch {
+      setError('Gagal mengubah provider transkripsi suara.')
     } finally {
       setBusy(false)
     }
@@ -308,7 +350,7 @@ export function AiSettings() {
                   {hasByok
                     ? 'Permintaan sesi ini memakai kunci Anda sendiri dan tidak mengurangi kuota bersama.'
                     : usage
-                      ? `Sisa token input: ${usage.remainingInputTokens.toLocaleString('id-ID')}/${usage.limitInputTokens.toLocaleString('id-ID')} (reset 00:00 WIB)`
+                      ? `Token input: ${usage.remainingInputTokens.toLocaleString('id-ID')}/${usage.limitInputTokens.toLocaleString('id-ID')}${usage.remainingSttChunks !== undefined ? ` · Transkripsi suara: ${usage.remainingSttChunks}/${usage.limitSttChunks} potongan` : ''} (reset 00:00 WIB)`
                       : cloudNote || 'Masuk ke akun Cakapp di bagian atas untuk memuat kuota dan model aktif.'}
                 </p>
               </div>
@@ -434,6 +476,76 @@ export function AiSettings() {
             </div>
           </div>
         )}
+
+        <div className="mt-5 pt-4 border-t border-line space-y-3">
+          <div>
+            <p className="settings-label">Transkripsi Suara ke Teks (Speech-to-Text)</p>
+            <p className="settings-description mt-0.5">
+              Pilih mesin bawaan pengubah rekaman suara menjadi teks. Kedua opsi saling mem-backup otomatis jika salah satu terkendala.
+            </p>
+          </div>
+
+          <div className="auth-mode-row">
+            <button
+              type="button"
+              className="auth-mode"
+              aria-pressed={config.sttMode === 'local'}
+              onClick={() => void switchSttMode('local')}
+              disabled={busy}
+            >
+              Default: Whisper Lokal (Offline)
+            </button>
+            <button
+              type="button"
+              className="auth-mode"
+              aria-pressed={config.sttMode === 'cloud'}
+              onClick={() => void switchSttMode('cloud')}
+              disabled={busy}
+            >
+              Default: Cloud AI (API Key Server)
+            </button>
+          </div>
+
+          {config.sttMode === 'local' ? (
+            <p className="settings-description">
+              Suara diubah menjadi teks di laptop Anda secara gratis memakai Whisper. Jika model Whisper belum terunduh atau gagal di perangkat ini, sistem otomatis mencoba Cloud Speech-to-Text selama Anda masuk akun.
+            </p>
+          ) : (
+            <div className="rounded-lg border border-line bg-bg p-3 space-y-2.5 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="font-medium text-ink">Provider Cloud Speech-to-Text</p>
+                  <p className="text-muted mt-0.5">
+                    Suara dipotong per kalimat pendek dan dikirim ke server menggunakan kunci Gemini atau OpenAI (Claude belum mendukung audio suara).
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void switchSttProvider('gemini')}
+                    className={`workspace-button ${config.sttProvider === 'gemini' ? 'primary' : ''}`}
+                  >
+                    Google Gemini
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void switchSttProvider('openai')}
+                    className={`workspace-button ${config.sttProvider === 'openai' ? 'primary' : ''}`}
+                  >
+                    OpenAI
+                  </button>
+                </div>
+              </div>
+              {usage?.remainingSttChunks !== undefined && (
+                <p className="text-muted">
+                  Sisa kuota transkripsi hari ini: {usage.remainingSttChunks}/{usage.limitSttChunks} potongan suara (otomatis beralih ke Whisper Lokal jika habis).
+                </p>
+              )}
+            </div>
+          )}
+        </div>
 
         {message && <p role="status" className="settings-description auth-success mt-2">{message}</p>}
         {error && <p role="alert" className="auth-error mt-2">{error}</p>}

@@ -18,6 +18,8 @@ export interface TierLimits {
   reqPerMinute: number;
   reqPerDay: number;
   inputTokensPerDay: number;
+  sttChunksPerMinute: number;
+  sttChunksPerDay: number;
 }
 
 export const TIER_LIMITS: Record<UserTier, TierLimits> = {
@@ -25,17 +27,23 @@ export const TIER_LIMITS: Record<UserTier, TierLimits> = {
     reqPerMinute: 5,
     reqPerDay: 30,
     inputTokensPerDay: 300_000,
+    sttChunksPerMinute: 20,
+    sttChunksPerDay: 180,
   },
   pro: {
     reqPerMinute: 20,
     reqPerDay: 200,
     inputTokensPerDay: 2_000_000,
+    sttChunksPerMinute: 60,
+    sttChunksPerDay: 1_200,
   },
 };
 
 export const IP_REQ_PER_MINUTE = 20;
+export const IP_STT_REQ_PER_MINUTE = 40;
 export const MAX_INPUT_CHARS = 100_000;
-export const MAX_BODY_BYTES = 1_000_000; // 1 MB cap keeps payloads well below Vercel's 4.5 MB limit.
+export const MAX_BODY_BYTES = 1_000_000; // 1 MB cap keeps JSON payloads well below Vercel's 4.5 MB limit.
+export const MAX_AUDIO_CHUNK_BYTES = 2_500_000; // 2.5 MB max per short audio chunk, safely below Vercel's 4.5 MB limit.
 
 let cachedRedis: Redis | null = null;
 // ponytail: reuse Ratelimit instances per warm isolate so @upstash/ratelimit ephemeralCache avoids extra Redis hits.
@@ -217,6 +225,18 @@ export async function enforceAiLimits(params: {
   };
 }
 
+export async function recordRawUsdSpend(costUsd: number, redisArg?: Redis | null): Promise<number> {
+  if (!Number.isFinite(costUsd) || costUsd <= 0) return 0;
+  const redis = redisArg !== undefined ? redisArg : getRedis();
+  if (!redis) return costUsd;
+
+  const { dayKey, secondsUntilMidnight } = getWibDayInfo();
+  const budgetKey = `ai:budget:usd:${dayKey}`;
+  const total = await redis.incrbyfloat(budgetKey, costUsd);
+  await redis.expire(budgetKey, secondsUntilMidnight);
+  return total;
+}
+
 export async function recordGlobalSpend(params: {
   provider: AiProviderId;
   model: string;
@@ -225,16 +245,75 @@ export async function recordGlobalSpend(params: {
   redis?: Redis | null;
 }): Promise<number> {
   const cost = estimateCostUsd(params.provider, params.model, params.inputTokens, params.outputTokens);
-  if (cost <= 0) return 0;
+  return recordRawUsdSpend(cost, params.redis);
+}
 
+export async function enforceSttLimits(params: {
+  userId: string;
+  ip: string;
+  tier?: UserTier;
+  redis?: Redis | null;
+}): Promise<{ remainingMinute: number; remainingDailyChunks: number }> {
+  if (isKillSwitchActive()) {
+    throw new AiProxyError('BUDGET_EXCEEDED', 'Layanan Cloud AI sedang dinonaktifkan sementara oleh administrator.', 503, 300);
+  }
+
+  const tier: UserTier = params.tier ?? 'free';
+  const limits = TIER_LIMITS[tier];
   const redis = params.redis !== undefined ? params.redis : getRedis();
-  if (!redis) return cost;
+
+  if (!redis) {
+    return {
+      remainingMinute: limits.sttChunksPerMinute,
+      remainingDailyChunks: limits.sttChunksPerDay,
+    };
+  }
 
   const { dayKey, secondsUntilMidnight } = getWibDayInfo();
+
   const budgetKey = `ai:budget:usd:${dayKey}`;
-  const total = await redis.incrbyfloat(budgetKey, cost);
-  await redis.expire(budgetKey, secondsUntilMidnight);
-  return total;
+  const currentSpend = Number((await redis.get<number>(budgetKey)) ?? 0);
+  if (currentSpend >= getDailyBudgetUsd()) {
+    throw new AiProxyError(
+      'BUDGET_EXCEEDED',
+      'Batas anggaran harian Cloud AI global telah tercapai. Beralih ke Whisper Lokal.',
+      429,
+      secondsUntilMidnight,
+    );
+  }
+
+  const ipLimiter = getSlidingLimiter(redis, 'ai:rl:stt:ip', IP_STT_REQ_PER_MINUTE);
+  const ipRes = await ipLimiter.limit(params.ip || 'unknown');
+  if (!ipRes.success) {
+    const retryAfter = Math.max(1, Math.ceil((ipRes.reset - Date.now()) / 1000));
+    throw new AiProxyError('RATE_LIMITED', 'Terlalu banyak potongan audio per menit dari IP ini.', 429, retryAfter);
+  }
+
+  const userLimiter = getSlidingLimiter(redis, `ai:rl:stt:user:${tier}`, limits.sttChunksPerMinute);
+  const userRes = await userLimiter.limit(params.userId);
+  if (!userRes.success) {
+    const retryAfter = Math.max(1, Math.ceil((userRes.reset - Date.now()) / 1000));
+    throw new AiProxyError('RATE_LIMITED', `Batas transkripsi ${limits.sttChunksPerMinute} potongan/menit tercapai.`, 429, retryAfter);
+  }
+
+  const sttDayKey = `ai:daily:stt:${dayKey}:${params.userId}`;
+  const usedChunks = Number((await redis.get<number>(sttDayKey)) ?? 0);
+  if (usedChunks >= limits.sttChunksPerDay) {
+    throw new AiProxyError(
+      'QUOTA_EXCEEDED',
+      `Kuota transkripsi suara harian (${limits.sttChunksPerDay} potongan/hari) habis. Reset pukul 00:00 WIB.`,
+      429,
+      secondsUntilMidnight,
+    );
+  }
+
+  const nextChunks = await redis.incr(sttDayKey);
+  if (nextChunks === 1) await redis.expire(sttDayKey, secondsUntilMidnight);
+
+  return {
+    remainingMinute: userRes.remaining,
+    remainingDailyChunks: Math.max(0, limits.sttChunksPerDay - nextChunks),
+  };
 }
 
 export async function getUserUsage(userId: string, tier: UserTier = 'free', redis: Redis | null = getRedis()) {
@@ -250,16 +329,21 @@ export async function getUserUsage(userId: string, tier: UserTier = 'free', redi
       usedInputTokens: 0,
       limitInputTokens: limits.inputTokensPerDay,
       remainingInputTokens: limits.inputTokensPerDay,
+      usedSttChunks: 0,
+      limitSttChunks: limits.sttChunksPerDay,
+      remainingSttChunks: limits.sttChunksPerDay,
       resetAt: resetAtIso,
     };
   }
 
-  const [usedReqRaw, usedTokRaw] = await Promise.all([
+  const [usedReqRaw, usedTokRaw, usedSttRaw] = await Promise.all([
     redis.get<number>(`ai:daily:req:${dayKey}:${userId}`),
     redis.get<number>(`ai:daily:tok:${dayKey}:${userId}`),
+    redis.get<number>(`ai:daily:stt:${dayKey}:${userId}`),
   ]);
   const usedRequests = Number(usedReqRaw ?? 0);
   const usedInputTokens = Number(usedTokRaw ?? 0);
+  const usedSttChunks = Number(usedSttRaw ?? 0);
 
   return {
     tier,
@@ -269,6 +353,9 @@ export async function getUserUsage(userId: string, tier: UserTier = 'free', redi
     usedInputTokens,
     limitInputTokens: limits.inputTokensPerDay,
     remainingInputTokens: Math.max(0, limits.inputTokensPerDay - usedInputTokens),
+    usedSttChunks,
+    limitSttChunks: limits.sttChunksPerDay,
+    remainingSttChunks: Math.max(0, limits.sttChunksPerDay - usedSttChunks),
     resetAt: resetAtIso,
   };
 }

@@ -299,6 +299,50 @@ export async function callVercelAiGenerate(params: {
   return { text: fullText, model: activeModel }
 }
 
+export async function callVercelAiTranscribe(params: {
+  wavBuffer: Buffer
+  provider?: 'gemini' | 'openai'
+  language?: string
+  prompt?: string
+  signal?: AbortSignal
+}): Promise<{ text: string; model: string }> {
+  const cfg = aiKeyStore.getPublicConfig()
+  const provider = params.provider ?? cfg.sttProvider
+  const authHeaders = await buildDesktopAuthHeaders()
+  const byokHeaders = buildByokHeaders(provider)
+
+  const form = new FormData()
+  form.set('file', new Blob([new Uint8Array(params.wavBuffer)], { type: 'audio/wav' }), 'chunk.wav')
+  form.set('provider', provider)
+  if (params.language) form.set('language', params.language)
+  if (params.prompt) form.set('prompt', params.prompt.slice(0, 400))
+
+  const resp = await fetch(`${getAiApiBaseUrl()}/api/ai/transcribe`, {
+    method: 'POST',
+    headers: {
+      ...authHeaders,
+      ...byokHeaders,
+    },
+    body: form,
+    signal: params.signal,
+  })
+
+  if (!resp.ok) {
+    const body = (await resp.json().catch(() => null)) as {
+      error?: { code?: string; message?: string; retryAfter?: number }
+    } | null
+    throw new CloudProxyClientError(
+      body?.error?.code || 'PROVIDER_ERROR',
+      body?.error?.message || `Transkripsi Cloud AI gagal (${resp.status}).`,
+      resp.status,
+      body?.error?.retryAfter
+    )
+  }
+
+  const data = (await resp.json()) as { text?: string; model?: string }
+  return { text: (data.text ?? '').trim(), model: data.model ?? provider }
+}
+
 globalAiManager.setTransport(callVercelAiGenerate)
 globalAiManager.onFallback((reason) => emitAiFallbackNotice(reason))
 

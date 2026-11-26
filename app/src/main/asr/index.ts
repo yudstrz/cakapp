@@ -12,7 +12,10 @@ import { appleSpeechAvailable, installSpeechLocale, readSpeechLocales, speechDis
 import { whisperLanguage, type Spoken } from '../../shared/spoken'
 import { createWhisperServer, recoverer, vadModelPath, whisperServerPath, type WhisperServer } from './server'
 import { clipStart, hearsClip } from './speedCheck'
-import { createTranscriber, type Line, type Transcribe } from './transcribe'
+import { createTranscriber, wavBytes, type Line, type Transcribe } from './transcribe'
+import { isPromptEcho, withoutPromptLabel } from './hallucination'
+import { aiKeyStore } from '../aiKeyStore'
+import { callVercelAiTranscribe, emitAiFallbackNotice } from '../cloudAi'
 import { meetingWords, respell, whisperPrompt } from '../vocab'
 import type { TranscriptPartial } from '../../shared/types'
 import type { Chunk } from './chunker'
@@ -225,16 +228,93 @@ export function hookTranscription(p: {
     else if (isFake()) transcribe = async (c, o) => (await import('./fake')).fakeTranscribe(c, o, promptOf(), whisperLanguage(spokenNow()))
     else {
       const model = p.modelPath()
-      if (model && (p.server || existsSync(whisperServerPath()))) {
-        const srv = serverFor(model, p.pidFile, p.server)
-        srv.resetBudget()
-        // the model takes a few seconds to load: start now, so the first chunk does not wait for it
-        srv.url().catch((e) => console.error('whisper-server did not start', e))
-        transcribe = createTranscriber({ url: () => srv.url(), recover: recoverer(srv), onLanguage: (_t, lang, chars, locked) => hear(lang, chars, locked), prompt: promptOf,
-          language: () => whisperLanguage(spokenNow()), signal: options?.signal })
-      } else {
-        console.warn('whisper-server binary or speech model not found: recording preserved, meeting will use cloud notes')
-        setTimeout(() => warnOnce('no-speech-model'), NO_MODEL_NOTE_DELAY_MS)
+      const localTranscribe =
+        model && (p.server || existsSync(whisperServerPath()))
+          ? (() => {
+              const srv = serverFor(model, p.pidFile, p.server)
+              srv.resetBudget()
+              srv.url().catch((e) => console.error('whisper-server did not start', e))
+              return createTranscriber({
+                url: () => srv.url(),
+                recover: recoverer(srv),
+                onLanguage: (_t, lang, chars, locked) => hear(lang, chars, locked),
+                prompt: promptOf,
+                language: () => whisperLanguage(spokenNow()),
+                signal: options?.signal,
+              })
+            })()
+          : undefined
+
+      let cloudFallbackNotified = false
+      const cloudTranscribe: Transcribe = async (c, opt) => {
+        if (opt?.partial) return []
+        if (c.clearMs !== undefined && c.clearMs < 300) return []
+        const prompt = promptOf()
+        const lang = whisperLanguage(spokenNow())
+        const res = await callVercelAiTranscribe({
+          wavBuffer: wavBytes(c.samples),
+          language: lang ?? 'auto',
+          prompt,
+          signal: options?.signal,
+        })
+        const cleaned = withoutPromptLabel(res.text.replace(/\s+/g, ' ').trim(), prompt)
+        if (!cleaned || isPromptEcho(cleaned, prompt)) return []
+        return [
+          {
+            track: c.track,
+            startMs: Math.round(c.startMs),
+            endMs: Math.round(c.startMs + c.samples.length / 16),
+            text: cleaned,
+          },
+        ]
+      }
+
+      transcribe = async (c, opt) => {
+        const sttMode = aiKeyStore.getPublicConfig().sttMode
+        if (sttMode === 'cloud') {
+          if (opt?.partial) return []
+          try {
+            return await cloudTranscribe(c, opt)
+          } catch (err) {
+            if (options?.signal?.aborted) return []
+            if (!cloudFallbackNotified) {
+              cloudFallbackNotified = true
+              emitAiFallbackNotice(
+                localTranscribe
+                  ? 'Transkripsi Cloud AI tidak terjangkau/kuota habis. Beralih ke Whisper Lokal.'
+                  : 'Transkripsi Cloud AI gagal dan model Whisper Lokal belum diunduh. Rekaman audio tetap tersimpan.'
+              )
+            }
+            if (localTranscribe) return localTranscribe(c, opt)
+            warnOnce('no-speech-model')
+            return []
+          }
+        }
+
+        if (localTranscribe) {
+          try {
+            return await localTranscribe(c, opt)
+          } catch (err) {
+            if (options?.signal?.aborted || opt?.partial) throw err
+            try {
+              if (!cloudFallbackNotified) {
+                cloudFallbackNotified = true
+                emitAiFallbackNotice('Whisper Lokal terkendala. Transkripsi dialihkan sementara ke Cloud AI.')
+              }
+              return await cloudTranscribe(c, opt)
+            } catch {
+              throw err
+            }
+          }
+        }
+
+        if (opt?.partial) return []
+        try {
+          return await cloudTranscribe(c, opt)
+        } catch {
+          warnOnce('no-speech-model')
+          return []
+        }
       }
     }
     if (transcribe && options) {
@@ -272,7 +352,7 @@ export function hookTranscription(p: {
 
   const offStart = (p.onStart ?? onMeetingStart)((m) => { open(m.id) })
   recorded = async (id, tracks, stopped, options) => {
-    if (sessions.has(id) || !p.modelPath()) return false
+    if (sessions.has(id) || (!p.modelPath() && aiKeyStore.getPublicConfig().sttMode !== 'cloud')) return false
     const s = open(id, true, options)
     if (!s.pipeline) { sessions.delete(id); return false }
     const pipe = s.pipeline

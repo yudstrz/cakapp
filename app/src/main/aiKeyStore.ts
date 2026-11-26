@@ -8,15 +8,21 @@ import { getByokPublicStatus, maskApiKey, sanitizeLog } from './byokKey'
 
 export { maskApiKey, sanitizeLog }
 
+export type SttProviderChoice = 'gemini' | 'openai'
+
 export interface StoredAiConfig {
   mode: 'local' | 'cloud'
   activeProvider: CloudProviderId
+  sttMode: 'local' | 'cloud'
+  sttProvider: SttProviderChoice
   models: Partial<Record<CloudProviderId | 'local', string>>
 }
 
 export interface PublicAiConfig {
   mode: 'local' | 'cloud'
   activeProvider: CloudProviderId
+  sttMode: 'local' | 'cloud'
+  sttProvider: SttProviderChoice
   models: Record<CloudProviderId | 'local', string>
   baseUrl: string
   byok: {
@@ -70,6 +76,8 @@ export class AiKeyStore {
     const defaultConfig: StoredAiConfig = {
       mode: 'local',
       activeProvider: 'gemini',
+      sttMode: 'local',
+      sttProvider: 'gemini',
       models: {
         local: 'Model Offline Lokal',
         gemini: '',
@@ -88,6 +96,8 @@ export class AiKeyStore {
         const parsed = JSON.parse(raw) as {
           mode?: 'local' | 'cloud'
           activeProvider?: string
+          sttMode?: 'local' | 'cloud'
+          sttProvider?: string
           encryptedKeys?: unknown
           models?: Record<string, string>
         }
@@ -95,6 +105,8 @@ export class AiKeyStore {
         const merged: StoredAiConfig = {
           mode: parsed.mode === 'cloud' ? 'cloud' : 'local',
           activeProvider: normalizeCloudProvider(parsed.activeProvider),
+          sttMode: parsed.sttMode === 'cloud' ? 'cloud' : 'local',
+          sttProvider: parsed.sttProvider === 'openai' ? 'openai' : 'gemini',
           models: {
             local: parsed.models?.local || defaultConfig.models.local,
             gemini: cleanStoredModel(parsed.models?.gemini),
@@ -147,6 +159,8 @@ export class AiKeyStore {
     return {
       mode: this.cachedConfig.mode,
       activeProvider: this.cachedConfig.activeProvider,
+      sttMode: this.cachedConfig.sttMode,
+      sttProvider: this.cachedConfig.sttProvider,
       models: {
         local: this.cachedConfig.models.local || 'Model Offline Lokal',
         gemini: this.cachedConfig.models.gemini || '',
@@ -161,6 +175,18 @@ export class AiKeyStore {
 
   setMode(mode: 'local' | 'cloud'): void {
     this.cachedConfig.mode = mode
+    this.saveToDisk()
+    this.syncToGlobalManager()
+  }
+
+  setSttMode(sttMode: 'local' | 'cloud'): void {
+    this.cachedConfig.sttMode = sttMode
+    this.saveToDisk()
+    this.syncToGlobalManager()
+  }
+
+  setSttProvider(sttProvider: SttProviderChoice): void {
+    this.cachedConfig.sttProvider = sttProvider === 'openai' ? 'openai' : 'gemini'
     this.saveToDisk()
     this.syncToGlobalManager()
   }

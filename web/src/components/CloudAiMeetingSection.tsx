@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import MeetingNotesView from './MeetingNotesView';
 import {
   CloudAiClientError,
@@ -10,6 +11,10 @@ import {
   type ClientAiTask,
   type VerifiedClientModel,
 } from '@/lib/ai/chunk-client';
+import {
+  transcribeAudioFileInChunks,
+  type WebSttProviderId,
+} from '@/lib/ai/audio-chunk-client';
 import {
   buildWebByokHeaders,
   clearWebByokKey,
@@ -28,6 +33,8 @@ interface UsageData {
   limitRequests: number;
   remainingInputTokens: number;
   limitInputTokens: number;
+  remainingSttChunks?: number;
+  limitSttChunks?: number;
 }
 
 const PROVIDER_LABELS: Record<ClientAiProviderId, string> = {
@@ -36,7 +43,15 @@ const PROVIDER_LABELS: Record<ClientAiProviderId, string> = {
   anthropic: 'Anthropic Claude',
 };
 
-const PREF_KEY = 'cakapp:web-ai-pref';
+export const WEB_AI_PREF_KEY = 'cakapp:web-ai-pref';
+
+export interface WebAiPreferences {
+  defaultMode?: 'local' | 'cloud';
+  sttMode?: 'local' | 'cloud';
+  sttProvider?: WebSttProviderId;
+  provider?: ClientAiProviderId;
+  models?: Partial<Record<ClientAiProviderId, string>>;
+}
 
 export default function CloudAiMeetingSection({
   meetingId,
@@ -49,8 +64,12 @@ export default function CloudAiMeetingSection({
   transcripts: TranscriptItem[];
   readOnly?: boolean;
 }) {
+  const router = useRouter();
   const [content, setContent] = useState(initialContent);
+  const [localTranscripts, setLocalTranscripts] = useState<TranscriptItem[]>(transcripts);
   const [provider, setProvider] = useState<ClientAiProviderId>('gemini');
+  const [sttMode, setSttMode] = useState<'local' | 'cloud'>('cloud');
+  const [sttProvider, setSttProvider] = useState<WebSttProviderId>('gemini');
   const [selectedModels, setSelectedModels] = useState<Partial<Record<ClientAiProviderId, string>>>({});
   const [modelsByProvider, setModelsByProvider] = useState<Record<ClientAiProviderId, VerifiedClientModel[]>>({
     gemini: [],
@@ -59,12 +78,25 @@ export default function CloudAiMeetingSection({
   });
   const [usage, setUsage] = useState<UsageData | null>(null);
   const [loadingMeta, setLoadingMeta] = useState(!readOnly);
-  const [busyTask, setBusyTask] = useState<ClientAiTask | 'health' | null>(null);
+  const [busyTask, setBusyTask] = useState<ClientAiTask | 'health' | 'stt' | null>(null);
   const [partInfo, setPartInfo] = useState('');
   const [statusMsg, setStatusMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [byokInput, setByokInput] = useState('');
   const [hasByok, setHasByok] = useState(false);
+
+  useEffect(() => {
+    setLocalTranscripts(transcripts);
+  }, [transcripts]);
+
+  const savePrefs = (patch: Partial<WebAiPreferences>) => {
+    try {
+      const prev = JSON.parse(window.localStorage.getItem(WEB_AI_PREF_KEY) || '{}') as WebAiPreferences;
+      window.localStorage.setItem(WEB_AI_PREF_KEY, JSON.stringify({ ...prev, ...patch }));
+    } catch {
+      // Ignore storage write error.
+    }
+  };
 
   const loadMetadata = useCallback(async (activeProv: ClientAiProviderId, savedMap: Partial<Record<ClientAiProviderId, string>>) => {
     if (readOnly) return;
@@ -85,11 +117,7 @@ export default function CloudAiMeetingSection({
             nextMap[p] = reconcileSelectedModel(savedMap[p], data.models[p] ?? []);
           }
           setSelectedModels(nextMap);
-          try {
-            window.localStorage.setItem(PREF_KEY, JSON.stringify({ provider: activeProv, models: nextMap }));
-          } catch {
-            // Ignore storage write error.
-          }
+          savePrefs({ provider: activeProv, models: nextMap });
         }
       }
 
@@ -108,11 +136,17 @@ export default function CloudAiMeetingSection({
     let initProv: ClientAiProviderId = 'gemini';
     let initModels: Partial<Record<ClientAiProviderId, string>> = {};
     try {
-      const raw = window.localStorage.getItem(PREF_KEY);
+      const raw = window.localStorage.getItem(WEB_AI_PREF_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw) as { provider?: ClientAiProviderId; models?: Partial<Record<ClientAiProviderId, string>> };
+        const parsed = JSON.parse(raw) as WebAiPreferences;
         if (parsed.provider === 'gemini' || parsed.provider === 'openai' || parsed.provider === 'anthropic') {
           initProv = parsed.provider;
+        }
+        if (parsed.sttMode === 'local' || parsed.sttMode === 'cloud') {
+          setSttMode(parsed.sttMode);
+        }
+        if (parsed.sttProvider === 'gemini' || parsed.sttProvider === 'openai') {
+          setSttProvider(parsed.sttProvider);
         }
         if (parsed.models) initModels = parsed.models;
       }
@@ -137,11 +171,17 @@ export default function CloudAiMeetingSection({
   const handleModelChange = (modelId: string) => {
     const nextMap = { ...selectedModels, [provider]: modelId };
     setSelectedModels(nextMap);
-    try {
-      window.localStorage.setItem(PREF_KEY, JSON.stringify({ provider, models: nextMap }));
-    } catch {
-      // Ignore storage write error.
-    }
+    savePrefs({ provider, models: nextMap });
+  };
+
+  const handleSttModeChange = (nextMode: 'local' | 'cloud') => {
+    setSttMode(nextMode);
+    savePrefs({ sttMode: nextMode });
+  };
+
+  const handleSttProviderChange = (nextProv: WebSttProviderId) => {
+    setSttProvider(nextProv);
+    savePrefs({ sttProvider: nextProv });
   };
 
   const handleTestConnection = async () => {
@@ -181,19 +221,76 @@ export default function CloudAiMeetingSection({
     }
   };
 
+  const handleAudioFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setBusyTask('stt');
+    setPartInfo('Membaca rekaman suara...');
+    setStatusMsg('');
+    setErrorMsg('');
+
+    try {
+      const sttRes = await transcribeAudioFileInChunks({
+        file,
+        provider: sttProvider,
+        headers: buildWebByokHeaders(sttProvider),
+        onProgress: (cur, tot) => setPartInfo(`Mentranskripsi suara bagian ${cur}/${tot}...`),
+      });
+
+      if (sttRes.segments.length === 0) {
+        setErrorMsg('Tidak ada ucapan yang terdeteksi pada file suara tersebut.');
+        setPartInfo('');
+        return;
+      }
+
+      const saveRes = await fetch(`/api/meetings/${encodeURIComponent(meetingId)}/transcripts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          segments: sttRes.segments,
+          replace: localTranscripts.length === 0,
+          durationMs: sttRes.durationMs,
+        }),
+      });
+
+      if (!saveRes.ok) {
+        throw new Error('Gagal menyimpan hasil transkrip ke database.');
+      }
+
+      setLocalTranscripts((prev) =>
+        prev.length === 0 ? sttRes.segments : [...prev, ...sttRes.segments],
+      );
+      setPartInfo('');
+      setStatusMsg(`Berhasil mengubah suara ke teks (${sttRes.segments.length} bagian). Klik Buat Notulen untuk merangkum.`);
+      void loadMetadata(provider, selectedModels);
+      router.refresh();
+    } catch (err) {
+      setPartInfo('');
+      setErrorMsg(
+        err instanceof Error
+          ? err.message
+          : 'Gagal memproses file suara. Untuk transkripsi offline tanpa kuota, gunakan aplikasi desktop Cakapp.',
+      );
+    } finally {
+      setBusyTask(null);
+    }
+  };
+
   const handleGenerate = async (task: ClientAiTask) => {
     const activeModel = selectedModels[provider] || '';
     if (!activeModel) {
       setErrorMsg('Tidak ada model aktif untuk provider ini.');
       return;
     }
-    const transcriptText = transcripts
+    const transcriptText = localTranscripts
       .map((t) => `${t.speaker || (t.track === 'me' ? 'Anda' : 'Peserta')}: ${t.text}`)
       .join('\n')
       .trim();
 
     if (!transcriptText) {
-      setErrorMsg('Transkrip rapat kosong, tidak ada teks untuk diringkas.');
+      setErrorMsg('Transkrip rapat masih kosong. Unggah rekaman suara terlebih dahulu atau rekam dari aplikasi desktop.');
       return;
     }
 
@@ -264,11 +361,12 @@ export default function CloudAiMeetingSection({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-zinc-800/80">
         <div>
           <h2 className="text-sm sm:text-base font-semibold text-zinc-100">
-            Notulen & Ringkasan Rapat
+            Notulen, Ringkasan & Speech-to-Text
           </h2>
           {!readOnly && usage && !hasByok && (
             <p className="mt-1 text-xs text-zinc-300">
-              Sisa {usage.remainingRequests}/{usage.limitRequests} request hari ini (reset 00:00 WIB)
+              Sisa {usage.remainingRequests}/{usage.limitRequests} request notulen
+              {usage.remainingSttChunks !== undefined ? ` · ${usage.remainingSttChunks}/${usage.limitSttChunks} potongan suara` : ''} hari ini (reset 00:00 WIB)
             </p>
           )}
           {!readOnly && hasByok && (
@@ -289,7 +387,7 @@ export default function CloudAiMeetingSection({
         <div className="mb-6 rounded-xl border border-zinc-800 bg-zinc-950/60 p-4 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
             <div className="space-y-1.5">
-              <span className="block text-xs font-medium text-zinc-300">Provider Cloud AI</span>
+              <span className="block text-xs font-medium text-zinc-300">Provider Notulen Cloud AI</span>
               <div className="flex flex-wrap gap-2">
                 {(['gemini', 'openai', 'anthropic'] as const).map((p) => (
                   <button
@@ -333,10 +431,81 @@ export default function CloudAiMeetingSection({
             </div>
           </div>
 
+          <div className="pt-3 border-t border-zinc-800/80 space-y-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-medium text-zinc-200">Pengaturan Default Suara ke Teks (Speech-to-Text)</p>
+                <p className="text-[11px] text-zinc-400">
+                  Pilih preferensi default transkripsi Anda atau unggah file rekaman suara untuk diubah menjadi teks.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  disabled={busyTask !== null}
+                  onClick={() => handleSttModeChange('local')}
+                  className={`min-h-[34px] rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                    sttMode === 'local'
+                      ? 'bg-zinc-100 text-zinc-950'
+                      : 'border border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800'
+                  }`}
+                >
+                  Default: Whisper Lokal (PC)
+                </button>
+                <button
+                  type="button"
+                  disabled={busyTask !== null}
+                  onClick={() => handleSttModeChange('cloud')}
+                  className={`min-h-[34px] rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                    sttMode === 'cloud'
+                      ? 'bg-zinc-100 text-zinc-950'
+                      : 'border border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800'
+                  }`}
+                >
+                  Default: Cloud AI (API Key Server)
+                </button>
+              </div>
+            </div>
+
+            {sttMode === 'cloud' && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-800 bg-zinc-900/50 p-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-zinc-300">Provider Suara:</span>
+                  {(['gemini', 'openai'] as const).map((sp) => (
+                    <button
+                      key={sp}
+                      type="button"
+                      disabled={busyTask !== null}
+                      onClick={() => handleSttProviderChange(sp)}
+                      className={`min-h-[32px] rounded-md px-2.5 py-1 text-xs font-medium ${
+                        sttProvider === sp
+                          ? 'bg-zinc-200 text-zinc-950'
+                          : 'border border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800'
+                      }`}
+                    >
+                      {sp === 'gemini' ? 'Google Gemini' : 'OpenAI'}
+                    </button>
+                  ))}
+                </div>
+
+                <label className="inline-flex min-h-[34px] cursor-pointer items-center justify-center rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-100 hover:bg-zinc-700">
+                  <span>{busyTask === 'stt' ? partInfo || 'Mentranskripsi...' : 'Unggah Suara ke Teks'}</span>
+                  <input
+                    type="file"
+                    accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm"
+                    disabled={busyTask !== null}
+                    onChange={(e) => void handleAudioFileSelected(e)}
+                    className="sr-only"
+                  />
+                </label>
+              </div>
+            )}
+          </div>
+
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <button
               type="button"
-              disabled={busyTask !== null || activeModels.length === 0 || transcripts.length === 0}
+              disabled={busyTask !== null || activeModels.length === 0 || localTranscripts.length === 0}
               onClick={() => void handleGenerate('notulen')}
               className="min-h-[38px] rounded-lg bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-white disabled:opacity-50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-300"
             >
@@ -344,7 +513,7 @@ export default function CloudAiMeetingSection({
             </button>
             <button
               type="button"
-              disabled={busyTask !== null || activeModels.length === 0 || transcripts.length === 0}
+              disabled={busyTask !== null || activeModels.length === 0 || localTranscripts.length === 0}
               onClick={() => void handleGenerate('ringkasan')}
               className="min-h-[38px] rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2 text-xs font-medium text-zinc-100 hover:bg-zinc-800 disabled:opacity-50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-300"
             >

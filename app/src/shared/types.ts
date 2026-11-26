@@ -57,6 +57,8 @@ export type CakappApi = {
     getConfig(): Promise<{
       mode: 'local' | 'cloud'
       activeProvider: 'gemini' | 'openai' | 'anthropic'
+      sttMode: 'local' | 'cloud'
+      sttProvider: 'gemini' | 'openai'
       models: Record<'gemini' | 'openai' | 'anthropic' | 'local', string>
       baseUrl: string
       byok: {
@@ -65,7 +67,13 @@ export type CakappApi = {
       }
       fallbackAvailable: boolean
     }>
-    setConfig(config: { mode?: 'local' | 'cloud'; activeProvider?: string; model?: string }): Promise<any>
+    setConfig(config: {
+      mode?: 'local' | 'cloud'
+      activeProvider?: string
+      model?: string
+      sttMode?: 'local' | 'cloud'
+      sttProvider?: 'gemini' | 'openai'
+    }): Promise<any>
     getModels(opts?: { force?: boolean; provider?: string }): Promise<{
       ok: boolean
       models: Record<'gemini' | 'openai' | 'anthropic', Array<{ id: string; label: string; tier: 'hemat' | 'standar' | 'premium'; default?: boolean; provider: 'gemini' | 'openai' | 'anthropic' }>>
@@ -83,6 +91,9 @@ export type CakappApi = {
         usedInputTokens: number
         limitInputTokens: number
         remainingInputTokens: number
+        usedSttChunks?: number
+        limitSttChunks?: number
+        remainingSttChunks?: number
         resetAt: string
       }
       error?: string

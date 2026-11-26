@@ -11,7 +11,16 @@ export function hookAiIpc() {
 
   ipcMain.handle(
     'ai:set-config',
-    (_e, config: { mode?: 'local' | 'cloud'; activeProvider?: AIProviderId; model?: string }) => {
+    (
+      _e,
+      config: {
+        mode?: 'local' | 'cloud'
+        activeProvider?: AIProviderId
+        model?: string
+        sttMode?: 'local' | 'cloud'
+        sttProvider?: 'gemini' | 'openai'
+      }
+    ) => {
       if (config.mode) {
         aiKeyStore.setMode(config.mode)
       }
@@ -20,6 +29,12 @@ export function hookAiIpc() {
       }
       if (config.model !== undefined && config.activeProvider) {
         aiKeyStore.setModel(config.activeProvider, config.model)
+      }
+      if (config.sttMode) {
+        aiKeyStore.setSttMode(config.sttMode)
+      }
+      if (config.sttProvider) {
+        aiKeyStore.setSttProvider(config.sttProvider)
       }
       return aiKeyStore.getPublicConfig()
     }

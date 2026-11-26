@@ -74,6 +74,13 @@ Dimas (QA): Tolong follow up action item jadwal deployment dan PIC pengujian ke 
 
       store.setModel('gemini', 'gemini-3.5-flash-lite')
       expect(store.getPublicConfig().models.gemini).toBe('gemini-3.5-flash-lite')
+
+      expect(store.getPublicConfig().sttMode).toBe('local')
+      expect(store.getPublicConfig().sttProvider).toBe('gemini')
+      store.setSttMode('cloud')
+      store.setSttProvider('openai')
+      expect(store.getPublicConfig().sttMode).toBe('cloud')
+      expect(store.getPublicConfig().sttProvider).toBe('openai')
     })
 
     it('reconciles stored model to verified server default when retired', () => {
