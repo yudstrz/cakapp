@@ -7,13 +7,7 @@ import { SHOWCASE_MEETING } from '@/lib/showcase';
 export default function HomePage() {
   return (
     <div className="mx-auto max-w-5xl px-4 sm:px-6">
-      {/* Hero Section */}
       <section className="pt-14 sm:pt-20 pb-12 sm:pb-16 text-center">
-        <div className="inline-flex items-center gap-2 rounded-md border border-zinc-800 bg-zinc-900/80 px-3 py-1 text-xs font-medium text-zinc-300 mb-6">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          Perekaman Audio Sistem Native + Web Hub
-        </div>
-
         <h1 className="text-3xl sm:text-5xl md:text-6xl font-semibold tracking-tight text-zinc-100 leading-[1.15]">
           Rekam Rapat Tanpa Bot, <br />
           <span className="text-zinc-400">Akses Notulen dari Mana Saja.</span>
@@ -54,11 +48,8 @@ export default function HomePage() {
       {/* SHOWCASE SECTION (LIVE ON HOMEPAGE) */}
       <section className="py-12 border-t border-zinc-800/80">
         <div className="text-center mb-8 sm:mb-10">
-          <div className="inline-flex items-center gap-2 rounded bg-amber-950/80 border border-amber-800/60 px-2.5 py-0.5 text-xs font-medium text-amber-300 mb-3">
-            Showcase Demo Interaktif
-          </div>
           <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-zinc-100">
-            Contoh Hasil Rekaman & Notulen AI
+            Contoh Hasil Rekaman & Notulen Rapat
           </h2>
           <p className="mt-2 text-xs sm:text-sm text-zinc-400 max-w-xl mx-auto">
             Putar audio percakapan dwibahasa (ID & EN) di bawah ini. Teks transkrip tersorot otomatis (karaoke sinkron) dan klik baris mana pun untuk melompat ke detik audio tersebut.
@@ -116,8 +107,8 @@ export default function HomePage() {
                 </svg>
                 Notulen & Ringkasan AI Rapat
               </h3>
-              <span className="text-[10px] uppercase font-mono text-zinc-500">
-                Model: Whisper + LLM
+              <span className="text-xs text-zinc-400">
+                Contoh Notulen Terstruktur
               </span>
             </div>
 

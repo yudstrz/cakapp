@@ -1,33 +1,114 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { ChevronDown } from './Icons'
+
+type CloudProvider = 'gemini' | 'openai' | 'anthropic'
+
+interface VerifiedModelItem {
+  id: string
+  label: string
+  tier: 'hemat' | 'standar' | 'premium'
+  default?: boolean
+  provider: CloudProvider
+}
 
 interface AiConfigState {
   mode: 'local' | 'cloud'
-  activeProvider: 'gemini' | 'openai' | 'claude' | 'local'
-  hasKey: Record<string, boolean>
-  maskedKeys: Record<string, string>
-  models: Record<string, string>
+  activeProvider: CloudProvider
+  models: Record<CloudProvider | 'local', string>
+  baseUrl: string
+  byok: {
+    hasKey: Record<CloudProvider, boolean>
+    maskedKeys: Record<CloudProvider, string>
+  }
   fallbackAvailable: boolean
+}
+
+interface UsageInfo {
+  usedRequests: number
+  limitRequests: number
+  remainingRequests: number
+  usedInputTokens: number
+  limitInputTokens: number
+  remainingInputTokens: number
+  resetAt: string
+}
+
+const PROVIDER_NAMES: Record<CloudProvider, string> = {
+  gemini: 'Google Gemini',
+  openai: 'OpenAI',
+  anthropic: 'Anthropic Claude',
 }
 
 export function AiSettings() {
   const [config, setConfig] = useState<AiConfigState>()
-  const [keyInput, setKeyInput] = useState('')
+  const [modelsMap, setModelsMap] = useState<Record<CloudProvider, VerifiedModelItem[]>>({
+    gemini: [],
+    openai: [],
+    anthropic: [],
+  })
+  const [usage, setUsage] = useState<UsageInfo | null>(null)
+  const [loadingCloud, setLoadingCloud] = useState(false)
+  const [cloudNote, setCloudNote] = useState('')
+  const [byokInput, setByokInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
-  const refreshConfig = async () => {
+  const loadCloudData = useCallback(async (force = false, provider?: CloudProvider) => {
+    setLoadingCloud(true)
+    setCloudNote('')
     try {
-      const cfg = (await window.yogurt.ai.getConfig()) as AiConfigState
-      setConfig(cfg)
+      const [modelsRes, usageRes] = await Promise.all([
+        window.yogurt.ai.getModels({ force, provider }),
+        window.yogurt.ai.getUsage(),
+      ])
+
+      if (modelsRes.config) {
+        setConfig(modelsRes.config as AiConfigState)
+      }
+      if (modelsRes.ok) {
+        setModelsMap(modelsRes.models)
+      } else if (modelsRes.error) {
+        setCloudNote(modelsRes.error)
+      }
+
+      if (usageRes.ok && usageRes.usage) {
+        setUsage(usageRes.usage)
+      } else {
+        setUsage(null)
+      }
     } catch {
-      // ignore
+      setCloudNote('Tidak dapat memuat daftar model dari server. Pastikan Anda sudah masuk akun dan terhubung ke internet.')
+    } finally {
+      setLoadingCloud(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    void refreshConfig()
-  }, [])
+    let active = true
+    void window.yogurt.ai.getConfig().then((cfg) => {
+      if (!active) return
+      setConfig(cfg)
+      if (cfg.mode === 'cloud') {
+        void loadCloudData(false, cfg.activeProvider)
+      }
+    }).catch(() => {})
+
+    const offAuth = window.yogurt.auth.onChanged(() => {
+      void window.yogurt.ai.getConfig().then((cfg) => {
+        if (!active) return
+        setConfig(cfg)
+        if (cfg.mode === 'cloud') {
+          void loadCloudData(true, cfg.activeProvider)
+        }
+      }).catch(() => {})
+    })
+
+    return () => {
+      active = false
+      offAuth()
+    }
+  }, [loadCloudData])
 
   const switchMode = async (newMode: 'local' | 'cloud') => {
     setBusy(true)
@@ -37,23 +118,27 @@ export function AiSettings() {
       const updated = (await window.yogurt.ai.setConfig({ mode: newMode })) as AiConfigState
       setConfig(updated)
       setMessage(newMode === 'local' ? 'Mode AI Lokal (Offline) aktif.' : 'Mode Cloud AI aktif.')
+      if (newMode === 'cloud') {
+        await loadCloudData(false, updated.activeProvider)
+      }
     } catch {
-      setError('Gagal mengubah mode AI.')
+      setError('Gagal mengubah mode pemrosesan AI.')
     } finally {
       setBusy(false)
     }
   }
 
-  const switchProvider = async (provider: 'gemini' | 'openai' | 'claude') => {
+  const switchProvider = async (provider: CloudProvider) => {
     setBusy(true)
     setMessage('')
     setError('')
-    setKeyInput('')
+    setByokInput('')
     try {
       const updated = (await window.yogurt.ai.setConfig({ activeProvider: provider })) as AiConfigState
       setConfig(updated)
+      await loadCloudData(false, provider)
     } catch {
-      setError('Gagal memilih provider.')
+      setError('Gagal memilih provider Cloud AI.')
     } finally {
       setBusy(false)
     }
@@ -61,6 +146,8 @@ export function AiSettings() {
 
   const switchModel = async (model: string) => {
     if (!config) return
+    setMessage('')
+    setError('')
     try {
       const updated = (await window.yogurt.ai.setConfig({
         activeProvider: config.activeProvider,
@@ -68,40 +155,7 @@ export function AiSettings() {
       })) as AiConfigState
       setConfig(updated)
     } catch {
-      // ignore
-    }
-  }
-
-  const saveKey = async () => {
-    if (!config || !keyInput.trim()) return
-    setBusy(true)
-    setMessage('')
-    setError('')
-    try {
-      const updated = (await window.yogurt.ai.setKey(config.activeProvider, keyInput.trim())) as AiConfigState
-      setConfig(updated)
-      setKeyInput('')
-      setMessage(`API Key ${config.activeProvider.toUpperCase()} berhasil disimpan dan dienkripsi.`)
-    } catch {
-      setError('Gagal menyimpan API Key.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const clearKey = async () => {
-    if (!config) return
-    setBusy(true)
-    setMessage('')
-    setError('')
-    try {
-      const updated = (await window.yogurt.ai.clearKey(config.activeProvider)) as AiConfigState
-      setConfig(updated)
-      setMessage(`API Key ${config.activeProvider.toUpperCase()} telah dihapus.`)
-    } catch {
-      setError('Gagal menghapus API Key.')
-    } finally {
-      setBusy(false)
+      setError('Gagal menyimpan pilihan model.')
     }
   }
 
@@ -113,24 +167,70 @@ export function AiSettings() {
     try {
       const res = await window.yogurt.ai.testConnection(config.activeProvider)
       if (res.ok) {
-        setMessage(res.message || 'Koneksi API berhasil diverifikasi.')
+        setMessage(res.message || 'Koneksi ke layanan Cloud AI siap digunakan.')
       } else {
-        setError(res.error || 'Gagal memverifikasi API Key.')
+        setError(res.error || 'Uji koneksi gagal.')
       }
     } catch {
-      setError('Terjadi kesalahan saat menguji koneksi.')
+      setError('Terjadi kesalahan saat menguji koneksi ke server.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const applyByok = async () => {
+    if (!config || !byokInput.trim()) return
+    setBusy(true)
+    setMessage('')
+    setError('')
+    try {
+      const updated = (await window.yogurt.ai.setByokKey(config.activeProvider, byokInput.trim())) as AiConfigState
+      setConfig(updated)
+      setByokInput('')
+      setMessage(`Kunci pribadi ${PROVIDER_NAMES[config.activeProvider]} diaktifkan untuk sesi ini.`)
+      await loadCloudData(true, config.activeProvider)
+    } catch {
+      setError('Gagal mengaktifkan kunci pribadi.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const resetByok = async () => {
+    if (!config) return
+    setBusy(true)
+    setMessage('')
+    setError('')
+    try {
+      const updated = (await window.yogurt.ai.clearByokKey(config.activeProvider)) as AiConfigState
+      setConfig(updated)
+      setMessage(`Kembali memakai kunci bersama server untuk ${PROVIDER_NAMES[config.activeProvider]}.`)
+      await loadCloudData(true, config.activeProvider)
+    } catch {
+      setError('Gagal mereset kunci ke server.')
     } finally {
       setBusy(false)
     }
   }
 
   if (!config) {
-    return null
+    return (
+      <section aria-labelledby="ai-settings-heading" className="auth-settings">
+        <h2 id="ai-settings-heading" className="settings-section-heading">
+          Kecerdasan Buatan (Hybrid AI Engine)
+        </h2>
+        <div className="settings-group auth-settings-body">
+          <p className="settings-description">Memuat pengaturan kecerdasan buatan...</p>
+        </div>
+      </section>
+    )
   }
 
   const currentProvider = config.activeProvider
-  const isKeySet = config.hasKey[currentProvider]
-  const currentMask = config.maskedKeys[currentProvider]
+  const verifiedList = modelsMap[currentProvider] ?? []
+  const activeModelId = config.models[currentProvider] || ''
+  const hasByok = config.byok.hasKey[currentProvider]
+  const byokMask = config.byok.maskedKeys[currentProvider]
 
   return (
     <section aria-labelledby="ai-settings-heading" className="auth-settings">
@@ -140,10 +240,9 @@ export function AiSettings() {
 
       <div className="settings-group auth-settings-body">
         <p className="settings-description">
-          Pilih antara model AI Lokal offline untuk privasi maksimal atau Cloud AI pihak ketiga dengan API Key Anda sendiri.
+          Pilih AI Lokal untuk pemrosesan 100% offline di komputer ini, atau Cloud AI menggunakan kunci bersama yang dikelola di server Cakapp tanpa perlu memasukkan API key.
         </p>
 
-        {/* Mode Selector */}
         <div className="auth-mode-row mt-3">
           <button
             type="button"
@@ -161,18 +260,17 @@ export function AiSettings() {
             onClick={() => void switchMode('cloud')}
             disabled={busy}
           >
-            Cloud AI (API Key Pribadi)
+            Cloud AI (Server Bersama)
           </button>
         </div>
 
-        {/* LOCAL MODE CARD */}
         {config.mode === 'local' && (
           <div className="auth-status-card auth-guest-active mt-4">
             <div className="auth-badge guest">
               <span>Mode Lokal Aktif</span>
             </div>
             <p className="settings-description">
-              Notulen dan ringkasan rapat diproses 100% di komputer lokal menggunakan model AI offline (Qwen 3 / Gemma 4). Tidak ada teks percakapan yang dikirim ke internet.
+              Notulen dan ringkasan rapat diproses langsung di perangkat Anda tanpa mengirim transkrip ke internet.
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <button
@@ -189,140 +287,154 @@ export function AiSettings() {
                 disabled={busy}
                 onClick={() => void switchMode('cloud')}
               >
-                Beralih ke Cloud AI (Tanpa Download)
+                Beralih ke Cloud AI (Tanpa Unduh)
               </button>
             </div>
           </div>
         )}
 
-        {/* CLOUD MODE SETTINGS */}
         {config.mode === 'cloud' && (
           <div className="mt-4 space-y-4">
-            {/* Provider Selection Buttons */}
+            <div className="rounded-lg border border-line bg-bg p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div>
+                <p className="font-medium text-ink">
+                  {hasByok
+                    ? `Mode Kunci Pribadi Aktif (${byokMask})`
+                    : usage
+                      ? `Sisa ${usage.remainingRequests}/${usage.limitRequests} request hari ini`
+                      : 'Kuota Harian Cloud AI'}
+                </p>
+                <p className="text-muted mt-0.5">
+                  {hasByok
+                    ? 'Permintaan sesi ini memakai kunci Anda sendiri dan tidak mengurangi kuota bersama.'
+                    : usage
+                      ? `Sisa token input: ${usage.remainingInputTokens.toLocaleString('id-ID')}/${usage.limitInputTokens.toLocaleString('id-ID')} (reset 00:00 WIB)`
+                      : cloudNote || 'Masuk ke akun Cakapp di bagian atas untuk memuat kuota dan model aktif.'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="workspace-button"
+                  disabled={busy || loadingCloud}
+                  onClick={() => void loadCloudData(true, currentProvider)}
+                >
+                  {loadingCloud ? 'Memuat...' : 'Segarkan'}
+                </button>
+                <button
+                  type="button"
+                  data-testid="ai-test-connection"
+                  className="workspace-button"
+                  disabled={busy}
+                  onClick={() => void testConnection()}
+                >
+                  Uji Koneksi
+                </button>
+              </div>
+            </div>
+
             <div>
-              <p className="settings-label mb-2">Pilih Provider Cloud AI:</p>
+              <p className="settings-label mb-2">Provider Cloud AI</p>
               <div className="flex flex-wrap gap-2">
-                {(['gemini', 'openai', 'claude'] as const).map((p) => {
+                {(['gemini', 'openai', 'anthropic'] as const).map((p) => {
                   const active = currentProvider === p
-                  const has = config.hasKey[p]
                   return (
                     <button
                       key={p}
                       type="button"
+                      disabled={busy}
                       onClick={() => void switchProvider(p)}
                       className={`workspace-button ${active ? 'primary' : ''}`}
                     >
-                      {p === 'gemini' && 'Google Gemini'}
-                      {p === 'openai' && 'OpenAI'}
-                      {p === 'claude' && 'Anthropic Claude'}
-                      {has && <span className="ml-1.5 text-[10px] text-emerald-400 font-bold">•</span>}
+                      {PROVIDER_NAMES[p]}
                     </button>
                   )
                 })}
               </div>
             </div>
 
-            {/* Model Selection */}
             <div className="settings-row">
               <div className="settings-row-copy">
-                <p className="settings-label">Model Aktif</p>
-                <p className="settings-description">Pilih model yang akan digunakan untuk membuat notulen dan ringkasan.</p>
-              </div>
-              <select
-                className="workspace-button"
-                value={config.models[currentProvider] || ''}
-                onChange={(e) => void switchModel(e.target.value)}
-                disabled={busy}
-              >
-                {currentProvider === 'gemini' && (
-                  <>
-                    <option value="gemini-2.0-flash">Gemini 2.0 Flash (Direkomendasikan)</option>
-                    <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                  </>
-                )}
-                {currentProvider === 'openai' && (
-                  <>
-                    <option value="gpt-4o-mini">GPT-4o Mini (Cepat & Hemat)</option>
-                    <option value="gpt-4o">GPT-4o</option>
-                  </>
-                )}
-                {currentProvider === 'claude' && (
-                  <>
-                    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
-                    <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
-                  </>
-                )}
-              </select>
-            </div>
-
-            {/* API Key Input Section */}
-            <div className="rounded-xl border border-line bg-bg p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="settings-label">
-                  API Key {currentProvider === 'gemini' ? 'Google Gemini' : currentProvider === 'openai' ? 'OpenAI' : 'Anthropic Claude'}
+                <label htmlFor="ai-active-model" className="settings-label">
+                  Model Aktif
+                </label>
+                <p className="settings-description">
+                  Daftar diisi otomatis dari model yang terverifikasi aktif di provider.
                 </p>
-                {isKeySet && (
-                  <span className="rounded bg-emerald-950/80 border border-emerald-800/60 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
-                    Tersimpan ({currentMask})
-                  </span>
-                )}
               </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="password"
-                  placeholder={isKeySet ? 'Masukkan key baru untuk mengganti' : 'Tempelkan API Key di sini'}
-                  value={keyInput}
-                  onChange={(e) => setKeyInput(e.target.value)}
-                  className="flex-1 rounded-md border border-line bg-card px-3 py-1.5 text-xs text-ink placeholder:text-muted"
-                />
-                <button
-                  type="button"
-                  className="workspace-button primary"
-                  disabled={busy || !keyInput.trim()}
-                  onClick={() => void saveKey()}
+              <span className="settings-select-wrap">
+                <select
+                  id="ai-active-model"
+                  data-testid="ai-model-select"
+                  className="settings-select"
+                  value={activeModelId}
+                  onChange={(e) => void switchModel(e.target.value)}
+                  disabled={busy || loadingCloud || verifiedList.length === 0}
                 >
-                  Simpan
-                </button>
-                {isKeySet && (
-                  <button
-                    type="button"
-                    className="workspace-button"
-                    disabled={busy}
-                    onClick={() => void clearKey()}
-                  >
-                    Hapus
-                  </button>
-                )}
-              </div>
-
-              {isKeySet && (
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    className="workspace-button"
-                    disabled={busy}
-                    onClick={() => void testConnection()}
-                  >
-                    Uji Koneksi API
-                  </button>
-                </div>
-              )}
+                  {loadingCloud && <option value="">Memverifikasi model aktif...</option>}
+                  {!loadingCloud && verifiedList.length === 0 && (
+                    <option value="">Model belum dimuat (masuk akun dulu)</option>
+                  )}
+                  {verifiedList.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}{m.default ? ' (Default)' : ''}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={14} aria-hidden="true" />
+              </span>
             </div>
 
-            {/* Security & Fallback Notices */}
-            <div className="rounded-lg border border-line bg-card/60 p-3 space-y-1.5 text-xs text-muted">
-              <p className="flex items-center gap-2 text-ink">
-                <span>Enkripsi safeStorage:</span> Kunci API disimpan terenkripsi di keychain sistem operasi dan tidak pernah dicatat dalam teks polos.
+            <details className="rounded-lg border border-line bg-bg p-3 text-xs">
+              <summary className="cursor-pointer select-none font-medium text-ink">
+                Opsi Lanjutan: Gunakan API Key Sendiri (Opsional)
+              </summary>
+              <div className="mt-3 space-y-2.5">
+                <p className="text-muted">
+                  Tidak wajib diisi. Jika diisi, permintaan sesi ini dikirim menggunakan kunci pribadi Anda tanpa memotong kuota bersama, dan otomatis dihapus saat aplikasi ditutup.
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="password"
+                    value={byokInput}
+                    onChange={(e) => setByokInput(e.target.value)}
+                    placeholder={`API Key ${PROVIDER_NAMES[currentProvider]} (opsional)`}
+                    aria-label={`API Key ${PROVIDER_NAMES[currentProvider]}`}
+                    className="settings-name-field flex-1 min-w-[200px]"
+                  />
+                  <button
+                    type="button"
+                    className="workspace-button"
+                    disabled={busy || !byokInput.trim()}
+                    onClick={() => void applyByok()}
+                  >
+                    Pakai Key Ini
+                  </button>
+                  {hasByok && (
+                    <button
+                      type="button"
+                      className="workspace-button"
+                      disabled={busy}
+                      onClick={() => void resetByok()}
+                    >
+                      Reset ke Server
+                    </button>
+                  )}
+                </div>
+              </div>
+            </details>
+
+            <div className="rounded-lg border border-line bg-bg p-3 space-y-1.5 text-xs text-muted">
+              <p className="text-ink">
+                <strong>Kunci Terkelola di Server:</strong> Kunci API Cloud dikelola terpusat di backend Cakapp dan tidak pernah disimpan di perangkat pengguna.
               </p>
-              <p className="flex items-center gap-2 text-ink">
-                <span>Smart Fallback Otomatis:</span> Jika kuota API habis atau laptop offline, sistem otomatis mengalihkan proses ke Model AI Lokal tanpa crash.
+              <p className="text-ink">
+                <strong>Smart Fallback Otomatis:</strong> Jika kuota harian habis, batas permintaan tercapai, atau jaringan terputus, pembuatan notulen otomatis beralih ke AI Lokal tanpa henti paksa.
               </p>
             </div>
           </div>
         )}
 
-        {/* Status Messages */}
         {message && <p role="status" className="settings-description auth-success mt-2">{message}</p>}
         {error && <p role="alert" className="auth-error mt-2">{error}</p>}
       </div>

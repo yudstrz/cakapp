@@ -45,7 +45,10 @@ export function Workspace({ route, meeting, folders, go, back, forward, search, 
     let active = true, updated = false
     const off = window.yogurt.widget.onState((view) => { updated = true; setRecording(view) })
     void window.yogurt.widget.state().then((view) => { if (active && !updated) setRecording(view) })
-    return () => { active = false; off() }
+    const offAiFallback = window.yogurt.ai?.onFallback?.((reason) => {
+      toasts.add({ title: reason, timeout: 6000 })
+    })
+    return () => { active = false; off(); offAiFallback?.() }
   }, [])
   const peek = useSidebarPeek(collapsed, route)
   const sidebarVisible = !collapsed || peek.open
@@ -160,7 +163,7 @@ export function Workspace({ route, meeting, folders, go, back, forward, search, 
         onCancel={() => setAuthModalOpen(false)}
       >
         <div className="max-h-[70vh] overflow-y-auto pr-1">
-          <AuthSettings onDone={() => setAuthModalOpen(false)} />
+          <AuthSettings onDone={() => setAuthModalOpen(false)} compact />
         </div>
         <div className="modal-actions mt-4">
           <ModalClose data-dialog-cancel className="workspace-button">Tutup</ModalClose>

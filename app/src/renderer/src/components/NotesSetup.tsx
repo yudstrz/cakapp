@@ -43,15 +43,13 @@ export function NotesSetup({ go }: { go: (route: string) => void }) {
   const useCloudInstead = async () => {
     setSkipFailed(false)
     try {
-      const cfg = await window.yogurt.ai.setConfig({ mode: 'cloud' })
+      await window.yogurt.ai.setConfig({ mode: 'cloud' })
       await window.yogurt.setup.skipNotesDownload()
       setOpen(false)
-      const hasAnyKey = Object.entries(cfg.hasKey || {}).some(([k, v]) => k !== 'local' && Boolean(v))
       toasts.add({
-        title: hasAnyKey ? 'Mode Cloud AI aktif — download AI offline dilewati' : 'Download AI offline dilewati — silakan isi API Key Cloud',
+        title: 'Mode Cloud AI aktif. Unduhan AI offline dilewati.',
         timeout: 6000,
       })
-      if (!hasAnyKey) go('/settings')
     } catch {
       setSkipFailed(true)
     }

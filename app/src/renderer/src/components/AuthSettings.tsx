@@ -3,7 +3,7 @@ import type { AuthState } from '../../../shared/types'
 import { t } from '../../../shared/i18n'
 import { Check, Globe, Lock } from './Icons'
 
-export function AuthSettings({ onDone }: { onDone?: () => void } = {}) {
+export function AuthSettings({ onDone, compact }: { onDone?: () => void; compact?: boolean } = {}) {
   const [state, setState] = useState<AuthState>()
   const [register, setRegister] = useState(false)
   const [email, setEmail] = useState('')
@@ -87,7 +87,7 @@ export function AuthSettings({ onDone }: { onDone?: () => void } = {}) {
 
   return (
     <section aria-labelledby="account-heading" className="auth-settings">
-      <h2 id="account-heading" className="settings-section-heading">{t('auth-account')}</h2>
+      {!compact && <h2 id="account-heading" className="settings-section-heading">{t('auth-account')}</h2>}
       <div className="settings-group auth-settings-body">
         {/* Status Mode Card */}
         {!state ? (

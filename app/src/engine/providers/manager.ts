@@ -1,53 +1,89 @@
-import type {
-  AIProvider,
-  AIProviderId,
-  GenerateNotesParams,
-  GenerateNotesResult,
-  GenerateTitleParams,
-  ProviderManagerConfig,
-  StreamChatParams,
+import {
+  normalizeCloudProvider,
+  type AIProvider,
+  type AIProviderId,
+  type CloudTransportFn,
+  type GenerateNotesParams,
+  type GenerateNotesResult,
+  type GenerateTitleParams,
+  type ProviderManagerConfig,
+  type StreamChatParams,
 } from './types'
 import { LocalProvider, type LocalLlmRunner } from './local'
-import { GeminiProvider } from './gemini'
-import { OpenAIProvider } from './openai'
-import { ClaudeProvider } from './claude'
+import { formatFallbackNotice } from './gemini'
+import { GeminiProvider, OpenAIProvider } from './openai'
+import { AnthropicProvider } from './claude'
 
 export class AIProviderManager {
   private localProvider: LocalProvider
   private geminiProvider: GeminiProvider
   private openAIProvider: OpenAIProvider
-  private claudeProvider: ClaudeProvider
+  private anthropicProvider: AnthropicProvider
   private config: ProviderManagerConfig
+  private fallbackListeners = new Set<(reason: string) => void>()
 
   constructor(initialConfig?: Partial<ProviderManagerConfig>, localRunner?: LocalLlmRunner) {
+    const transport = initialConfig?.transport
     this.localProvider = new LocalProvider(localRunner)
-    this.geminiProvider = new GeminiProvider(initialConfig?.keys?.gemini || '', initialConfig?.models?.gemini || 'gemini-2.0-flash')
-    this.openAIProvider = new OpenAIProvider(initialConfig?.keys?.openai || '', initialConfig?.models?.openai || 'gpt-4o-mini')
-    this.claudeProvider = new ClaudeProvider(initialConfig?.keys?.claude || '', initialConfig?.models?.claude || 'claude-3-5-sonnet-20241022')
+    this.geminiProvider = new GeminiProvider(initialConfig?.models?.gemini || '', transport)
+    this.openAIProvider = new OpenAIProvider(initialConfig?.models?.openai || '', transport)
+    this.anthropicProvider = new AnthropicProvider(
+      initialConfig?.models?.anthropic || initialConfig?.models?.claude || '',
+      transport
+    )
 
     this.config = {
       mode: initialConfig?.mode || 'local',
-      activeProvider: initialConfig?.activeProvider || 'gemini',
-      keys: initialConfig?.keys || {},
+      activeProvider: initialConfig?.activeProvider === 'local' ? 'local' : normalizeCloudProvider(initialConfig?.activeProvider),
       models: initialConfig?.models || {},
+      transport,
     }
   }
 
+  onFallback(listener: (reason: string) => void): () => void {
+    this.fallbackListeners.add(listener)
+    return () => this.fallbackListeners.delete(listener)
+  }
+
+  private notifyFallback(reason: string) {
+    for (const cb of this.fallbackListeners) {
+      try {
+        cb(reason)
+      } catch {
+        // Ignore listener error.
+      }
+    }
+  }
+
+  setTransport(transport: CloudTransportFn | undefined) {
+    this.config.transport = transport
+    this.geminiProvider.setTransport(transport)
+    this.openAIProvider.setTransport(transport)
+    this.anthropicProvider.setTransport(transport)
+  }
+
   updateConfig(newConfig: Partial<ProviderManagerConfig>) {
+    const nextActive =
+      newConfig.activeProvider !== undefined
+        ? newConfig.activeProvider === 'local'
+          ? 'local'
+          : normalizeCloudProvider(newConfig.activeProvider)
+        : this.config.activeProvider
+
     this.config = {
       ...this.config,
       ...newConfig,
-      keys: { ...this.config.keys, ...newConfig.keys },
+      activeProvider: nextActive,
       models: { ...this.config.models, ...newConfig.models },
     }
 
-    if (newConfig.keys?.gemini !== undefined) this.geminiProvider.setApiKey(newConfig.keys.gemini)
-    if (newConfig.keys?.openai !== undefined) this.openAIProvider.setApiKey(newConfig.keys.openai)
-    if (newConfig.keys?.claude !== undefined) this.claudeProvider.setApiKey(newConfig.keys.claude)
-
-    if (newConfig.models?.gemini) this.geminiProvider.setModel(newConfig.models.gemini)
-    if (newConfig.models?.openai) this.openAIProvider.setModel(newConfig.models.openai)
-    if (newConfig.models?.claude) this.claudeProvider.setModel(newConfig.models.claude)
+    if (newConfig.transport !== undefined) {
+      this.setTransport(newConfig.transport)
+    }
+    if (newConfig.models?.gemini !== undefined) this.geminiProvider.setModel(newConfig.models.gemini)
+    if (newConfig.models?.openai !== undefined) this.openAIProvider.setModel(newConfig.models.openai)
+    const anthModel = newConfig.models?.anthropic ?? newConfig.models?.claude
+    if (anthModel !== undefined) this.anthropicProvider.setModel(anthModel)
   }
 
   setLocalRunner(runner: LocalLlmRunner) {
@@ -59,16 +95,14 @@ export class AIProviderManager {
   }
 
   getProvider(id: AIProviderId): AIProvider {
-    switch (id) {
+    if (id === 'local') return this.localProvider
+    switch (normalizeCloudProvider(id)) {
       case 'gemini':
         return this.geminiProvider
       case 'openai':
         return this.openAIProvider
-      case 'claude':
-        return this.claudeProvider
-      case 'local':
-      default:
-        return this.localProvider
+      case 'anthropic':
+        return this.anthropicProvider
     }
   }
 
@@ -80,39 +114,32 @@ export class AIProviderManager {
   }
 
   /**
-   * Generates notes with smart fallback.
-   * If the chosen Cloud AI fails (offline, 429 quota, invalid key), it gracefully falls back to Local AI.
+   * Run Cloud AI via server proxy; on rate limit, quota/budget exhaustion, unavailable model,
+   * timeout, or network failure, switch to Local AI without crashing and emit a short notice.
    */
   async generateNotes(params: GenerateNotesParams): Promise<GenerateNotesResult> {
     const primary = this.getActiveProvider()
-
-    // If local mode is selected, run local directly
     if (primary.id === 'local') {
       return primary.generateNotes(params)
     }
 
-    // Cloud Mode: Try primary cloud provider
     try {
       if (!primary.isAvailable()) {
-        throw new Error(`API Key untuk ${primary.name} belum diisi atau tidak valid`)
+        throw new Error(`Layanan Cloud AI (${primary.name}) belum terhubung.`)
       }
       return await primary.generateNotes(params)
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : String(err)
-      console.warn(`[AI Engine] ${primary.name} gagal (${errMsg}). Mengaktifkan Smart Fallback ke AI Lokal...`)
+      if (params.signal?.aborted) throw err
+      const rawMsg = err instanceof Error ? err.message : String(err)
+      const notice = formatFallbackNotice(err)
+      console.warn(`[AI Engine] ${primary.name} gagal (${rawMsg}). Beralih ke AI Lokal.`)
+      this.notifyFallback(notice)
 
-      // Smart Fallback ke Local Provider
-      try {
-        const localResult = await this.localProvider.generateNotes(params)
-        return {
-          ...localResult,
-          fallbackUsed: true,
-          error: `Dialihkan ke AI Lokal karena kendala Cloud AI: ${errMsg}`,
-        }
-      } catch (localErr: unknown) {
-        throw new Error(
-          `Semua provider AI gagal. Cloud: ${errMsg}. Local: ${localErr instanceof Error ? localErr.message : String(localErr)}`
-        )
+      const localResult = await this.localProvider.generateNotes(params)
+      return {
+        ...localResult,
+        fallbackUsed: true,
+        error: `${notice} (${rawMsg})`,
       }
     }
   }
@@ -124,10 +151,11 @@ export class AIProviderManager {
     }
 
     try {
-      if (!primary.isAvailable()) throw new Error('Cloud provider not available')
+      if (!primary.isAvailable()) throw new Error('Cloud provider unavailable')
       return await primary.generateTitle(params)
     } catch (err: unknown) {
-      console.warn(`[AI Engine] Judul otomatis fallback ke lokal: ${err instanceof Error ? err.message : String(err)}`)
+      if (params.signal?.aborted) throw err
+      console.warn('[AI Engine] Judul otomatis beralih ke AI Lokal.')
       return this.localProvider.generateTitle(params)
     }
   }
@@ -139,14 +167,15 @@ export class AIProviderManager {
     }
 
     try {
-      if (!primary.isAvailable()) throw new Error('Cloud provider not available')
+      if (!primary.isAvailable()) throw new Error('Cloud provider unavailable')
       return await primary.streamChat(params)
     } catch (err: unknown) {
-      console.warn(`[AI Engine] Tanya-jawab chat fallback ke lokal: ${err instanceof Error ? err.message : String(err)}`)
+      if (params.signal?.aborted) throw err
+      const notice = formatFallbackNotice(err)
+      this.notifyFallback(notice)
       return this.localProvider.streamChat(params)
     }
   }
 }
 
-// Global Singleton Instance
 export const globalAiManager = new AIProviderManager()

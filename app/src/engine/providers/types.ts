@@ -1,4 +1,30 @@
-export type AIProviderId = 'local' | 'openai' | 'gemini' | 'claude' | 'agnes'
+export type CloudProviderId = 'gemini' | 'openai' | 'anthropic'
+export type AIProviderId = 'local' | CloudProviderId | 'claude'
+
+export function normalizeCloudProvider(id: string | undefined): CloudProviderId {
+  if (id === 'openai') return 'openai'
+  if (id === 'anthropic' || id === 'claude') return 'anthropic'
+  return 'gemini'
+}
+
+export interface VerifiedModelInfo {
+  id: string
+  label: string
+  tier: 'hemat' | 'standar' | 'premium'
+  default?: boolean
+  provider: CloudProviderId
+}
+
+export interface AiUsageSnapshot {
+  tier: 'free' | 'pro'
+  usedRequests: number
+  limitRequests: number
+  remainingRequests: number
+  usedInputTokens: number
+  limitInputTokens: number
+  remainingInputTokens: number
+  resetAt: string
+}
 
 export interface GenerateNotesParams {
   transcript: string
@@ -21,6 +47,7 @@ export interface GenerateNotesResult {
 
 export interface StreamChatParams {
   messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>
+  task?: 'notulen' | 'ringkasan'
   onToken?: (token: string) => void
   signal?: AbortSignal
 }
@@ -31,11 +58,21 @@ export interface GenerateTitleParams {
   signal?: AbortSignal
 }
 
+export type CloudTransportFn = (params: {
+  provider: CloudProviderId
+  model: string
+  task: 'notulen' | 'ringkasan'
+  input: string
+  stream?: boolean
+  onToken?: (chunk: string) => void
+  signal?: AbortSignal
+}) => Promise<{ text: string; model: string }>
+
 export interface ProviderManagerConfig {
   mode: 'local' | 'cloud'
   activeProvider: AIProviderId
-  keys: Partial<Record<AIProviderId, string>>
   models?: Partial<Record<AIProviderId, string>>
+  transport?: CloudTransportFn
 }
 
 export interface AIProvider {

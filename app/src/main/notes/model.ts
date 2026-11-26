@@ -62,31 +62,34 @@ export function createNotesModel(o: { engine: Engine; modelPath: () => string | 
   return {
     /** the model, loaded; a stopped job's signal stops what it is writing */
     async llm(signal?: AbortSignal): Promise<Llm> {
+      const buildLocalLlm = async (): Promise<Llm> => {
+        const m = await load()
+        return {
+          contextSize: m.contextSize,
+          count: (texts) => o.engine.count(texts),
+          chat: (prompt, onToken, opts) => {
+            const messages: EngineMessage[] = [...before(opts?.before), { role: 'user', content: prompt }]
+            // only for a prompt long enough to be worth reading ahead: a meeting's notes or a question about one
+            if (prompt.length > 20_000) console.info('NOTES', `prompt ${heldMatch(held, prompt)}`)
+            // not known while it runs; the worker skips what it already holds, so knowing less only costs a check
+            held = ''
+            let wrote = false
+            const ask = () => o.engine.chat({ messages, ...(opts?.maxTokens ? { maxTokens: opts.maxTokens } : {}), ...(opts?.temperature !== undefined ? { temperature: opts.temperature } : {}) }, (t) => { wrote = true; onToken(t) }, signal)
+            // no word came on the graphics card: loaded again without it, and asked again (nothing was shown yet)
+            let first = true
+            return again(async () => { if (!first) await ensure(); first = false; return ask() }, () => !wrote && !signal?.aborted)
+              .then((r) => { if (!signal?.aborted) held = messages[0].content; return r })
+          },
+          readAhead: async (text, stop) => {
+            const s = stop ?? signal
+            held = await readInSteps(held, text, async (part) => { await o.engine.preload([{ role: 'user', content: part }], s) }, s)
+          },
+        }
+      }
       if (isCloudAiAvailable()) {
-        return createCloudLlm(signal)
+        return createCloudLlm(signal, () => (o.modelPath() ? buildLocalLlm() : Promise.resolve(null)))
       }
-      const m = await load()
-      return {
-        contextSize: m.contextSize,
-        count: (texts) => o.engine.count(texts),
-        chat: (prompt, onToken, opts) => {
-          const messages: EngineMessage[] = [...before(opts?.before), { role: 'user', content: prompt }]
-          // only for a prompt long enough to be worth reading ahead: a meeting's notes or a question about one
-          if (prompt.length > 20_000) console.info('NOTES', `prompt ${heldMatch(held, prompt)}`)
-          // not known while it runs; the worker skips what it already holds, so knowing less only costs a check
-          held = ''
-          let wrote = false
-          const ask = () => o.engine.chat({ messages, ...(opts?.maxTokens ? { maxTokens: opts.maxTokens } : {}), ...(opts?.temperature !== undefined ? { temperature: opts.temperature } : {}) }, (t) => { wrote = true; onToken(t) }, signal)
-          // no word came on the graphics card: loaded again without it, and asked again (nothing was shown yet)
-          let first = true
-          return again(async () => { if (!first) await ensure(); first = false; return ask() }, () => !wrote && !signal?.aborted)
-            .then((r) => { if (!signal?.aborted) held = messages[0].content; return r })
-        },
-        readAhead: async (text, stop) => {
-          const s = stop ?? signal
-          held = await readInSteps(held, text, async (part) => { await o.engine.preload([{ role: 'user', content: part }], s) }, s)
-        },
-      }
+      return buildLocalLlm()
     },
     async unload() {
       await loading?.catch(() => {})

@@ -256,8 +256,8 @@
 .app-toast button:focus-visible { outline:2px solid var(--focus);outline-offset:2px; }
 
 /* The cited passage remains selectable text and keeps the same line boxes in every state. */
-.citation-passage { display:inline;color:inherit;font:inherit;letter-spacing:inherit;text-align:inherit;white-space:normal;padding:1px 0;margin-inline:2px;border-radius:3px;box-decoration-break:clone;-webkit-box-decoration-break:clone;text-decoration-line:underline;text-decoration-style:dotted;text-decoration-color:color-mix(in srgb,var(--accent) 60%,transparent);text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-skip-ink:auto;transition:background-color var(--dur-micro) ease,text-decoration-color var(--dur-micro) ease; }
-.citation-passage,.citation-passage * { user-select:text;-webkit-user-select:text;cursor:text; }
+.citation-passage { display:inline;color:inherit;font:inherit;letter-spacing:inherit;text-align:inherit;white-space:normal;padding:1px 0;margin-inline:2px;border-radius:3px;-webkit-box-decoration-break:clone;box-decoration-break:clone;text-decoration-line:underline;text-decoration-style:dotted;text-decoration-color:color-mix(in srgb,var(--accent) 60%,transparent);text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-skip-ink:auto;transition:background-color var(--dur-micro) ease,text-decoration-color var(--dur-micro) ease; }
+.citation-passage,.citation-passage * { -webkit-user-select:text;user-select:text;cursor:text; }
 .citation-passage:is(:hover,[data-focus-ring],[aria-expanded=true]) { background:var(--accent-soft);text-decoration-color:var(--accent); }
 .citation-passage:focus-visible { outline:2px solid var(--focus);outline-offset:1px; }
 .citation-positioner { z-index:100; }

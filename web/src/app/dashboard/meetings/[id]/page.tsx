@@ -5,7 +5,7 @@ import { getDb } from '@/lib/neon';
 import { getCurrentUser } from '@/lib/auth';
 import { SHOWCASE_MEETING } from '@/lib/showcase';
 import AudioPlayer from '@/components/AudioPlayer';
-import MeetingNotesView from '@/components/MeetingNotesView';
+import CloudAiMeetingSection from '@/components/CloudAiMeetingSection';
 
 export const revalidate = 0;
 
@@ -156,25 +156,12 @@ export default async function MeetingDetailPage({
           transcripts={transcriptRows}
         />
 
-        {/* AI Notes Section */}
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-6 sm:p-8">
-          <div className="flex items-center justify-between mb-6 pb-3 border-b border-zinc-800/80">
-            <h2 className="text-sm sm:text-base font-semibold text-zinc-100 flex items-center gap-2">
-              <svg className="w-4 h-4 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-              </svg>
-              Notulen & Ringkasan Rapat
-            </h2>
-            <span className="text-[10px] uppercase font-mono text-zinc-500">
-              Model: Whisper + LLM
-            </span>
-          </div>
-
-          <MeetingNotesView content={notes?.enhanced || notes?.mine || ''} />
-        </div>
+        <CloudAiMeetingSection
+          meetingId={id}
+          initialContent={notes?.enhanced || notes?.mine || ''}
+          transcripts={transcriptRows}
+          readOnly={isShowcase}
+        />
       </div>
     </div>
   );

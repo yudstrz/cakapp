@@ -31,9 +31,16 @@ const api: CakappApi = {
   ai: {
     getConfig: () => ipcRenderer.invoke('ai:get-config'),
     setConfig: (config) => ipcRenderer.invoke('ai:set-config', config),
-    setKey: (provider, key) => ipcRenderer.invoke('ai:set-key', provider, key),
-    clearKey: (provider) => ipcRenderer.invoke('ai:clear-key', provider),
+    getModels: (opts) => ipcRenderer.invoke('ai:get-models', opts),
+    getUsage: () => ipcRenderer.invoke('ai:get-usage'),
+    setByokKey: (provider, key) => ipcRenderer.invoke('ai:set-byok-key', provider, key),
+    clearByokKey: (provider) => ipcRenderer.invoke('ai:clear-byok-key', provider),
     testConnection: (provider) => ipcRenderer.invoke('ai:test-connection', provider),
+    onFallback: (cb) => {
+      const on = (_e: unknown, reason: string) => cb(reason)
+      ipcRenderer.on('ai:fallback-notice', on)
+      return () => { ipcRenderer.removeListener('ai:fallback-notice', on) }
+    },
   },
   setup: {
     state: () => ipcRenderer.invoke('setup:state'),

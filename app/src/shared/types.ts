@@ -56,16 +56,41 @@ export type CakappApi = {
   ai: {
     getConfig(): Promise<{
       mode: 'local' | 'cloud'
-      activeProvider: string
-      hasKey: Record<string, boolean>
-      maskedKeys: Record<string, string>
-      models: Record<string, string>
+      activeProvider: 'gemini' | 'openai' | 'anthropic'
+      models: Record<'gemini' | 'openai' | 'anthropic' | 'local', string>
+      baseUrl: string
+      byok: {
+        hasKey: Record<'gemini' | 'openai' | 'anthropic', boolean>
+        maskedKeys: Record<'gemini' | 'openai' | 'anthropic', string>
+      }
       fallbackAvailable: boolean
     }>
     setConfig(config: { mode?: 'local' | 'cloud'; activeProvider?: string; model?: string }): Promise<any>
-    setKey(provider: string, key: string): Promise<any>
-    clearKey(provider: string): Promise<any>
+    getModels(opts?: { force?: boolean; provider?: string }): Promise<{
+      ok: boolean
+      models: Record<'gemini' | 'openai' | 'anthropic', Array<{ id: string; label: string; tier: 'hemat' | 'standar' | 'premium'; default?: boolean; provider: 'gemini' | 'openai' | 'anthropic' }>>
+      allowPremium?: boolean
+      config?: any
+      error?: string
+    }>
+    getUsage(): Promise<{
+      ok: boolean
+      usage?: {
+        tier: 'free' | 'pro'
+        usedRequests: number
+        limitRequests: number
+        remainingRequests: number
+        usedInputTokens: number
+        limitInputTokens: number
+        remainingInputTokens: number
+        resetAt: string
+      }
+      error?: string
+    }>
+    setByokKey(provider: string, key: string): Promise<any>
+    clearByokKey(provider: string): Promise<any>
     testConnection(provider: string): Promise<{ ok: boolean; message?: string; error?: string }>
+    onFallback(cb: (reason: string) => void): () => void
   }
   setup: {
     state(): Promise<SetupState>

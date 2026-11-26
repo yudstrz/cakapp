@@ -1,157 +1,355 @@
-import { loadAppEnv } from './env'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { BrowserWindow, safeStorage } from 'electron'
 import type { Llm } from './notes/enhance'
+import { userDataDir } from './paths'
+import { aiKeyStore, getAiApiBaseUrl } from './aiKeyStore'
+import { buildByokHeaders } from './byokKey'
 import { globalAiManager } from '../engine/providers/manager'
+import {
+  CloudProxyClientError,
+  formatFallbackNotice,
+  reconcileVerifiedModel,
+} from '../engine/providers/gemini'
+import type {
+  AiUsageSnapshot,
+  CloudProviderId,
+  VerifiedModelInfo,
+} from '../engine/providers/types'
 
-loadAppEnv()
+let cachedModelsMap: Record<CloudProviderId, VerifiedModelInfo[]> | null = null
+let cachedModelsAt = 0
+const CLIENT_MODELS_TTL_MS = 5 * 60_000
 
-export function getCloudAiKeys() {
-  const cfg = globalAiManager.getConfig()
-  const agentKey = process.env.AGENT_API_KEY || process.env.FLASH_MODEL_API_KEY || cfg.keys.agnes || ''
-  const openaiKey = cfg.keys.openai || process.env.OPENAI_API_KEY || ''
-  const geminiKey = cfg.keys.gemini || process.env.GEMINI_API_KEY || ''
-  const claudeKey = cfg.keys.claude || process.env.CLAUDE_API_KEY || ''
-  const agentBaseUrl = process.env.AGENT_API_BASE_URL || 'https://api.openai.com/v1'
-  const agentModel = process.env.AGENT_MODEL_ID || 'gemini-2.0-flash-lite'
-  const defaultProvider = cfg.mode === 'local' ? 'local' : cfg.activeProvider
-
-  return { agentKey, openaiKey, geminiKey, claudeKey, agentBaseUrl, agentModel, defaultProvider }
+export function emitAiFallbackNotice(reason: string): void {
+  try {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send('ai:fallback-notice', reason)
+      }
+    }
+  } catch {
+    // Ignore when running outside Electron window context (tests).
+  }
 }
 
-export function isCloudAiAvailable(): boolean {
-  const cfg = globalAiManager.getConfig()
-  if (cfg.mode === 'local') return false
-  const active = globalAiManager.getActiveProvider()
-  if (active.id === 'local') return false
-  return Boolean(active.isAvailable())
-}
+async function buildDesktopAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {}
 
-/**
- * Panggil Provider AI aktif dengan fallback berantai:
- * Aktif -> Gemini -> OpenAI -> Claude -> Agnes -> Local
- */
-export async function askAgnesOrFallback(
-  prompt: string,
-  onToken?: (token: string) => void,
-  signal?: AbortSignal
-): Promise<string> {
-  const active = globalAiManager.getActiveProvider()
-
-  // 1. Coba provider aktif jika bukan local
-  if (active.id !== 'local' && active.isAvailable()) {
-    try {
-      console.info(`[Cloud AI] Memanggil provider utama: ${active.name}...`)
-      return await active.streamChat({
-        messages: [{ role: 'user', content: prompt }],
-        onToken,
-        signal,
-      })
-    } catch (err: unknown) {
-      if (signal?.aborted) throw err
-      console.warn(`[Cloud AI] ${active.name} gagal, mengaktifkan Smart Fallback:`, err instanceof Error ? err.message : String(err))
+  try {
+    const { getBetterAuthClient } = await import('./betterAuthClient')
+    const client = getBetterAuthClient() as unknown as { getCookie?: () => string }
+    const cookie = client.getCookie?.()
+    if (cookie) {
+      headers.Cookie = cookie
+      return headers
     }
+  } catch {
+    // Fallback to Neon session token if BetterAuth client is not initialized.
   }
 
-  const { agentKey, openaiKey, geminiKey, claudeKey, agentBaseUrl, agentModel } = getCloudAiKeys()
-
-  // 2. Fallback ke Google Gemini
-  if (geminiKey && active.id !== 'gemini') {
-    try {
-      console.info('[Cloud AI] Fallback: Memanggil Gemini...')
-      const gemini = globalAiManager.getProvider('gemini')
-      return await gemini.streamChat({
-        messages: [{ role: 'user', content: prompt }],
-        onToken,
-        signal,
-      })
-    } catch (err: unknown) {
-      if (signal?.aborted) throw err
-      console.warn('[Cloud AI] Gemini fallback error:', err instanceof Error ? err.message : String(err))
-    }
-  }
-
-  // 3. Fallback ke OpenAI
-  if (openaiKey && active.id !== 'openai') {
-    try {
-      console.info('[Cloud AI] Fallback: Memanggil OpenAI...')
-      const openai = globalAiManager.getProvider('openai')
-      return await openai.streamChat({
-        messages: [{ role: 'user', content: prompt }],
-        onToken,
-        signal,
-      })
-    } catch (err: unknown) {
-      if (signal?.aborted) throw err
-      console.warn('[Cloud AI] OpenAI fallback error:', err instanceof Error ? err.message : String(err))
-    }
-  }
-
-  // 4. Fallback ke Anthropic Claude
-  if (claudeKey && active.id !== 'claude') {
-    try {
-      console.info('[Cloud AI] Fallback: Memanggil Claude...')
-      const claude = globalAiManager.getProvider('claude')
-      return await claude.streamChat({
-        messages: [{ role: 'user', content: prompt }],
-        onToken,
-        signal,
-      })
-    } catch (err: unknown) {
-      if (signal?.aborted) throw err
-      console.warn('[Cloud AI] Claude fallback error:', err instanceof Error ? err.message : String(err))
-    }
-  }
-
-  // 5. Fallback ke Agnes AI jika ada
-  if (agentKey) {
-    try {
-      console.info('[Cloud AI] Fallback: Memanggil Agnes AI...')
-      const resp = await fetch(`${agentBaseUrl.replace(/\/+$/, '')}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${agentKey}`,
-        },
-        body: JSON.stringify({
-          model: agentModel,
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.2,
-        }),
-        signal,
-      })
-
-      if (resp.ok) {
-        const data = (await resp.json()) as { choices?: Array<{ message?: { content?: string } }> }
-        const text = data.choices?.[0]?.message?.content?.trim()
-        if (text) {
-          if (onToken) onToken(text)
-          return text
+  try {
+    const sessionFile = join(userDataDir(), 'auth-session.bin')
+    if (existsSync(sessionFile) && safeStorage?.isEncryptionAvailable?.()) {
+      const stored = JSON.parse(safeStorage.decryptString(readFileSync(sessionFile))) as Record<string, string>
+      if (stored.neon_session) {
+        const parsed = JSON.parse(stored.neon_session) as { token?: string }
+        if (parsed.token) {
+          headers.Authorization = `Bearer ${parsed.token}`
         }
       }
-    } catch (err: unknown) {
-      if (signal?.aborted) throw err
+    }
+  } catch {
+    // Unauthenticated guest session; server will return 401 and trigger Local AI fallback.
+  }
+
+  return headers
+}
+
+export async function fetchVerifiedCloudModels(opts: { force?: boolean; provider?: CloudProviderId } = {}): Promise<{
+  models: Record<CloudProviderId, VerifiedModelInfo[]>
+  allowPremium: boolean
+}> {
+  const activeProv = opts.provider ?? aiKeyStore.getPublicConfig().activeProvider
+  const byokHeaders = buildByokHeaders(activeProv)
+  const hasByok = Object.keys(byokHeaders).length > 0
+
+  if (!opts.force && !hasByok && cachedModelsMap && Date.now() - cachedModelsAt < CLIENT_MODELS_TTL_MS) {
+    return { models: cachedModelsMap, allowPremium: false }
+  }
+
+  const authHeaders = await buildDesktopAuthHeaders()
+  const resp = await fetch(`${getAiApiBaseUrl()}/api/ai/models`, {
+    method: 'GET',
+    headers: { ...authHeaders, ...byokHeaders },
+  })
+
+  if (!resp.ok) {
+    const body = (await resp.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null
+    throw new CloudProxyClientError(
+      body?.error?.code || 'PROVIDER_ERROR',
+      body?.error?.message || `Gagal memuat daftar model (${resp.status}).`,
+      resp.status
+    )
+  }
+
+  const data = (await resp.json()) as {
+    models: Record<CloudProviderId, VerifiedModelInfo[]>
+    allowPremium?: boolean
+  }
+
+  if (!hasByok) {
+    cachedModelsMap = data.models
+    cachedModelsAt = Date.now()
+  }
+
+  const pub = aiKeyStore.getPublicConfig()
+  for (const p of ['gemini', 'openai', 'anthropic'] as const) {
+    const reconciled = reconcileVerifiedModel(pub.models[p], data.models[p] ?? [])
+    if (reconciled !== pub.models[p]) {
+      aiKeyStore.setModel(p, reconciled)
     }
   }
 
-  // 6. Terakhir: Smart Fallback ke Local Provider
-  console.info('[Cloud AI] Seluruh Cloud AI gagal/tidak tersedia. Menjalankan Smart Fallback ke AI Lokal.')
-  const local = globalAiManager.getProvider('local')
-  return local.streamChat({
-    messages: [{ role: 'user', content: prompt }],
-    onToken,
-    signal,
-  })
+  return { models: data.models, allowPremium: Boolean(data.allowPremium) }
 }
 
-export function createCloudLlm(signal?: AbortSignal): Llm {
+export async function fetchCloudUsage(): Promise<AiUsageSnapshot> {
+  const authHeaders = await buildDesktopAuthHeaders()
+  const resp = await fetch(`${getAiApiBaseUrl()}/api/ai/usage`, {
+    method: 'GET',
+    headers: authHeaders,
+  })
+  if (!resp.ok) {
+    const body = (await resp.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null
+    throw new CloudProxyClientError(
+      body?.error?.code || 'PROVIDER_ERROR',
+      body?.error?.message || `Gagal memuat kuota harian (${resp.status}).`,
+      resp.status
+    )
+  }
+  return (await resp.json()) as AiUsageSnapshot
+}
+
+export async function testCloudHealth(provider: CloudProviderId): Promise<{
+  ok: boolean
+  message?: string
+  error?: string
+}> {
+  try {
+    const authHeaders = await buildDesktopAuthHeaders()
+    const byokHeaders = buildByokHeaders(provider)
+    const resp = await fetch(`${getAiApiBaseUrl()}/api/ai/health`, {
+      method: 'GET',
+      headers: { ...authHeaders, ...byokHeaders },
+    })
+
+    const data = (await resp.json().catch(() => null)) as {
+      ok?: boolean
+      killSwitch?: boolean
+      providers?: Record<
+        string,
+        { configured?: boolean; defaultModel?: string; defaultModelReady?: boolean; availableModels?: number }
+      >
+      error?: { message?: string }
+    } | null
+
+    if (!resp.ok) {
+      return { ok: false, error: data?.error?.message || `Uji koneksi gagal (${resp.status}).` }
+    }
+    if (data?.killSwitch) {
+      return { ok: false, error: 'Layanan Cloud AI sedang dinonaktifkan sementara oleh pemilik.' }
+    }
+    const pInfo = data?.providers?.[provider]
+    if (!pInfo?.configured) {
+      return { ok: false, error: `Provider ${provider} belum dikonfigurasi di server.` }
+    }
+    if (!pInfo.availableModels) {
+      return { ok: false, error: `Tidak ada model aktif untuk ${provider} saat ini.` }
+    }
+    if (!pInfo.defaultModelReady) {
+      return {
+        ok: true,
+        message: `Terhubung. Model utama digantikan model aktif cadangan (${pInfo.availableModels} model tersedia).`,
+      }
+    }
+    return {
+      ok: true,
+      message: `Koneksi siap. Model utama (${pInfo.defaultModel}) aktif di provider.`,
+    }
+  } catch {
+    return { ok: false, error: 'Tidak dapat menghubungi server Cloud AI. Periksa koneksi internet Anda.' }
+  }
+}
+
+export async function callVercelAiGenerate(params: {
+  provider: CloudProviderId
+  model: string
+  task: 'notulen' | 'ringkasan'
+  input: string
+  stream?: boolean
+  onToken?: (chunk: string) => void
+  signal?: AbortSignal
+}): Promise<{ text: string; model: string }> {
+  let modelId = params.model
+  if (!modelId) {
+    const { models } = await fetchVerifiedCloudModels({ provider: params.provider })
+    modelId = reconcileVerifiedModel('', models[params.provider] ?? [])
+    if (!modelId) {
+      throw new CloudProxyClientError('MODEL_UNAVAILABLE', `Model untuk ${params.provider} tidak tersedia.`, 503)
+    }
+    aiKeyStore.setModel(params.provider, modelId)
+  }
+
+  const authHeaders = await buildDesktopAuthHeaders()
+  const byokHeaders = buildByokHeaders(params.provider)
+  const stream = params.stream ?? true
+
+  const resp = await fetch(`${getAiApiBaseUrl()}/api/ai/generate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders,
+      ...byokHeaders,
+    },
+    body: JSON.stringify({
+      provider: params.provider,
+      model: modelId,
+      task: params.task,
+      input: params.input,
+      stream,
+    }),
+    signal: params.signal,
+  })
+
+  if (!resp.ok) {
+    const body = (await resp.json().catch(() => null)) as {
+      error?: { code?: string; message?: string; retryAfter?: number }
+    } | null
+    throw new CloudProxyClientError(
+      body?.error?.code || 'PROVIDER_ERROR',
+      body?.error?.message || `Server Cloud AI mengembalikan status ${resp.status}.`,
+      resp.status,
+      body?.error?.retryAfter
+    )
+  }
+
+  if (!stream) {
+    const data = (await resp.json()) as { text?: string; model?: string }
+    const text = data.text ?? ''
+    if (text && params.onToken) params.onToken(text)
+    return { text, model: data.model ?? modelId }
+  }
+
+  if (!resp.body) {
+    throw new CloudProxyClientError('PROVIDER_ERROR', 'Stream respons Cloud AI kosong.', 502)
+  }
+
+  const reader = resp.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let fullText = ''
+  let activeModel = modelId
+  let currentEvent = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+
+    for (const raw of lines) {
+      const line = raw.trim()
+      if (!line) {
+        currentEvent = ''
+        continue
+      }
+      if (line.startsWith('event:')) {
+        currentEvent = line.slice(6).trim()
+        continue
+      }
+      if (!line.startsWith('data:')) continue
+      const payloadStr = line.slice(5).trim()
+      if (!payloadStr) continue
+
+      let parsed: Record<string, unknown>
+      try {
+        parsed = JSON.parse(payloadStr) as Record<string, unknown>
+      } catch {
+        continue
+      }
+
+      if (currentEvent === 'token' && typeof parsed.text === 'string') {
+        fullText += parsed.text
+        params.onToken?.(parsed.text)
+      } else if (currentEvent === 'done' && typeof parsed.model === 'string') {
+        activeModel = parsed.model
+      } else if (currentEvent === 'error') {
+        throw new CloudProxyClientError(
+          typeof parsed.code === 'string' ? parsed.code : 'PROVIDER_ERROR',
+          typeof parsed.message === 'string' ? parsed.message : 'Streaming Cloud AI terputus.',
+          502,
+          typeof parsed.retryAfter === 'number' ? parsed.retryAfter : undefined
+        )
+      }
+    }
+  }
+
+  return { text: fullText, model: activeModel }
+}
+
+globalAiManager.setTransport(callVercelAiGenerate)
+globalAiManager.onFallback((reason) => emitAiFallbackNotice(reason))
+
+export function isCloudAiAvailable(): boolean {
+  return aiKeyStore.getPublicConfig().mode === 'cloud'
+}
+
+export function createCloudLlm(
+  signal?: AbortSignal,
+  getLocalFallback?: () => Promise<Llm | null>
+): Llm {
   return {
     contextSize: 32_768,
     count: async (texts: string[]) => texts.map((t) => Math.ceil(t.length / 4)),
     chat: async (prompt: string, onToken: (t: string) => void, opts) => {
-      let fullPrompt = prompt
+      let fullInput = prompt
       if (opts?.before && opts.before.length > 0) {
-        fullPrompt = `Konteks sebelumnya:\n${opts.before.join('\n')}\n\nTugas:\n${prompt}`
+        fullInput = `Konteks sebelumnya:\n${opts.before.join('\n')}\n\nTugas:\n${prompt}`
       }
-      return askAgnesOrFallback(fullPrompt, onToken, signal)
+      const pub = aiKeyStore.getPublicConfig()
+      const provider = pub.activeProvider
+      const task = opts?.summary ? 'ringkasan' : 'notulen'
+
+      try {
+        const active = globalAiManager.getProvider(provider)
+        return await active.streamChat({
+          messages: [{ role: 'user', content: fullInput }],
+          task,
+          onToken,
+          signal,
+        })
+      } catch (err: unknown) {
+        if (signal?.aborted) throw err
+        const notice = formatFallbackNotice(err)
+        console.warn('[Cloud AI] Beralih otomatis ke AI Lokal:', err instanceof Error ? err.message : String(err))
+        emitAiFallbackNotice(notice)
+
+        if (getLocalFallback) {
+          const localLlm = await getLocalFallback().catch(() => null)
+          if (localLlm) {
+            return localLlm.chat(prompt, onToken, opts)
+          }
+        }
+
+        const local = globalAiManager.getProvider('local')
+        return local.streamChat({
+          messages: [{ role: 'user', content: fullInput }],
+          onToken,
+          signal,
+        })
+      }
     },
     readAhead: async () => {},
   }
