@@ -1,6 +1,7 @@
+<h1 align="center">Cakapp</h1>
+
 <p align="center"><a href="https://maxy.academy"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme-banner-app-dark.webp"><img src="docs/assets/readme-banner-app-light.webp" width="880" alt="Cakapp. AI meeting notes without a bot. The app showing a launch planning meeting with Ask open."></picture></a></p>
 
-<div align="center"><strong>Cakapp</strong></div>
 <div align="center">Cakapp AI Note Taker.<br />Private meeting notes, with no bot in your call.</div>
 <br />
 <div align="center">
@@ -38,7 +39,7 @@ Cakapp is available for [Mac](https://github.com/yudstrz/cakapp/releases/latest/
 
 ## Watch the demo
 
-https://github.com/user-attachments/assets/da16b894-beb1-491a-89e1-fd10666dc9b8
+<https://github.com/user-attachments/assets/da16b894-beb1-491a-89e1-fd10666dc9b8>
 
 ## How it works
 

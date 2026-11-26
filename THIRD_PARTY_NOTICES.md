@@ -17,4 +17,3 @@ Cakapp doesn't ship any models in this repo or the installers. It downloads them
 - Gemma 4 (E2B, E4B, 26B A4B), Qwen3 1.7B and gpt-oss (20B, 120B): Apache-2.0.
 - Whisper (speech to text) and Silero VAD (voice detection): MIT.
 - EmbeddingGemma 300M: provided under and subject to the [Gemma Terms of Use](https://ai.google.dev/gemma/terms).
-
