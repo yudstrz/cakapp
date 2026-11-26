@@ -58,8 +58,8 @@
     "yazl": "3.3.1"
   },
   "productName": "Cakapp",
-  "desktopName": "yogurt.desktop",
+  "desktopName": "cakapp.desktop",
   "description": "Cakapp AI Note Taker",
-  "author": "Frigade",
+  "author": "Maxy Academy",
   "license": "MIT"
 }
