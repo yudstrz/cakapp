@@ -217,6 +217,17 @@ Meeting data stays local; Cakapp goes online for model downloads and update chec
 ## Development
 
 - [Build and run locally](docs/building.md)
+- [Cloud AI Backend Proxy & Quota Guide](docs/AI_BACKEND.md)
+
+### Cloud AI Provider Protection Checklist (Owner)
+
+- [ ] Pasang *spending limit* dan *budget alert* bulanan di konsol Google AI Studio / Google Cloud Billing, OpenAI Platform, dan Anthropic Console.
+- [ ] Gunakan API key khusus untuk aplikasi Cakapp di Vercel Environment Variables (jangan memakai kunci pribadi lintas proyek) agar mudah dicabut sewaktu-waktu.
+- [ ] Rotasi API key secara berkala: buat key baru di konsol provider, perbarui env di Vercel, lakukan redeploy, uji lewat `/api/ai/health`, lalu cabut key lama.
+- [ ] **Pengingat triwulanan (tiap 3 bulan)**: periksa ulang daftar `MODEL_SEED` dan harga token di `web/src/lib/ai/models.ts` mengacu ke halaman resmi tiap provider:
+  - Google Gemini: <https://ai.google.dev/models>
+  - OpenAI: <https://developers.openai.com/api/docs/models>
+  - Anthropic: <https://platform.claude.com/docs/en/models/overview>
 
 ---
 

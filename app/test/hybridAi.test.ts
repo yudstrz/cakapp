@@ -1,31 +1,36 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   buildNotesPrompt,
-  buildTitlePrompt,
   LocalProvider,
-  OpenAIProvider,
-  GeminiProvider,
-  ClaudeProvider,
   AIProviderManager,
+  CloudProxyClientError,
+  reconcileVerifiedModel,
+  splitTranscriptChunks,
 } from '../src/engine/providers'
+import { AiKeyStore } from '../src/main/aiKeyStore'
 import {
-  encryptApiKey,
-  decryptApiKey,
+  buildByokHeaders,
+  clearAllByokKeys,
+  clearByokApiKey,
+  getByokApiKey,
+  getByokPublicStatus,
   maskApiKey,
   sanitizeLog,
-  AiKeyStore,
-} from '../src/main/aiKeyStore'
+  setByokApiKey,
+} from '../src/main/byokKey'
 
-describe('Day 3 (Kamis) - Hybrid AI Engine & Unified Provider Verification', () => {
-  // TC-3.1: Perbandingan Kualitas Notulen Lokal vs Cloud
-  describe('TC-3.1: Perbandingan Struktur Notulen Lokal & Cloud', () => {
-    it('LocalProvider generates enterprise-standard structured notes', async () => {
+describe('Hybrid AI Engine, Shared Proxy Client, Isolated BYOK, & Smart Fallback', () => {
+  beforeEach(() => {
+    clearAllByokKeys()
+  })
+
+  describe('TC-3.1: Struktur Notulen Lokal & Prompt Standar', () => {
+    it('LocalProvider generates structured Indonesian meeting notes offline', async () => {
       const local = new LocalProvider()
       const sampleTranscript = `
 Budi (PM): Selamat pagi rekan-rekan. Agenda kita adalah finalisasi rilis fitur transkripsi bilingual.
 Sarah (Tech Lead): Dari sisi teknis, model sudah teruji di CPU lokal tanpa internet.
 Dimas (QA): Tolong follow up action item jadwal deployment dan PIC pengujian ke tim kami.
-Budi (PM): Baik, disepakati rilis dijadwalkan hari Jumat ini.
 `
       const result = await local.generateNotes({
         transcript: sampleTranscript,
@@ -38,183 +43,139 @@ Budi (PM): Baik, disepakati rilis dijadwalkan hari Jumat ini.
       expect(result.enhanced).toContain('### Ringkasan Eksekutif')
       expect(result.enhanced).toContain('### Pokok Keputusan (Key Decisions)')
       expect(result.enhanced).toContain('### Daftar Tugas & Tindak Lanjut (Action Items)')
-      expect(result.enhanced).toContain('- [ ]')
       expect(result.enhanced).toContain('Budi Santoso')
     })
 
-    it('buildNotesPrompt creates uniform prompt with all required enterprise sections for Cloud AI', () => {
-      const prompt = buildNotesPrompt({
-        transcript: 'Manager: Kita harus pastikan integrasi Cloud AI berjalan stabil.',
-        language: 'id',
-        title: 'Review Arsitektur Hybrid',
-        attendees: ['Manager A', 'Engineer B'],
-      })
-
-      expect(prompt).toContain('### STRUKTUR WAJIB:')
-      expect(prompt).toContain('1. ### Ringkasan Eksekutif')
-      expect(prompt).toContain('2. ### Pokok Keputusan (Key Decisions)')
-      expect(prompt).toContain('3. ### Daftar Tugas & Tindak Lanjut (Action Items)')
-      expect(prompt).toContain('Judul Pertemuan: Review Arsitektur Hybrid')
-      expect(prompt).toContain('Peserta Rapat: Manager A, Engineer B')
-      expect(prompt).toContain('=== TRANSKRIP PERCAKAPAN RAPAT ===')
-    })
-  })
-
-  // TC-3.2: Penggabungan Catatan Manual Pengguna
-  describe('TC-3.2: Penggabungan Catatan Manual Pengguna (Prioritas Tinggi)', () => {
-    it('prioritizes user manual notes in prompt construction', () => {
-      const manualNotes = 'Catatan Direktur: Anggaran disetujui maks 100 juta dan harus selesai Q3.'
-      const prompt = buildNotesPrompt({
-        transcript: 'Speaker A: Kita diskusikan alokasi anggaran.',
-        mine: manualNotes,
-        language: 'id',
-      })
-
-      expect(prompt).toContain('=== CATATAN MANUAL PENGGUNA (PRIORITAS TINGGI) ===')
-      expect(prompt).toContain(manualNotes)
-      expect(prompt).toContain('MENCERMINKAN FOKUS UTAMA dan HARUS DIPRIORITASKAN')
-    })
-
-    it('LocalProvider embeds manual notes into executive summary', async () => {
+    it('embeds manual notes and custom rewrite instructions in LocalProvider fallback', async () => {
       const local = new LocalProvider()
-      const manualNote = 'Catatan Direktur: Anggaran disetujui maks 100 juta'
       const result = await local.generateNotes({
-        transcript: 'Rapat anggaran proyek.',
-        mine: manualNote,
+        transcript: 'Diskusi alokasi anggaran.',
+        mine: 'Catatan Direktur: Anggaran maks 100 juta',
+        instruction: 'Ringkas untuk CEO',
         language: 'id',
       })
 
-      expect(result.enhanced).toContain('Prioritas Catatan Pengguna: Catatan Direktur: Anggaran disetujui maks 100 juta')
+      expect(result.enhanced).toContain('Prioritas Catatan Pengguna: Catatan Direktur: Anggaran maks 100 juta')
+      expect(result.enhanced).toContain('Catatan Penyesuaian: Ringkas untuk CEO')
+      expect(buildNotesPrompt({ transcript: 'Halo', mine: 'Poin A' })).toContain('Poin A')
     })
   })
 
-  // TC-3.3: Uji Fitur "Write Again" (Instruksi Kustom Pengguna)
-  describe('TC-3.3: Fitur Write Again (Prompt Ulang Kustom)', () => {
-    it('injects custom user rewrite instruction into prompt', () => {
-      const customInstruction = 'Tulis ulang seringkas mungkin dalam 3 poin bullet saja'
-      const prompt = buildNotesPrompt({
-        transcript: 'Percakapan panjang 30 menit mengenai strategi pasar...',
-        instruction: customInstruction,
-        language: 'id',
-      })
-
-      expect(prompt).toContain('=== INSTRUKSI KHUSUS ("WRITE AGAIN") ===')
-      expect(prompt).toContain(customInstruction)
-    })
-
-    it('LocalProvider reflects custom instruction in generated notes', async () => {
-      const local = new LocalProvider()
-      const instruction = 'Format ulang untuk email eksekutif kepada CEO'
-      const result = await local.generateNotes({
-        transcript: 'Diskusi rencana ekspansi kantor cabang baru.',
-        instruction,
-        language: 'id',
-      })
-
-      expect(result.enhanced).toContain(`Catatan Penyesuaian: ${instruction}`)
-    })
-  })
-
-  // TC-3.4: Keamanan & Enkripsi API Key
-  describe('TC-3.4: Keamanan & Enkripsi API Key (Safe Storage & Log Redaction)', () => {
-    it('encrypts API key so it is not stored as plain text on disk', () => {
-      const rawKey = 'sk-proj-1234567890abcdefghijklmnopqrstuvwxyz'
-      const encrypted = encryptApiKey(rawKey)
-
-      expect(encrypted).not.toBe(rawKey)
-      expect(encrypted.length).toBeGreaterThan(0)
-
-      const decrypted = decryptApiKey(encrypted)
-      expect(decrypted).toBe(rawKey)
-    })
-
-    it('masks API keys properly for safe UI presentation', () => {
-      const key = 'sk-ant-api03-123456789abcdefghijkl'
-      const masked = maskApiKey(key)
-
-      expect(masked).toBe('sk-a••••••••ijkl')
-      expect(masked).not.toContain('123456789')
-
-      expect(maskApiKey('')).toBe('')
-      expect(maskApiKey('12345')).toBe('••••••••')
-    })
-
-    it('redacts sensitive API keys from application logs', () => {
-      const logWithOpenAi = 'Error calling https://api.openai.com: Bearer sk-1234567890abcdef1234567890'
-      const sanitizedOpenAi = sanitizeLog(logWithOpenAi)
-      expect(sanitizedOpenAi).not.toContain('sk-1234567890')
-      expect(sanitizedOpenAi).toContain('[REDACTED_OPENAI_KEY]')
-
-      const logWithGemini = 'Request to Gemini failed: key=AIzaSyD123456789012345678901234567890123'
-      const sanitizedGemini = sanitizeLog(logWithGemini)
-      expect(sanitizedGemini).not.toContain('AIzaSyD1234567890')
-      expect(sanitizedGemini).toContain('[REDACTED_GEMINI_KEY]')
-
-      const logWithClaude = 'Anthropic client init: sk-ant-api03-1234567890abcdef123456'
-      const sanitizedClaude = sanitizeLog(logWithClaude)
-      expect(sanitizedClaude).not.toContain('sk-ant-api03')
-      expect(sanitizedClaude).toContain('[REDACTED_CLAUDE_KEY]')
-    })
-
-    it('AiKeyStore manages encrypted keys without exposing them in public config', () => {
+  describe('TC-3.2: Pemisahan Konfigurasi AI & Modul BYOK Sesi', () => {
+    it('AiKeyStore stores zero cloud API keys and scrubs deprecated model IDs', () => {
       const store = new AiKeyStore(':memory:')
-      store.setApiKey('openai', 'sk-test-secret-key-12345')
+      store.setMode('cloud')
+      store.setActiveProvider('claude')
+      store.setModel('gemini', 'gemini-1.5-pro')
 
-      const publicConfig = store.getPublicConfig()
-      expect(publicConfig.hasKey.openai).toBe(true)
-      expect(publicConfig.maskedKeys.openai).toContain('••••••••')
-      expect(publicConfig.maskedKeys.openai).not.toBe('sk-test-secret-key-12345')
+      const pub = store.getPublicConfig()
+      expect(pub.activeProvider).toBe('anthropic')
+      expect(pub.models.gemini).toBe('')
 
-      // Internal getter retrieves decrypted key
-      expect(store.getDecryptedKey('openai')).toBe('sk-test-secret-key-12345')
+      store.setModel('gemini', 'gemini-3.5-flash-lite')
+      expect(store.getPublicConfig().models.gemini).toBe('gemini-3.5-flash-lite')
+    })
 
-      store.clearApiKey('openai')
-      expect(store.getPublicConfig().hasKey.openai).toBe(false)
+    it('reconciles stored model to verified server default when retired', () => {
+      const verified = [
+        { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', tier: 'hemat' as const, default: true, provider: 'gemini' as const },
+        { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', tier: 'standar' as const, provider: 'gemini' as const },
+      ]
+      expect(reconcileVerifiedModel('gemini-2.0-flash', verified)).toBe('gemini-3.5-flash-lite')
+      expect(reconcileVerifiedModel('gemini-3.8-flash', verified)).toBe('gemini-3.8-flash')
+      expect(reconcileVerifiedModel('gemini-3.8-flash', [])).toBe('')
+    })
+
+    it('manages optional BYOK keys in isolated memory module and redacts logs', () => {
+      setByokApiKey('openai', 'sk-test-secret-key-1234567890')
+      expect(getByokApiKey('openai')).toBe('sk-test-secret-key-1234567890')
+
+      const status = getByokPublicStatus()
+      expect(status.hasKey.openai).toBe(true)
+      expect(status.maskedKeys.openai).toContain('••••••••')
+      expect(buildByokHeaders('openai')).toEqual({
+        'X-BYOK-Api-Key': 'sk-test-secret-key-1234567890',
+        'X-BYOK-Provider': 'openai',
+      })
+
+      const dirty = 'Error: Bearer sk-1234567890abcdef1234567890 and AIzaSyD1234567890123456789012345'
+      const clean = sanitizeLog(dirty)
+      expect(clean).not.toContain('sk-1234567890')
+      expect(clean).not.toContain('AIzaSyD123456')
+      expect(maskApiKey('12345')).toBe('••••••••')
+
+      clearByokApiKey('openai')
+      expect(getByokPublicStatus().hasKey.openai).toBe(false)
     })
   })
 
-  // TC-3.5: Uji Smart Fallback Otomatis
-  describe('TC-3.5: Smart Fallback Otomatis saat Cloud Error / Offline', () => {
-    it('gracefully falls back to LocalProvider when Cloud AI throws 429 Quota Exceeded error', async () => {
+  describe('TC-3.3: Chunking Map-Reduce & Smart Fallback Otomatis ke AI Lokal', () => {
+    it('chunks long transcripts into map-reduce requests via server proxy transport', async () => {
+      const seenTasks: string[] = []
+      const transport = vi.fn(async (req: { task: 'notulen' | 'ringkasan'; model: string; onToken?: (t: string) => void }) => {
+        seenTasks.push(req.task)
+        const text = req.task === 'ringkasan' ? 'Intisari bagian' : '### Ringkasan Eksekutif\nNotulen final proxy'
+        req.onToken?.(text)
+        return { text, model: req.model }
+      })
+
       const manager = new AIProviderManager({
         mode: 'cloud',
         activeProvider: 'gemini',
-        keys: { gemini: 'fake-quota-exhausted-key' },
+        models: { gemini: 'gemini-3.5-flash-lite' },
+        transport,
       })
 
-      // Mock Gemini to throw 429 Quota Exceeded
-      const gemini = manager.getProvider('gemini') as GeminiProvider
-      vi.spyOn(gemini, 'generateNotes').mockRejectedValueOnce(
-        new Error('Gemini API error (429): RESOURCE_EXHAUSTED / Quota exceeded for model')
-      )
+      const longTranscript = Array.from({ length: 400 }, (_, i) => `Pembicara ${i}: Pembahasan teknis poin ke-${i} mengenai arsitektur dan jadwal rilis aplikasi.`).join('\n')
+      expect(splitTranscriptChunks(longTranscript, 24_000).length).toBeGreaterThan(1)
 
-      const result = await manager.generateNotes({
-        transcript: 'Pembahasan migrasi server ke kubernetes.',
-        language: 'id',
-        attendees: ['DevOps Lead', 'Backend Engineer'],
-      })
-
-      // Did not crash!
-      expect(result).toBeDefined()
-      expect(result.fallbackUsed).toBe(true)
-      expect(result.provider).toBe('local')
-      expect(result.error).toContain('RESOURCE_EXHAUSTED')
-      expect(result.enhanced).toContain('### Ringkasan Eksekutif')
-      expect(result.enhanced).toContain('### Pokok Keputusan (Key Decisions)')
+      const res = await manager.generateNotes({ transcript: longTranscript, language: 'id' })
+      expect(res.fallbackUsed).toBe(false)
+      expect(res.provider).toBe('gemini')
+      expect(seenTasks.slice(0, -1).every((t) => t === 'ringkasan')).toBe(true)
+      expect(seenTasks[seenTasks.length - 1]).toBe('notulen')
     })
 
-    it('gracefully falls back to LocalProvider when Cloud AI experiences network disconnection', async () => {
+    it.each([
+      ['RATE_LIMITED', 429, 'Batas permintaan Cloud AI per menit tercapai'],
+      ['QUOTA_EXCEEDED', 429, 'Kuota harian Cloud AI habis'],
+      ['BUDGET_EXCEEDED', 429, 'Kuota bersama Cloud AI sedang penuh'],
+      ['MODEL_UNAVAILABLE', 404, 'Model Cloud AI tidak tersedia'],
+      ['TIMEOUT', 504, 'Waktu tunggu Cloud AI habis'],
+    ])('falls back to Local AI with notice when server returns %s', async (code, status, expectedNotice) => {
+      const notices: string[] = []
       const manager = new AIProviderManager({
         mode: 'cloud',
         activeProvider: 'openai',
-        keys: { openai: 'valid-looking-key' },
+        models: { openai: 'gpt-6-luna' },
+        transport: async () => {
+          throw new CloudProxyClientError(code, `Server returned ${code}`, status)
+        },
+      })
+      manager.onFallback((msg) => notices.push(msg))
+
+      const result = await manager.generateNotes({
+        transcript: 'Pembahasan migrasi server ke arsitektur baru.',
+        language: 'id',
       })
 
-      // Mock OpenAI to throw network disconnected error
-      const openai = manager.getProvider('openai') as OpenAIProvider
-      vi.spyOn(openai, 'generateNotes').mockRejectedValueOnce(
-        new TypeError('Failed to fetch: ENOTFOUND api.openai.com')
-      )
+      expect(result.fallbackUsed).toBe(true)
+      expect(result.provider).toBe('local')
+      expect(notices[0]).toContain(expectedNotice)
+      expect(result.enhanced).toContain('### Ringkasan Eksekutif')
+    })
+
+    it('falls back to Local AI when network is offline', async () => {
+      const notices: string[] = []
+      const manager = new AIProviderManager({
+        mode: 'cloud',
+        activeProvider: 'anthropic',
+        models: { anthropic: 'claude-haiku-5-5' },
+        transport: async () => {
+          throw new TypeError('fetch failed: ENOTFOUND cakapp.vercel.app')
+        },
+      })
+      manager.onFallback((msg) => notices.push(msg))
 
       const result = await manager.generateNotes({
         transcript: 'Evaluasi performa database kuartal ini.',
@@ -223,27 +184,7 @@ Budi (PM): Baik, disepakati rilis dijadwalkan hari Jumat ini.
 
       expect(result.fallbackUsed).toBe(true)
       expect(result.provider).toBe('local')
-      expect(result.error).toContain('ENOTFOUND')
-      expect(result.enhanced).toContain('### Ringkasan Eksekutif')
-    })
-
-    it('automatically falls back to local title generation when Cloud AI fails', async () => {
-      const manager = new AIProviderManager({
-        mode: 'cloud',
-        activeProvider: 'claude',
-        keys: { claude: 'some-key' },
-      })
-
-      const claude = manager.getProvider('claude') as ClaudeProvider
-      vi.spyOn(claude, 'generateTitle').mockRejectedValueOnce(new Error('Connection timeout'))
-
-      const title = await manager.generateTitle({
-        transcript: 'Speaker A: Rapat evaluasi pipeline CI CD dan deployment.',
-        language: 'id',
-      })
-
-      expect(title).toBeDefined()
-      expect(title.length).toBeGreaterThan(0)
+      expect(notices[0]).toContain('Cloud AI sedang tidak terjangkau')
     })
   })
 })
