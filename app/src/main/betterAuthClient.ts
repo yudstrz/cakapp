@@ -47,9 +47,12 @@ function createSafeBetterAuthStorage() {
   return (cachedStorage ??= buildSafeBetterAuthStorage())
 }
 
+export const DEFAULT_PRODUCTION_URL = 'https://cakapp.vercel.app'
+
 export function getBetterAuthBaseUrl(): string {
   loadAppEnv()
-  return (process.env.BETTER_AUTH_URL || process.env.WEB_PORTAL_URL || 'http://localhost:3000').replace(/\/+$/, '')
+  const fallback = app?.isPackaged ? DEFAULT_PRODUCTION_URL : 'http://localhost:3000'
+  return (process.env.BETTER_AUTH_URL || process.env.WEB_PORTAL_URL || fallback).replace(/\/+$/, '')
 }
 
 function getElectronOptions() {

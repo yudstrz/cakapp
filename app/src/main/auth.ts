@@ -2,7 +2,7 @@ import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypt
 import { createServer } from 'node:http'
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { ipcMain, type SafeStorage } from 'electron'
+import { app, ipcMain, type SafeStorage } from 'electron'
 import { loadAppEnv } from './env'
 import { getNeonClient, isNeonConfigured } from './neon'
 
@@ -95,7 +95,8 @@ export function hookAuth(d: {
   const getSupabaseUrl = () => process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || ''
   const getSupabaseAnonKey = () => process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || ''
   const hasSupabase = () => !!getSupabaseUrl() && !!getSupabaseAnonKey()
-  const hasBetterAuth = () => !!(process.env.BETTER_AUTH_URL || process.env.WEB_PORTAL_URL)
+  const defaultPortalUrl = () => (app?.isPackaged ? 'https://cakapp.vercel.app' : 'http://localhost:3000')
+  const hasBetterAuth = () => Boolean(process.env.BETTER_AUTH_URL || process.env.WEB_PORTAL_URL || app?.isPackaged)
   const hasNeon = () => isNeonConfigured()
   const configured = () => hasBetterAuth() || hasNeon() || hasSupabase()
   const secureStorage = () => d.safeStorage.isEncryptionAvailable() &&
@@ -138,7 +139,7 @@ export function hookAuth(d: {
 
   const state = async (): Promise<AuthState> => {
     const isConfigured = configured(), canStoreSecurely = secureStorage()
-    const webPortalUrl = (process.env.BETTER_AUTH_URL || process.env.WEB_PORTAL_URL || 'http://localhost:3000').replace(/\/+$/, '')
+    const webPortalUrl = (process.env.BETTER_AUTH_URL || process.env.WEB_PORTAL_URL || defaultPortalUrl()).replace(/\/+$/, '')
     const google = hasSupabase() || hasBetterAuth()
     if (!isConfigured || !canStoreSecurely) return { configured: isConfigured, secureStorage: canStoreSecurely, user: null, google, webPortalUrl }
 
