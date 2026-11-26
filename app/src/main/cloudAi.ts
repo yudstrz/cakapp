@@ -2,6 +2,7 @@ import dotenv from 'dotenv'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Llm } from './notes/enhance'
+import { globalAiManager } from '../engine/providers/manager'
 
 // Load environment configuration
 for (const envPath of [
@@ -16,37 +17,106 @@ for (const envPath of [
 }
 
 export function getCloudAiKeys() {
-  const agentKey = process.env.AGENT_API_KEY || process.env.FLASH_MODEL_API_KEY || ''
-  const openaiKey = process.env.OPENAI_API_KEY || ''
-  const geminiKey = process.env.GEMINI_API_KEY || ''
+  const cfg = globalAiManager.getConfig()
+  const agentKey = process.env.AGENT_API_KEY || process.env.FLASH_MODEL_API_KEY || cfg.keys.agnes || ''
+  const openaiKey = cfg.keys.openai || process.env.OPENAI_API_KEY || ''
+  const geminiKey = cfg.keys.gemini || process.env.GEMINI_API_KEY || ''
+  const claudeKey = cfg.keys.claude || process.env.CLAUDE_API_KEY || ''
   const agentBaseUrl = process.env.AGENT_API_BASE_URL || 'https://api.openai.com/v1'
   const agentModel = process.env.AGENT_MODEL_ID || 'gemini-2.0-flash-lite'
-  const defaultProvider = process.env.DEFAULT_AI_PROVIDER || (agentKey ? 'agnes' : geminiKey ? 'gemini' : openaiKey ? 'openai' : 'local')
+  const defaultProvider = cfg.mode === 'local' ? 'local' : cfg.activeProvider
 
-  return { agentKey, openaiKey, geminiKey, agentBaseUrl, agentModel, defaultProvider }
+  return { agentKey, openaiKey, geminiKey, claudeKey, agentBaseUrl, agentModel, defaultProvider }
 }
 
 export function isCloudAiAvailable(): boolean {
-  const { agentKey, openaiKey, geminiKey, defaultProvider } = getCloudAiKeys()
-  if (defaultProvider === 'local') return false
-  return !!(agentKey || openaiKey || geminiKey)
+  const cfg = globalAiManager.getConfig()
+  if (cfg.mode === 'local') return false
+  const active = globalAiManager.getActiveProvider()
+  if (active.id === 'local') return false
+  return Boolean(active.isAvailable())
 }
 
 /**
- * Utama: Panggil Agnes AI (Flash Model Tier)
- * Fallback: Gemini 2.0 Flash -> OpenAI gpt-4o-mini
+ * Panggil Provider AI aktif dengan fallback berantai:
+ * Aktif -> Gemini -> OpenAI -> Claude -> Agnes -> Local
  */
 export async function askAgnesOrFallback(
   prompt: string,
   onToken?: (token: string) => void,
   signal?: AbortSignal
 ): Promise<string> {
-  const { agentKey, openaiKey, geminiKey, agentBaseUrl, agentModel } = getCloudAiKeys()
+  const active = globalAiManager.getActiveProvider()
 
-  // 1. Coba Agnes AI terlebih dahulu (Prioritas Utama)
+  // 1. Coba provider aktif jika bukan local
+  if (active.id !== 'local' && active.isAvailable()) {
+    try {
+      console.info(`[Cloud AI] Memanggil provider utama: ${active.name}...`)
+      return await active.streamChat({
+        messages: [{ role: 'user', content: prompt }],
+        onToken,
+        signal,
+      })
+    } catch (err: unknown) {
+      if (signal?.aborted) throw err
+      console.warn(`[Cloud AI] ${active.name} gagal, mengaktifkan Smart Fallback:`, err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  const { agentKey, openaiKey, geminiKey, claudeKey, agentBaseUrl, agentModel } = getCloudAiKeys()
+
+  // 2. Fallback ke Google Gemini
+  if (geminiKey && active.id !== 'gemini') {
+    try {
+      console.info('[Cloud AI] Fallback: Memanggil Gemini...')
+      const gemini = globalAiManager.getProvider('gemini')
+      return await gemini.streamChat({
+        messages: [{ role: 'user', content: prompt }],
+        onToken,
+        signal,
+      })
+    } catch (err: unknown) {
+      if (signal?.aborted) throw err
+      console.warn('[Cloud AI] Gemini fallback error:', err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  // 3. Fallback ke OpenAI
+  if (openaiKey && active.id !== 'openai') {
+    try {
+      console.info('[Cloud AI] Fallback: Memanggil OpenAI...')
+      const openai = globalAiManager.getProvider('openai')
+      return await openai.streamChat({
+        messages: [{ role: 'user', content: prompt }],
+        onToken,
+        signal,
+      })
+    } catch (err: unknown) {
+      if (signal?.aborted) throw err
+      console.warn('[Cloud AI] OpenAI fallback error:', err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  // 4. Fallback ke Anthropic Claude
+  if (claudeKey && active.id !== 'claude') {
+    try {
+      console.info('[Cloud AI] Fallback: Memanggil Claude...')
+      const claude = globalAiManager.getProvider('claude')
+      return await claude.streamChat({
+        messages: [{ role: 'user', content: prompt }],
+        onToken,
+        signal,
+      })
+    } catch (err: unknown) {
+      if (signal?.aborted) throw err
+      console.warn('[Cloud AI] Claude fallback error:', err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  // 5. Fallback ke Agnes AI jika ada
   if (agentKey) {
     try {
-      console.info('[Cloud AI] Menggunakan Agnes AI (Prioritas Utama)...')
+      console.info('[Cloud AI] Fallback: Memanggil Agnes AI...')
       const resp = await fetch(`${agentBaseUrl.replace(/\/+$/, '')}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -68,81 +138,20 @@ export async function askAgnesOrFallback(
           if (onToken) onToken(text)
           return text
         }
-      } else {
-        console.warn(`[Cloud AI] Agnes AI merespons status ${resp.status}, beralih ke fallback Gemini...`)
       }
     } catch (err: unknown) {
       if (signal?.aborted) throw err
-      console.warn('[Cloud AI] Agnes AI request error, beralih ke fallback:', err instanceof Error ? err.message : String(err))
     }
   }
 
-  // 2. Fallback ke Google Gemini 2.0 Flash
-  if (geminiKey) {
-    try {
-      console.info('[Cloud AI] Fallback: Memanggil Gemini 2.0 Flash...')
-      const resp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.2 },
-          }),
-          signal,
-        }
-      )
-
-      if (resp.ok) {
-        const gData = (await resp.json()) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }
-        const text = gData.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
-        if (text) {
-          if (onToken) onToken(text)
-          return text
-        }
-      } else {
-        console.warn(`[Cloud AI] Gemini merespons status ${resp.status}, beralih ke OpenAI fallback...`)
-      }
-    } catch (err: unknown) {
-      if (signal?.aborted) throw err
-      console.warn('[Cloud AI] Gemini error, beralih ke OpenAI:', err instanceof Error ? err.message : String(err))
-    }
-  }
-
-  // 3. Fallback ke OpenAI (gpt-4o-mini)
-  if (openaiKey) {
-    try {
-      console.info('[Cloud AI] Fallback: Memanggil OpenAI gpt-4o-mini...')
-      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${openaiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.2,
-        }),
-        signal,
-      })
-
-      if (resp.ok) {
-        const data = (await resp.json()) as { choices?: Array<{ message?: { content?: string } }> }
-        const text = data.choices?.[0]?.message?.content?.trim()
-        if (text) {
-          if (onToken) onToken(text)
-          return text
-        }
-      }
-    } catch (err: unknown) {
-      if (signal?.aborted) throw err
-      console.warn('[Cloud AI] OpenAI error:', err instanceof Error ? err.message : String(err))
-    }
-  }
-
-  throw new Error('Semua provider AI (Agnes AI, Gemini, OpenAI) gagal menghasilkan respons')
+  // 6. Terakhir: Smart Fallback ke Local Provider
+  console.info('[Cloud AI] Seluruh Cloud AI gagal/tidak tersedia. Menjalankan Smart Fallback ke AI Lokal.')
+  const local = globalAiManager.getProvider('local')
+  return local.streamChat({
+    messages: [{ role: 'user', content: prompt }],
+    onToken,
+    signal,
+  })
 }
 
 export function createCloudLlm(signal?: AbortSignal): Llm {

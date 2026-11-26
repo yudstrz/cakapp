@@ -69,6 +69,7 @@ import { cleanJargon } from '../shared/jargon'
 import { setGenericTitles } from './titles'
 import { installAppMenu } from './appMenu'
 import { hookAuth } from './auth'
+import { hookAiIpc } from './aiIpc'
 import { checkNeonHealth, initNeonSchema, isNeonConfigured, syncMeetingToNeon } from './neon'
 import { isCloudAiAvailable } from './cloudAi'
 import { UtilityEngine } from './engine'
@@ -617,6 +618,7 @@ app.whenReady().then(() => {
     },
     rememberProfile: accountProfile => updateSettings(settingsFile, { accountProfile: accountProfile ?? undefined }),
   })
+  hookAiIpc()
   const getUserId = () => loadSettings(settingsFile).accountProfile?.id ?? null
   setUserIdProvider(getUserId)
   setCalendarSelection(() => loadSettings(settingsFile))

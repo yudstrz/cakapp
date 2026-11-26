@@ -1,5 +1,6 @@
 import { AboutCakapp } from '../components/AboutYogurt'
 import { AuthSettings } from '../components/AuthSettings'
+import { AiSettings } from '../components/AiSettings'
 import { retryToast, toasts } from '../components/TrashToast'
 import { LoadingContent } from '../components/LoadingContent'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -271,6 +272,8 @@ export function Settings({ revision = 0, focus }: { revision?: number; focus?: s
           <AiApps />
 
           <AuthSettings />
+
+          <AiSettings />
 
           <Updates />
           <AboutCakapp />

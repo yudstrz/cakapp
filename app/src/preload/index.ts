@@ -22,6 +22,13 @@ const api: CakappApi = {
     status: () => ipcRenderer.invoke('neon:status'),
     sync: (meetingId) => ipcRenderer.invoke('neon:sync', meetingId),
   },
+  ai: {
+    getConfig: () => ipcRenderer.invoke('ai:get-config'),
+    setConfig: (config) => ipcRenderer.invoke('ai:set-config', config),
+    setKey: (provider, key) => ipcRenderer.invoke('ai:set-key', provider, key),
+    clearKey: (provider) => ipcRenderer.invoke('ai:clear-key', provider),
+    testConnection: (provider) => ipcRenderer.invoke('ai:test-connection', provider),
+  },
   setup: {
     state: () => ipcRenderer.invoke('setup:state'),
     onState: (cb) => {

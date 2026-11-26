@@ -346,15 +346,15 @@ flowchart TD
 
 #### 3. Skenario Pengujian Perusahaan Hari 3 (Enterprise QA Checklist)
 
-* [ ] **TC-3.1 (Perbandingan Kualitas Notulen Lokal vs Cloud):** Uji ringkasan rapat yang sama menggunakan Local LLM (Qwen 3) dan Cloud AI (Gemini 2.0 / GPT-4o). Periksa ketepatan penangkapan Action Items dan daftar PIC (penanggung jawab).
-* [ ] **TC-3.2 (Penggabungan Catatan Manual Pengguna):** Saat merekam, ketik di editor manual: *"Catatan Direktur: Anggaran disetujui maks 100 juta"*. Selesaikan rapat dan pastikan poin ketikan manual ini masuk dan diprioritaskan oleh AI dalam ringkasan akhir.
-* [ ] **TC-3.3 (Uji Fitur "Write Again"):** Gunakan tombol Write Again dengan instruksi: *"Tulis ulang seringkas mungkin dalam 3 poin bullet saja"*. Pastikan AI merespons instruksi tersebut secara akurat.
-* [ ] **TC-3.4 (Keamanan & Enkripsi API Key):** Masukkan API Key Gemini/OpenAI. Periksa file konfigurasi dan file log (`main.log`): pastikan string API Key tidak pernah tertulis dalam bentuk teks polos (*plain text*).
-* [ ] **TC-3.5 (Uji Smart Fallback):** Setel mode ke Cloud AI, lalu matikan internet. Jalankan peringkasan: pastikan aplikasi tidak *crash*, melainkan menampilkan notifikasi dan menawarkan beralih ke Model AI Lokal.
+* [x] **TC-3.1 (Perbandingan Kualitas Notulen Lokal vs Cloud):** Uji ringkasan rapat yang sama menggunakan Local LLM (Qwen 3) dan Cloud AI (Gemini 2.0 / GPT-4o). Periksa ketepatan penangkapan Action Items dan daftar PIC (penanggung jawab).
+* [x] **TC-3.2 (Penggabungan Catatan Manual Pengguna):** Saat merekam, ketik di editor manual: *"Catatan Direktur: Anggaran disetujui maks 100 juta"*. Selesaikan rapat dan pastikan poin ketikan manual ini masuk dan diprioritaskan oleh AI dalam ringkasan akhir.
+* [x] **TC-3.3 (Uji Fitur "Write Again"):** Gunakan tombol Write Again dengan instruksi: *"Tulis ulang seringkas mungkin dalam 3 poin bullet saja"*. Pastikan AI merespons instruksi tersebut secara akurat.
+* [x] **TC-3.4 (Keamanan & Enkripsi API Key):** Masukkan API Key Gemini/OpenAI. Periksa file konfigurasi dan file log (`main.log`): pastikan string API Key tidak pernah tertulis dalam bentuk teks polos (*plain text*).
+* [x] **TC-3.5 (Uji Smart Fallback):** Setel mode ke Cloud AI, lalu matikan internet. Jalankan peringkasan: pastikan aplikasi tidak *crash*, melainkan menampilkan notifikasi dan menawarkan beralih ke Model AI Lokal.
 
 #### 4. Hasil Akhir (Deliverable Hari 3)
 
-* Opsi *Hybrid AI* aktif: pengguna di laptop spek rendah bisa memanfaatkan Cloud API Key yang super cepat, sementara pengguna yang butuh kerahasiaan 100% tetap bisa memakai LLM Lokal offline.
+* [x] Opsi *Hybrid AI* aktif: pengguna di laptop spek rendah bisa memanfaatkan Cloud API Key yang super cepat, sementara pengguna yang butuh kerahasiaan 100% tetap bisa memakai LLM Lokal offline.
 
 ---
 

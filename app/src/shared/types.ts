@@ -51,6 +51,20 @@ export type CakappApi = {
     status(): Promise<{ ok: boolean; timestamp?: string; version?: string; error?: string }>
     sync(meetingId: string): Promise<boolean>
   }
+  ai: {
+    getConfig(): Promise<{
+      mode: 'local' | 'cloud'
+      activeProvider: string
+      hasKey: Record<string, boolean>
+      maskedKeys: Record<string, string>
+      models: Record<string, string>
+      fallbackAvailable: boolean
+    }>
+    setConfig(config: { mode?: 'local' | 'cloud'; activeProvider?: string; model?: string }): Promise<any>
+    setKey(provider: string, key: string): Promise<any>
+    clearKey(provider: string): Promise<any>
+    testConnection(provider: string): Promise<{ ok: boolean; message?: string; error?: string }>
+  }
   setup: {
     state(): Promise<SetupState>
     /** called with each change; returns the way to stop listening */
