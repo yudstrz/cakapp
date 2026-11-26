@@ -36,9 +36,8 @@ output/
 # marketing site
 
 # local credentials
-.env
-.env.local
-.env.*.local
+.env*
+!.env.example
 *.p12
 *.p8
 
@@ -47,4 +46,5 @@ output/
 scratch/
 .pnpm-store
 .next/
+*.tsbuildinfo
 
