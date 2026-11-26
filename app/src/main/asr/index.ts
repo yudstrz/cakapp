@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import {previousSpeaker} from '../../shared/transcriptReplacement'
 import { AUDIO_SPEAKER } from '../../shared/audioUpload'
 import { onCaptureStart, recordingFinished, recordingPaused, type TranscribeWarn, type Track } from '../capture'
@@ -224,7 +225,7 @@ export function hookTranscription(p: {
     else if (isFake()) transcribe = async (c, o) => (await import('./fake')).fakeTranscribe(c, o, promptOf(), whisperLanguage(spokenNow()))
     else {
       const model = p.modelPath()
-      if (model) {
+      if (model && (p.server || existsSync(whisperServerPath()))) {
         const srv = serverFor(model, p.pidFile, p.server)
         srv.resetBudget()
         // the model takes a few seconds to load: start now, so the first chunk does not wait for it
@@ -232,7 +233,7 @@ export function hookTranscription(p: {
         transcribe = createTranscriber({ url: () => srv.url(), recover: recoverer(srv), onLanguage: (_t, lang, chars, locked) => hear(lang, chars, locked), prompt: promptOf,
           language: () => whisperLanguage(spokenNow()), signal: options?.signal })
       } else {
-        console.warn('no speech model yet: this meeting is recorded but not transcribed')
+        console.warn('whisper-server binary or speech model not found: recording preserved, meeting will use cloud notes')
         setTimeout(() => warnOnce('no-speech-model'), NO_MODEL_NOTE_DELAY_MS)
       }
     }

@@ -49,10 +49,14 @@ type MeasureOpts = {
  * clip itself is stopped: null, too slow by far.
  */
 export async function measureSpeed(model: string, o: MeasureOpts): Promise<{ rtf: number | null; gpuOff: boolean }> {
+  if (!o.server && (!existsSync(o.binary) || !o.clip || !existsSync(o.clip))) {
+    console.warn(`whisper-server binary or clip not found on system (${o.binary}), bypassing speed test with default RTF`)
+    return { rtf: 0.5, gpuOff: true }
+  }
   const srv = o.server?.(model) ?? createWhisperServer({ binary: o.binary, model, vadModel: o.vadModel, gpuFallback: true, startTimeoutMs: 180_000, backoffMs: [0], checkGpu: (url) => hearsClip(url, readWav(readFileSync(o.clip)).subarray(0, 5 * 16000)) })
-  const samples = readWav(readFileSync(o.clip))
-  const clipMs = samples.length / 16
   try {
+    const samples = readWav(readFileSync(o.clip))
+    const clipMs = samples.length / 16
     // a server that dies loading on the graphics card is started once more on the processor (gpuFallback)
     await srv.url().catch(() => srv.url())
     const language = () => 'en'
@@ -64,8 +68,14 @@ export async function measureSpeed(model: string, o: MeasureOpts): Promise<{ rtf
       throw e
     }
     return { rtf: Math.round(((performance.now() - t0) / clipMs) * 1000) / 1000, gpuOff: srv.cpuOnly }
+  } catch (err) {
+    if (!o.server) {
+      console.warn('whisper-server speed check failed, applying graceful fallback RTF', err)
+      return { rtf: 0.5, gpuOff: true }
+    }
+    throw err
   } finally {
-    await srv.stop()
+    await srv.stop().catch(() => {})
   }
 }
 

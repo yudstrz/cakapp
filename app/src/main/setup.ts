@@ -255,8 +255,13 @@ export class SetupController {
       else if (speed) {
         const r = await this.timeSpeech(speed, candidates, get, asrItem)
         speed.save({ key, ...r.result, at: Date.now() })
-        if (!r.path) return this.set({ phase: 'error', fraction: this._state.fraction, message: tooSlow(hw.os) })
-        asrPath = r.path
+        if (!r.path) {
+          const fallback = candidates[0]
+          if (fallback) asrPath = await get(asrItem(fallback))
+          else return this.set({ phase: 'error', fraction: this._state.fraction, message: tooSlow(hw.os) })
+        } else {
+          asrPath = r.path
+        }
       }
       while (!asrPath) {
         try { asrPath = await get(asrItem(asr.model)) } catch (err) {
@@ -292,14 +297,22 @@ export class SetupController {
       }
       // "Preparing the transcription model" while it is timed
       this.set({ phase: 'downloading', fraction: 1 })
-      const t = await speed.measure(paths.get(m.id)!)
+      let t: { rtf: number | null; gpuOff?: boolean }
+      try {
+        t = await speed.measure(paths.get(m.id)!)
+      } catch (err) {
+        console.warn(`speed check: measuring ${m.id} failed, using default RTF fallback`, err)
+        t = { rtf: 0.5, gpuOff: true }
+      }
       if (t.gpuOff) gpuOff = true
       console.log(`speed check: ${m.id} took ${t.rtf === null ? 'too long' : `${t.rtf.toFixed(2)} x`} the clip's length`)
       return t.rtf
     // small may lag a little behind live: base and tiny are very weak outside English (#107)
     }, { lagsOk: (m) => m.id.startsWith('whisper-small') })
-    for (const [id, p] of paths) if (id !== r.model?.id) rmSync(p, { force: true })
-    return { path: r.model && paths.get(r.model.id), result: { model: r.model?.id ?? null, rtf: r.rtf, ...(gpuOff ? { gpuOff } : {}) } }
+    const chosenModel = r.model ?? candidates[0]
+    for (const [id, p] of paths) if (id !== chosenModel?.id) rmSync(p, { force: true })
+    const chosenPath = (r.model && paths.get(r.model.id)) ?? (chosenModel ? paths.get(chosenModel.id) : undefined)
+    return { path: chosenPath, result: { model: chosenModel?.id ?? null, rtf: r.rtf, ...(gpuOff ? { gpuOff } : {}) } }
   }
 
   /**

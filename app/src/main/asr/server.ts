@@ -123,6 +123,9 @@ export function createWhisperServer(o: Opts) {
   const GPU_HANGS = 2
 
   const launch = async (): Promise<string> => {
+    if (!existsSync(o.binary)) {
+      throw new Error(`whisper-server executable not found at ${o.binary}`)
+    }
     if (o.pidFile) { mkdirSync(dirname(o.pidFile), { recursive: true }); killStale(o.pidFile, o.lookup) }
     const port = await freePort()
     // beam 5, as in the model eval
