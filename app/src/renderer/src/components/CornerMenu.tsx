@@ -92,7 +92,7 @@ export function CornerMenu({ visible, section, recording, go, shortcuts }: { vis
     else go('/' + next)
   }
   const labels = {
-    news: t("What's new"), github: t('Star us on GitHub'), discord: t('Join Discord'),
+    news: t("What's new"), github: t('Star us on GitHub'),
     shortcuts: t('Keyboard shortcuts'), feedback: t('Send feedback'), settings: t('Settings'), trash: t('Trash'),
   }
   const glyphs = { news: Megaphone, shortcuts: Keyboard, feedback: MessageCircle, settings: Settings, trash: Trash2 }
@@ -115,14 +115,14 @@ export function CornerMenu({ visible, section, recording, go, shortcuts }: { vis
           <ActionTooltipPopup label={t('Help and settings')} align="start" />
         </Tooltip.Root>
         <Menu.Portal>
-          <Menu.Positioner side="top" align="start" sideOffset={8} collisionPadding={8} positionMethod="fixed" className="corner-position">
+          <Menu.Positioner side="bottom" align="end" sideOffset={8} collisionPadding={8} positionMethod="fixed" className="corner-position">
             <Menu.Popup aria-label={t('Cakapp menu')} data-testid="corner-menu" data-motion="instant" className="menu-entry corner-menu"
               data-suppress-hover={entering || undefined} onPointerMove={event => {
                 if (entering && (event.movementX || event.movementY)) setEntering(false)
               }}
               finalFocus={destination.current ? false : undefined}>
               {cornerRows.map(id => {
-                const Icon = id === 'github' || id === 'discord' ? null : glyphs[id]
+                const Icon = id === 'github' ? null : glyphs[id]
                 const icon = Icon ? <Icon size={15} aria-hidden="true" /> : <span className={'corner-mark ' + id} aria-hidden="true" />
                 if (id === 'settings' || id === 'trash' || id === 'shortcuts') {
                   return <Menu.Item key={id} label={labels[id]} data-testid={id === 'settings' ? 'settings-open' : id === 'trash' ? 'nav-trash' : 'corner-shortcuts'}

@@ -23,104 +23,106 @@
   --ease-player-duck: linear(0, 0.00391, 0.01563, 0.03516, 0.0625, 0.09766, 0.14063, 0.19141, 0.25, 0.31641, 0.39063, 0.47266, 0.5625, 0.66016, 0.76563, 0.87891, 1);
   /* Spring samples every 10ms: stiffness 640, damping 32, mass 1. */
   --ease-player-return: linear(0, 0.02869, 0.10244, 0.2049, 0.32261, 0.44499, 0.56409, 0.67433, 0.77212, 0.85554, 0.92399, 0.97783, 1.01814, 1.04642, 1.06443, 1.07399, 1.07691, 1.07484, 1.06925, 1.06143, 1.0524, 1.04299, 1.03381, 1.0253, 1.01775, 1.0113, 1.006, 1.00182, 0.99869, 0.99649, 0.99508, 0.99432, 0.99409, 0.99423, 0.99466, 1, 1);
-  --bg: #FFFFFF;
-  --card: #F6F6F8;
-  --ink: #23242A;
-  --muted: #6E6F7B;
-  --line: #E6E6EC;
-  --accent: #2563EB;
-  --primary: #2563EB;
-  --primary-hover: color-mix(in srgb, var(--primary) 92%, black);
+  --bg: #FAF7F2;
+  --card: #F4EFE6;
+  --ink: #1C1917;
+  --muted: #6B655E;
+  --line: #E5DFD3;
+  --accent: #B84A27;
+  --primary: #B84A27;
+  --primary-hover: #9E3D1E;
   --focus: var(--accent);
   --pill-accent: var(--accent);
-  --primary-ink: #FFFFFF;
-  --accent-soft: color-mix(in srgb, var(--accent) 10%, var(--bg));
-  --status-live: #416D48;
-  --danger: #C13E51;
-  --danger-ink: #FFFFFF;
-  --float: #FFFFFF;
-  --chrome: #F8F8FA;
-  --shadow: 0 16px 48px rgba(28, 24, 40, .13), 0 2px 8px rgba(28, 24, 40, .07);
-  --shadow-soft: 0 1px 3px rgba(28, 24, 40, .07);
-  --written: #50515C;
-  --heading: #292A32;
-  --scrim: rgba(20, 18, 28, .18);
-  --pill: #232229;
-  --pill-ink: #FAF9FF;
+  --primary-ink: #FFFDF9;
+  --accent-soft: color-mix(in srgb, var(--accent) 11%, var(--bg));
+  --status-live: #2E6B40;
+  --danger: #B42318;
+  --danger-ink: #FFFDF9;
+  --float: #FFFDF9;
+  --chrome: #F2EDE4;
+  --shadow: 0 18px 44px rgba(28, 25, 23, .12), 0 2px 8px rgba(28, 25, 23, .06);
+  --shadow-soft: 0 1px 3px rgba(28, 25, 23, .07);
+  --written: #44403C;
+  --heading: #1C1917;
+  --scrim: rgba(28, 25, 23, .22);
+  --pill: #23201C;
+  --pill-ink: #FAF7F2;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #18191D;
-    --card: #202126;
-    --ink: #EEEFF4;
-    --muted: #9A9BA9;
-    --line: #32333D;
-    --accent: #60A5FA;
+    --bg: #171513;
+    --card: #23201C;
+    --ink: #F2ECE3;
+    --muted: #A39B91;
+    --line: #36312B;
+    --accent: #DF744F;
+    --primary: #C85732;
+    --primary-hover: #D9653F;
     --accent-soft: color-mix(in srgb, var(--accent) 16%, var(--bg));
-    --status-live: #AED4B5;
-    --danger: #F28798;
-    --danger-ink: #32121B;
-    --float: #24252C;
-    --chrome: #1D1E23;
-    --shadow: 0 18px 48px rgba(0, 0, 0, .4), 0 2px 8px rgba(0, 0, 0, .2);
-    --shadow-soft: 0 1px 3px rgba(0, 0, 0, .2);
-    --written: #B8B9C4;
-    --heading: #E4E5EC;
-    --scrim: rgba(0, 0, 0, .45);
-    --pill: #25232E;
-    --pill-ink: #FAF9FF;
+    --status-live: #8FD1A1;
+    --danger: #F97066;
+    --danger-ink: #2A1210;
+    --float: #2A2622;
+    --chrome: #1F1C19;
+    --shadow: 0 20px 50px rgba(0, 0, 0, .48), 0 2px 10px rgba(0, 0, 0, .25);
+    --shadow-soft: 0 1px 3px rgba(0, 0, 0, .24);
+    --written: #C9C1B6;
+    --heading: #F2ECE3;
+    --scrim: rgba(12, 10, 9, .55);
+    --pill: #23201C;
+    --pill-ink: #FAF7F2;
   }
 }
 
-/* The recorder keeps its own palette while the application adopts quiet neutral layers. */
+/* Editorial Paper & Ink palette across the desktop workspace while keeping the floating recorder distinct. */
 :root:not(.widget) {
-  --bg: #FFFFFF;
-  --chrome: #F3F3F3;
-  --card: #F6F6F6;
-  --row-hover: color-mix(in srgb, var(--ink) 5%, transparent);
-  --float: #FFFFFF;
-  --ink: #29292C;
-  --muted: #606066;
-  --heading: #29292C;
-  --written: #54545A;
-  --line: #E6E6E8;
-  --playback-bg: color-mix(in srgb, var(--accent) 17%, var(--bg));
+  --bg: #FAF7F2;
+  --chrome: #F2EDE4;
+  --card: #F4EFE6;
+  --row-hover: color-mix(in srgb, var(--ink) 4.5%, transparent);
+  --float: #FFFDF9;
+  --ink: #1C1917;
+  --muted: #6B655E;
+  --heading: #1C1917;
+  --written: #44403C;
+  --line: #E5DFD3;
+  --playback-bg: color-mix(in srgb, var(--accent) 14%, var(--bg));
   --playback-ink: var(--ink);
-  --control: #ECECEE;
-  --control-hover: #E4E4E7;
-  --control-pressed: #DCDCE1;
+  --control: #EAE3D7;
+  --control-hover: #E0D7C8;
+  --control-pressed: #D6CBBA;
   --control-border: transparent;
-  --selected: color-mix(in srgb, var(--accent) 4%, var(--control-hover));
-  --danger: #B63C4D;
-  --danger-ink: #FFFFFF;
-  --danger-soft: #F4E5E8;
-  --danger-control-ink: #A13041;
-  --scrim: #16161938;
-  --shadow: 0 16px 44px #17171A1A, 0 2px 6px #17171A0D;
-  --shadow-soft: 0 1px 2px #17171A08;
+  --selected: color-mix(in srgb, var(--accent) 9%, var(--control-hover));
+  --danger: #B42318;
+  --danger-ink: #FFFDF9;
+  --danger-soft: #FDECEB;
+  --danger-control-ink: #912018;
+  --scrim: rgba(28, 25, 23, .24);
+  --shadow: 0 18px 44px rgba(28, 25, 23, .12), 0 2px 6px rgba(28, 25, 23, .06);
+  --shadow-soft: 0 1px 2px rgba(28, 25, 23, .06);
 }
 @media (prefers-color-scheme: dark) {
   :root:not(.widget) {
-    --bg: #1B1B1D;
-    --chrome: #242425;
-    --card: #202021;
-    --float: #29292B;
-    --ink: #E7E6EB;
-    --muted: #A7A4AD;
-    --heading: #E7E6EB;
-    --written: #C6C3CC;
-    --line: #343436;
+    --bg: #171513;
+    --chrome: #1F1C19;
+    --card: #23201C;
+    --float: #2A2622;
+    --ink: #F2ECE3;
+    --muted: #A39B91;
+    --heading: #F2ECE3;
+    --written: #C9C1B6;
+    --line: #36312B;
     --playback-bg: var(--accent-soft);
-    --control: #333335;
-    --control-hover: #3B3B3E;
-    --control-pressed: #434347;
-    --danger: #F098A5;
-    --danger-ink: #32121B;
-    --danger-soft: #59343C;
-    --danger-control-ink: #FFD6DC;
-    --scrim: #00000066;
-    --shadow: 0 18px 48px #00000040, 0 2px 8px #00000026;
-    --shadow-soft: 0 1px 2px #00000014;
+    --control: #2E2A25;
+    --control-hover: #38332D;
+    --control-pressed: #423C35;
+    --danger: #F97066;
+    --danger-ink: #2A1210;
+    --danger-soft: #4A2220;
+    --danger-control-ink: #FDA29B;
+    --scrim: rgba(12, 10, 9, .55);
+    --shadow: 0 20px 50px rgba(0, 0, 0, .48), 0 2px 8px rgba(0, 0, 0, .28);
+    --shadow-soft: 0 1px 2px rgba(0, 0, 0, .18);
   }
 }
 
@@ -527,14 +529,14 @@ input::selection, textarea::selection, .note-prose ::selection { background: var
 .calendar-schedule { background: var(--bg); }
 .calendar-schedule [data-testid="event"] + [data-testid="event"] { border-top: 1px solid var(--line); }
 .calendar-schedule [data-testid="event"] { min-height: 76px; }
-.past-day > ul { overflow: hidden; border: 1px solid var(--line); border-radius: 10px; }
+.past-day > ul { overflow: hidden; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); border-radius: 0; }
 .card-row + .card-row { border-top: 1px solid var(--line); }
 .document-main { background: var(--bg); }
-.document-body { padding-top: 86px; }
+.document-body { padding-top: 32px; }
 .document-meta { padding-bottom:18px; }
 .note-layout { min-height:0; }
 .note-page-width { width:100%;max-width:860px;margin-inline:auto;padding-inline:clamp(20px,calc(10cqw - 42px),48px); }
-.note-header { flex:none;padding-top:84px; }
+.note-header { flex:none;padding-top:28px; }
 .note-metadata .note-chip { font-size:12px;line-height:18px; }
 .note-metadata { display:flex;align-items:center;flex-wrap:wrap;gap:8px;min-width:0; }
 .note-meta-row { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:16px; }
@@ -755,7 +757,7 @@ html:not(.widget) button:focus-visible, html:not(.widget) input:focus-visible { 
 .note-transcript-pane[hidden] { display:none!important; }
 .page-loading { pointer-events:none; }
 .loading-prose { display:grid;gap:12px;padding-block:6px; }
-.note-title-type { font-size:28px;line-height:1.25;font-weight:600;letter-spacing:-.03em; }
+.note-title-type { font-family: var(--font-brand); font-size: 30px; line-height: 1.2; font-weight: 600; letter-spacing: -.025em; }
 .loading-note-chip { height:var(--button-height);max-width:30%;border-radius:6px;background:var(--control); }
 .loading-transcript-turns { display:grid;gap:12px; }
 .loading-folder-icon { width:16px;height:16px;flex:none;border-radius:4px;background:var(--control); }

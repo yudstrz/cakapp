@@ -37,10 +37,6 @@ Cakapp is available for [Mac](https://github.com/yudstrz/cakapp/releases/latest/
 - **Local MCP server.** When you turn this on, apps on your computer can read your notes, transcripts, saved audio and each meeting's calendar details (attendees' names and emails).
 - **Automatic stop.** By default, Cakapp stops recording when it detects that your call has ended. A recording you start yourself with New note asks first instead, since it may not be a call.
 
-## Watch the demo
-
-<https://github.com/user-attachments/assets/da16b894-beb1-491a-89e1-fd10666dc9b8>
-
 ## How it works
 
 1. **Record.** Start recording your microphone and call audio; you can add your own notes.

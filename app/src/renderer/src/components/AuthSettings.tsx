@@ -210,23 +210,27 @@ export function AuthSettings({ onDone }: { onDone?: () => void } = {}) {
               </button>
             </form>
 
-            {state.google && <button
-              type="button"
-              className="workspace-button auth-google"
-              disabled={busy || !state.configured || !state.secureStorage}
-              onClick={() => void google()}
-            >
-              {t('auth-google')}
-            </button>}
+            {(state.google || state.webPortalUrl) && (
+              <div className="auth-oauth-row">
+                {state.google && <button
+                  type="button"
+                  className="workspace-button auth-google"
+                  disabled={busy || !state.configured || !state.secureStorage}
+                  onClick={() => void google()}
+                >
+                  {t('auth-google')}
+                </button>}
 
-            {state.webPortalUrl && <button
-              type="button"
-              className="workspace-button auth-google"
-              disabled={busy || !state.configured || !state.secureStorage}
-              onClick={() => void browser()}
-            >
-              Masuk lewat Browser
-            </button>}
+                {state.webPortalUrl && <button
+                  type="button"
+                  className="workspace-button auth-google"
+                  disabled={busy || !state.configured || !state.secureStorage}
+                  onClick={() => void browser()}
+                >
+                  Masuk lewat Browser
+                </button>}
+              </div>
+            )}
           </div>
         )}
 

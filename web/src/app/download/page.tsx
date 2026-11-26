@@ -5,7 +5,7 @@ export default function DownloadPage() {
     <div className="mx-auto max-w-4xl px-4 sm:px-6 py-12 sm:py-20 text-center">
       <div className="inline-flex items-center gap-2 rounded-md border border-zinc-800 bg-zinc-900/80 px-3 py-1 text-xs font-medium text-zinc-300 mb-6">
         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-        Versi Desktop v0.3.67
+        Versi Desktop v1.0.0
       </div>
 
       <h1 className="text-2xl sm:text-4xl md:text-5xl font-semibold text-zinc-100 tracking-tight">
@@ -37,7 +37,7 @@ export default function DownloadPage() {
           </div>
           <div className="mt-6">
             <a
-              href="https://github.com/yudstrz/cakapp/releases/download/v0.3.67/Cakapp-windows-x64.exe"
+              href="https://github.com/yudstrz/cakapp/releases"
               target="_blank"
               rel="noreferrer"
               className="block w-full text-center rounded-lg bg-zinc-100 py-2.5 text-xs font-semibold text-zinc-950 transition-colors hover:bg-white"

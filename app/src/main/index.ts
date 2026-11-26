@@ -69,7 +69,7 @@ import { cleanJargon } from '../shared/jargon'
 import { setGenericTitles } from './titles'
 import { installAppMenu } from './appMenu'
 import { hookAuth } from './auth'
-import { setupBetterAuthMain } from './betterAuthClient'
+import { setupBetterAuthMain, handleAuthDeepLink, DESKTOP_SCHEME } from './betterAuthClient'
 import { hookAiIpc } from './aiIpc'
 import { aiKeyStore } from './aiKeyStore'
 import { checkNeonHealth, initNeonSchema, isNeonConfigured, syncMeetingToNeon } from './neon'
@@ -135,8 +135,20 @@ let updateMainMenu = () => {}
 let menuBar: ReturnType<typeof createTray> | undefined
 /** test runs: no window on screen, never takes focus from what the person is doing */
 const BACKGROUND = process.env.YOGURT_BACKGROUND === '1'
-// an AI app's yogurt-mcp starting Cakapp while it was still opening (--hidden) brings no window forward
-app.on('second-instance', (_e, argv) => { if (app.isReady() && !startedHidden(process.platform, argv)) showMain() })
+// an AI app's yogurt-mcp starting Cakapp while it was still opening (--hidden) brings no window forward.
+// Also handles deep-link callbacks (com.cakapp.app://...) arriving via second-instance on Windows/Linux.
+app.on('second-instance', (_e, argv) => {
+  if (app.isReady() && !startedHidden(process.platform, argv)) showMain()
+  // Forward any deep-link URL in argv to BetterAuth (Windows/Linux path)
+  if (process.platform !== 'darwin') {
+    const deepLink = argv.find(arg => arg.startsWith(`${DESKTOP_SCHEME}://`))
+    if (deepLink) handleAuthDeepLink(deepLink, () => win)
+  }
+})
+// macOS delivers deep links via open-url event, not second-instance
+app.on('open-url', (_event, url) => {
+  if (process.platform === 'darwin') handleAuthDeepLink(url, () => win)
+})
 
 /** Links open in the user's browser, never inside the app window. */
 function openExternally(url: string) {
