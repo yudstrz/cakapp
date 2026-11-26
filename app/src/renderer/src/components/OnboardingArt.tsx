@@ -3,8 +3,8 @@ import type { PermissionKind } from '../../../shared/types'
 import { AppIcon, Logo } from './Logo'
 import { t } from '../../../shared/i18n'
 import { RecordingPill } from './RecordingPill'
-import rayPhoto from '../assets/onboarding/ray.webp'
-import lincolnPhoto from '../assets/onboarding/lincoln.webp'
+import indonesiaManPhoto from '../assets/onboarding/indonesia-man.jpg'
+import indonesiaWomanPhoto from '../assets/onboarding/indonesia-woman.jpg'
 import mayaPhoto from '../assets/onboarding/maya.webp'
 
 /*
@@ -16,11 +16,11 @@ import mayaPhoto from '../assets/onboarding/maya.webp'
 
 const d = (i: number) => ({ ['--i' as string]: i })
 
-const ray = { name: 'Ray', photo: rayPhoto, width: 600, height: 556 }
+const ray = { name: 'Raka', photo: indonesiaManPhoto, width: 600, height: 600 }
 const maya = { name: 'Maya', photo: mayaPhoto, width: 308, height: 308 }
 
 function CallWindow({ welcome = false }: { welcome?: boolean }) {
-  const you = { name: t('You'), photo: lincolnPhoto, width: 600, height: 556 }
+  const you = { name: t('You'), photo: indonesiaWomanPhoto, width: 600, height: 600 }
   const people = welcome ? [ray, you] : [ray, you, maya]
   return <div className="ob-call">
     <div className="ob-call-grid">

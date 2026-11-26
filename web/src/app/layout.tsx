@@ -23,11 +23,12 @@ export default async function RootLayout({
         <header className="sticky top-0 z-50 border-b border-zinc-800/80 bg-[#09090b]/90 backdrop-blur-sm">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-4 sm:px-6 py-3.5">
             <a href="/" className="flex items-center gap-2.5 font-semibold text-lg tracking-tight text-zinc-100">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-700 bg-zinc-800 text-zinc-200">
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                  <line x1="12" x2="12" y1="19" y2="22" />
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-500/30 bg-blue-600/15">
+                <svg className="w-5 h-5" viewBox="0 0 100 100" fill="none">
+                  <path d="M 71.5 23.5 A 31 31 0 1 0 71.5 76.5" stroke="#3B82F6" strokeWidth="16" strokeLinecap="round" />
+                  <rect x="42" y="40" width="8.5" height="20" rx="4.25" fill="#10B981" />
+                  <rect x="56" y="30" width="8.5" height="40" rx="4.25" fill="#10B981" />
+                  <rect x="70" y="36" width="8.5" height="28" rx="4.25" fill="#10B981" />
                 </svg>
               </span>
               <span>Cakapp<span className="text-zinc-400 font-normal">.ai</span></span>

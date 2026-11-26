@@ -23,9 +23,9 @@ it('keeps a flat face on bordered controls, including selected, paused and proce
 
 it('uses one saturated fill and white ink for controls while standalone accents follow the theme', () => {
   const values = (token: string) => [...styles.matchAll(new RegExp('(?:^|[;{\\s])' + token + ':\\s*([^;]+);', 'g'))].map(match => match[1])
-  expect(values('--primary')).toEqual(['#6F00FF'])
+  expect(values('--primary')).toEqual(['#2563EB'])
   expect(values('--primary-ink')).toEqual(['#FFFFFF'])
-  expect(values('--accent')).toEqual(['#6F00FF', '#B780FF'])
+  expect(values('--accent')).toEqual(['#2563EB', '#60A5FA'])
 })
 
 it('retains the recording primary gradient, pressed depth and divider', () => {

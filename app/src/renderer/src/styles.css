@@ -28,8 +28,8 @@
   --ink: #23242A;
   --muted: #6E6F7B;
   --line: #E6E6EC;
-  --accent: #6F00FF;
-  --primary: #6F00FF;
+  --accent: #2563EB;
+  --primary: #2563EB;
   --primary-hover: color-mix(in srgb, var(--primary) 92%, black);
   --focus: var(--accent);
   --pill-accent: var(--accent);
@@ -55,7 +55,7 @@
     --ink: #EEEFF4;
     --muted: #9A9BA9;
     --line: #32333D;
-    --accent: #B780FF;
+    --accent: #60A5FA;
     --accent-soft: color-mix(in srgb, var(--accent) 16%, var(--bg));
     --status-live: #AED4B5;
     --danger: #F28798;
