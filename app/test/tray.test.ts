@@ -330,3 +330,13 @@ it('keeps the recording warning available when the pill is hidden, through pause
   state.recording({ t: 'warn', code: 'falling-behind' })
   expect(menu()[1]).toMatchObject({ label: warning, enabled: false })
 })
+
+it('destroys the native tray icon on will-quit so Windows does not leave zombie icons', () => {
+  vi.mocked(app.on).mockClear()
+  createTray({ show: true, os: 'win32', ...actions() })
+  expect(state.trays).toHaveLength(1)
+  const willQuit = vi.mocked(app.on).mock.calls.find(([event]) => event === 'will-quit')?.[1] as (() => void) | undefined
+  expect(willQuit).toBeTypeOf('function')
+  willQuit?.()
+  expect(state.trays[0].destroy).toHaveBeenCalledTimes(1)
+})

@@ -111,7 +111,7 @@ for (const envFile of [
 
 app.setName('Cakapp')
 // Windows shows notifications only for an app with this id (the installer's shortcut carries the same one, electron-builder appId)
-if (process.platform === 'win32') app.setAppUserModelId('so.yogurt.app')
+if (process.platform === 'win32') app.setAppUserModelId('com.cakapp.app')
 app.setPath('userData', userDataDir())
 // before anything goes online: a company's own HTTPS certificate, installed in the system, is trusted too (#115)
 const systemCerts = trustSystemCertificates()
@@ -124,9 +124,10 @@ process.on('uncaughtException', (err) => console.error('uncaught exception', err
 
 // Linux on Wayland: once more through XWayland, so the widget and the card can float (display.ts)
 const x11 = x11Relaunch(process.platform, process.argv, process.env, process.execPath)
+const singleInstance = !x11 && app.requestSingleInstanceLock()
 if (x11) { stripAppImageEnv(); app.relaunch(x11); app.exit(0) }
-// One Cakapp at a time: a second launch focuses the existing window
-else if (!app.requestSingleInstanceLock()) app.quit()
+// One Cakapp at a time: a second launch focuses the existing window and exits immediately before creating Tray/DB locks
+else if (!singleInstance) app.exit(0)
 let win: BrowserWindow | undefined
 let allowQuit = false
 let mcpQuiet = false
@@ -573,7 +574,7 @@ function startDetection() {
   }
 }
 
-app.whenReady().then(() => {
+if (singleInstance) app.whenReady().then(() => {
   setupBetterAuthMain(() => win)
   console.info('APP', `trusting ${systemCerts} certificates from the system on top of the built-in ones`)
   // Local Electron launches need the same Dock icon as the packaged application.
@@ -1166,6 +1167,7 @@ app.whenReady().then(() => {
       if (!mcpAutoQuit && !relaunching) {
         try { rmSync(join(userDataDir(), LAUNCH_FILE), { force: true }) } catch { }
       }
+      menuBar?.setVisible(false)
       finishQuit()
     })().catch((err) => console.error('quit was cancelled because saving or shutdown failed', err)).finally(() => {
       if (!allowQuit) resumeEditing()

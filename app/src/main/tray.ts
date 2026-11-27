@@ -163,6 +163,9 @@ export function createTray(d: { show: boolean; visible?: boolean; showNextMeetin
   app.on('will-quit', () => {
     clearInterval(clock); clearTimeout(calendar); clearTimeout(boundary); powerMonitor.off('resume', tick)
     if (os !== 'darwin') nativeTheme.off('updated', updateLook)
+    tray?.destroy()
+    tray = undefined
+    lastTitle = lastTooltip = undefined
   })
   onMeetingChange(refresh)
   onLanguage(refresh)
