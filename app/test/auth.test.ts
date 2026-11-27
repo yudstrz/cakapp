@@ -1,6 +1,7 @@
 import { describe, expect, it, afterEach, vi } from 'vitest'
 import { authError, hookAuth, validCredentials } from '../src/main/auth'
 import { findAuthDeepLink, normalizeAuthDeepLink } from '../src/main/authDeepLink'
+import { clearAllByokKeys, getByokApiKey, getByokPublicStatus, setByokApiKey } from '../src/main/byokKey'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -66,6 +67,45 @@ describe('auth state & guest mode fallback', () => {
     const state = await auth.state()
     // When Supabase is not configured, user is null (Guest Mode active)
     expect(state.user).toBeNull()
+  })
+
+  it('clears in-memory BYOK API keys immediately on signOut', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cakapp-auth-signout-'))
+    dirs.push(dir)
+    const settingsFile = join(dir, 'settings.json')
+    const fakeSafeStorage = {
+      isEncryptionAvailable: () => true,
+      getSelectedStorageBackend: () => 'basic_text',
+      encryptString: (s: string) => Buffer.from(s),
+      decryptString: (b: Buffer) => b.toString(),
+    } as any
+
+    const auth = hookAuth({
+      file: settingsFile,
+      safeStorage: fakeSafeStorage,
+      openExternal: async () => {},
+      rememberName: () => {},
+      rememberProfile: () => {},
+    })
+
+    setByokApiKey('openai', 'sk-proj-test1234567890abcdef')
+    setByokApiKey('gemini', 'AIzaSyTest12345678901234567890')
+    expect(getByokPublicStatus().hasKey.openai).toBe(true)
+    expect(getByokPublicStatus().hasKey.gemini).toBe(true)
+
+    try {
+      const res = await auth.signOut()
+      expect(res.ok).toBe(true)
+      expect(getByokApiKey('openai')).toBe('')
+      expect(getByokApiKey('gemini')).toBe('')
+      expect(getByokPublicStatus().hasKey).toEqual({
+        gemini: false,
+        openai: false,
+        anthropic: false,
+      })
+    } finally {
+      clearAllByokKeys()
+    }
   })
 })
 

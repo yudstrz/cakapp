@@ -422,12 +422,18 @@ describe('Hari 4 Portal APIs: Audio Range, RBAC, Share, Search/Ask & Workspaces'
     });
   });
 
-  it('handles desktop HTTPS sync push, ownership isolation, and pull via /api/sync', async () => {
+  it('handles desktop HTTPS sync push, ownership isolation, LWW stale rejection, and pull via /api/sync', async () => {
     let existingOwner: string | null = 'owner-1';
+    let existingUpdatedAtMs: number | null = 1500;
+    let meetingUpserts = 0;
     mockSql.mockImplementation(async (strings: TemplateStringsArray) => {
       const q = strings.join('?');
-      if (q.includes('SELECT user_id FROM meetings WHERE id')) {
-        return existingOwner ? [{ user_id: existingOwner }] : [];
+      if (q.includes('FROM meetings') && q.includes('WHERE id =')) {
+        return existingOwner ? [{ user_id: existingOwner, updated_at_ms: existingUpdatedAtMs }] : [];
+      }
+      if (q.includes('INSERT INTO meetings')) {
+        meetingUpserts += 1;
+        return [];
       }
       if (q.includes('FROM meetings') && q.includes('WHERE user_id =')) {
         return [{
@@ -458,13 +464,29 @@ describe('Hari 4 Portal APIs: Audio Range, RBAC, Share, Search/Ask & Workspaces'
         method: 'POST',
         body: JSON.stringify({
           kind: 'meeting',
-          meeting: { id: 'desk-1', title: 'Sync Desktop Call', startedAt: 1000, endedAt: 2000, app: 'Zoom', state: 'done' },
+          meeting: { id: 'desk-1', title: 'Sync Desktop Call', startedAt: 1000, endedAt: 2000, updatedAt: 2000, app: 'Zoom', state: 'done' },
           segments: [{ track: 'me', startMs: 10, endMs: 500, text: 'Halo', speaker: null }],
           notes: { mine: 'Catatan', enhanced: 'Ringkasan' },
         }),
       }),
     );
     expect(pushOk.status).toBe(200);
+    expect(meetingUpserts).toBe(1);
+
+    // Older offline edit must be skipped instead of clobbering newer server state
+    existingUpdatedAtMs = 5000;
+    const pushStale = await syncPost(
+      makeAuthReq('https://cakapp.test/api/sync', {
+        method: 'POST',
+        body: JSON.stringify({
+          kind: 'meeting',
+          meeting: { id: 'desk-1', title: 'Stale Offline Title', startedAt: 1000, endedAt: 2000, updatedAt: 2000, app: 'Zoom', state: 'done' },
+        }),
+      }),
+    );
+    expect(pushStale.status).toBe(200);
+    expect(await pushStale.json()).toEqual({ ok: true, skipped: 'stale' });
+    expect(meetingUpserts).toBe(1);
 
     existingOwner = 'someone-else';
     const pushForbidden = await syncPost(

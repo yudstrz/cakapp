@@ -391,5 +391,109 @@ describe('Day 2 (Rabu) - Local Whisper Engine & Two-Way Sync Verification', () =
         globalThis.fetch = originalFetch
       }
     })
+
+    it('isolates meetings/folders per active account, blocks cross-account push, and sends updatedAt on edits', async () => {
+      const originalFetch = globalThis.fetch
+      const postedIds: string[] = []
+      const postedPayloads: Array<{ meeting?: { id?: string; updatedAt?: number } }> = []
+      vi.spyOn(neonModule, 'isNeonConfigured').mockReturnValue(false)
+      vi.spyOn(cloudAiModule, 'buildDesktopAuthHeaders').mockResolvedValue({
+        Cookie: 'better-auth.session_token=test-cookie',
+      })
+      globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.includes('/api/sync?probe=1')) {
+          return new Response(JSON.stringify({ ok: true, meetings: [], folders: [] }), { status: 200 })
+        }
+        if (init?.method === 'POST' && typeof init.body === 'string') {
+          const body = JSON.parse(init.body) as { meeting?: { id?: string; updatedAt?: number } }
+          postedPayloads.push(body)
+          if (body.meeting?.id) postedIds.push(body.meeting.id)
+          return new Response(JSON.stringify({ ok: true }), { status: 200 })
+        }
+        return new Response(JSON.stringify({ ok: true, meetings: [], folders: [] }), { status: 200 })
+      }) as typeof fetch
+
+      try {
+        // 1. Account A creates private meeting + folder; Guest creates an unowned meeting
+        store.setScopeUserId('user-A')
+        const folderA = store.createFolder('Folder Rahasia A')
+        const mA = store.createMeeting({
+          title: 'Budget Confidential A',
+          startedAt: 1000,
+          endedAt: 2000,
+          eventId: null,
+          app: 'zoom',
+          attendees: [],
+          state: 'done',
+          userId: 'user-A',
+        }, 'm-user-a')
+        store.setNotes(mA.id, 'Rahasia A', 'Ringkasan A')
+        store.enqueueSync('meeting', mA.id, 'upsert')
+
+        store.setScopeUserId(null)
+        const mGuest = store.createMeeting({
+          title: 'Guest Draft Meeting',
+          startedAt: 1100,
+          endedAt: 2100,
+          eventId: null,
+          app: 'meet',
+          attendees: [],
+          state: 'done',
+        }, 'm-guest')
+
+        // 2. Signed-out (null) and Account B never see Account A's meeting, folder, or search results
+        expect(store.meetings({ limit: 50 }).map((m) => m.id)).toEqual(['m-guest'])
+        expect(store.folders().map((f) => f.id)).not.toContain(folderA.id)
+
+        store.setScopeUserId('user-B')
+        expect(store.meetings({ limit: 50 }).map((m) => m.id)).toEqual(['m-guest'])
+        expect(store.folders().map((f) => f.id)).not.toContain(folderA.id)
+        expect(store.search('Budget Confidential A', 10)).toHaveLength(0)
+
+        // 3. Switching active account on SyncEngine blocks pushing A's queued meeting under B's token
+        let currentUser: string | null = 'user-A'
+        const engine = new SyncEngine(store, () => currentUser, undefined, 0)
+        await engine.pullMeetings()
+
+        currentUser = 'user-B'
+        engine.resetAccount()
+
+        expect(store.pendingSyncMeetings(50, 'user-B').map((m) => m.id)).toEqual(['m-guest'])
+        expect(await engine.pushMeeting('m-user-a')).toBe(false)
+        expect(await engine.pushFolder(folderA.id)).toBe(false)
+
+        const flushed = await engine.flushQueue()
+        expect(flushed.processed).toBe(0)
+        expect(postedIds).not.toContain('m-user-a')
+
+        // 4. Account B claims the Guest meeting on sync, and subsequent note/rename edits mark pending + send updatedAt
+        await engine.pushMeeting(mGuest.id)
+        expect(postedIds).toContain('m-guest')
+        expect(store.meeting(mGuest.id)?.userId).toBe('user-B')
+        expect(store.meetingSyncStatus(mGuest.id)?.status).toBe('synced')
+
+        const beforeEdit = store.meeting(mGuest.id)?.updatedAt ?? 0
+        store.setNotes(mGuest.id, 'Catatan diperbarui', 'Ringkasan baru')
+        expect(store.meetingSyncStatus(mGuest.id)?.status).toBe('pending')
+        store.updateMeeting(mGuest.id, { title: 'Guest Draft Renamed' })
+        expect(store.meetingSyncStatus(mGuest.id)?.status).toBe('pending')
+
+        await engine.pushMeeting(mGuest.id)
+        const latestPayload = postedPayloads.at(-1)
+        expect(latestPayload?.meeting?.updatedAt).toBeGreaterThanOrEqual(beforeEdit)
+
+        // 5. When Account A signs back in, A's queued meeting flushes properly
+        currentUser = 'user-A'
+        store.setScopeUserId('user-A')
+        engine.resetAccount()
+        const flushedA = await engine.flushQueue()
+        expect(flushedA.processed).toBe(1)
+        expect(postedIds).toContain('m-user-a')
+        engine.destroy()
+      } finally {
+        globalThis.fetch = originalFetch
+      }
+    })
   })
 })

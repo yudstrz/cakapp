@@ -665,7 +665,9 @@ if (singleInstance) app.whenReady().then(() => {
   }
   // the person's own names, never given to the other side: the one in Settings and the Mac's
   const settingsFile = join(userDataDir(), 'settings.json')
-  let onAuthLoggedIn = () => {}
+  let lastAuthUserId = loadSettings(settingsFile).accountProfile?.id ?? null
+  store.setScopeUserId(lastAuthUserId)
+  let onAuthStateChanged = (_userId: string | null) => {}
   hookAuth({
     file: settingsFile,
     safeStorage,
@@ -676,7 +678,7 @@ if (singleInstance) app.whenReady().then(() => {
     rememberProfile: accountProfile => updateSettings(settingsFile, { accountProfile: accountProfile ?? undefined }),
     onChange: st => {
       win?.webContents.send('auth:changed', st)
-      if (st.user) onAuthLoggedIn()
+      onAuthStateChanged(st.user?.id ?? null)
     },
   })
   hookAiIpc({
@@ -859,8 +861,17 @@ if (singleInstance) app.whenReady().then(() => {
     return { filePath, mimeType }
   })
   pushMeetingSafe = (id) => { void syncEngine.pushMeeting(id).catch(err => console.warn('[syncEngine] push meeting failed:', err)) }
-  onAuthLoggedIn = () => { void syncEngine.syncAll().catch(err => console.warn('[syncEngine] sync after auth failed:', err)) }
-  if (getUserId()) onAuthLoggedIn()
+  onAuthStateChanged = (nextUserId) => {
+    if (nextUserId !== lastAuthUserId) {
+      lastAuthUserId = nextUserId
+      syncEngine.resetAccount()
+      store.setScopeUserId(nextUserId)
+      win?.webContents.send('meetings:changed')
+      win?.webContents.send('folders:changed')
+    }
+    if (nextUserId) void syncEngine.syncAll().catch(err => console.warn('[syncEngine] sync after auth failed:', err))
+  }
+  if (getUserId()) onAuthStateChanged(getUserId())
   onMeetingStopSaved((m) => {
     uploads.resume(); savedTranscriptions.resume()
     pushMeetingSafe(m.id)
@@ -1067,7 +1078,9 @@ if (singleInstance) app.whenReady().then(() => {
   ipcMain.handle('notes:get', (_e, id: unknown) => (isId(id) ? notes.view(id) : undefined))
   const saveEdit = (id: unknown, side: unknown, md: unknown, revision: unknown): NoteSaveResult => {
     if (!isId(id) || typeof md !== 'string' || !Number.isSafeInteger(revision) || Number(revision) < 1 || (side !== 'mine' && side !== 'enhanced')) return { revision: Number(revision) || 0, status: 'failed', retained: false }
-    return side === 'mine' ? notes.setMine(id, md, Number(revision)) : notes.setEnhanced(id, md, Number(revision))
+    const res = side === 'mine' ? notes.setMine(id, md, Number(revision)) : notes.setEnhanced(id, md, Number(revision))
+    if (res.status === 'saved') syncEngine.schedulePushMeeting(id)
+    return res
   }
   ipcMain.handle('notes:set-mine', (_e, id: unknown, md: unknown, revision: unknown) => saveEdit(id, 'mine', md, revision))
   ipcMain.handle('notes:set-enhanced', (_e, id: unknown, md: unknown, revision: unknown) => saveEdit(id, 'enhanced', md, revision))
@@ -1186,7 +1199,9 @@ if (singleInstance) app.whenReady().then(() => {
     return m && { ...m, ...(recordingPaused(m.id) ? { paused: true } : {}), ...(recordingMicMuted(m.id) ? { micMuted: true } : {}) }
   })
   // the person's own title for a note
-  ipcMain.handle('meetings:rename', (_e, id: unknown, title: unknown) => { if (isId(id) && typeof title === 'string') renameMeeting(id, title) })
+  ipcMain.handle('meetings:rename', (_e, id: unknown, title: unknown) => {
+    if (isId(id) && typeof title === 'string' && renameMeeting(id, title)) syncEngine.schedulePushMeeting(id)
+  })
   // who was there, by hand, or from a calendar event picked for the note: unedited notes are written again with them
   ipcMain.handle('meetings:rename-attendee', (_e, id: unknown, index: unknown, name: unknown, expected: unknown) => {
     if (!isId(id) || typeof index !== 'number' || typeof name !== 'string') return false

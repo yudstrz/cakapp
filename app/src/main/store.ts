@@ -176,6 +176,7 @@ function around(raw: string, pairs: string[]): SnippetPart[] {
 export class Store {
   /** public only so tests can poke at tables */
   readonly db: DatabaseSync
+  private scopeUserId: string | null | undefined = undefined
   constructor(file: string) {
     this.db = new DatabaseSync(file)
     this.db.exec(`
@@ -225,6 +226,7 @@ export class Store {
     if (!folderCols.includes('icon')) this.db.exec("ALTER TABLE folders ADD COLUMN icon TEXT NOT NULL DEFAULT 'folder'")
     if (!folderCols.includes('color')) this.db.exec("ALTER TABLE folders ADD COLUMN color TEXT NOT NULL DEFAULT 'default'")
     if (!folderCols.includes('position')) this.db.exec('ALTER TABLE folders ADD COLUMN position INTEGER')
+    if (!folderCols.includes('user_id')) this.db.exec('ALTER TABLE folders ADD COLUMN user_id TEXT')
     // notes tables made before "edited" existed (the developers' own copies) get it added
     const cols = (this.db.prepare('PRAGMA table_info(notes)').all() as Row[]).map((r) => String(r.name))
     if (!cols.includes('edited')) this.db.exec('ALTER TABLE notes ADD COLUMN edited INTEGER NOT NULL DEFAULT 0')
@@ -389,7 +391,10 @@ export class Store {
       if (k === 'attendees') return JSON.stringify(value)
       return typeof value === 'boolean' ? Number(value) : value as string | number | null
     })
-    this.db.prepare(`UPDATE meetings SET ${keys.map((k) => `${col[k]} = ?`).join(', ')} WHERE id = ?`).run(...vals, id)
+    const touchesContent = keys.some(k => k === 'title' || k === 'endedAt' || k === 'attendees' || k === 'state' || k === 'language')
+    const extra = touchesContent ? ', updated_at = ?, sync_status = ?' : ''
+    const extraVals = touchesContent ? [Date.now(), 'pending'] : []
+    this.db.prepare(`UPDATE meetings SET ${keys.map((k) => `${col[k]} = ?`).join(', ')}${extra} WHERE id = ?`).run(...vals, ...extraVals, id)
   }
   /** Refresh every note still linked to this occurrence, including alternate calendar IDs. */
   rememberEvent(event: CalEvent): Meeting[] {
@@ -453,10 +458,19 @@ export class Store {
     const r = this.db.prepare('SELECT * FROM meetings WHERE event_id = ? AND trashed_at IS NULL ORDER BY started_at DESC, rowid DESC LIMIT 1').get(eventId) as Row | undefined
     return r ? this.readMeeting(r) : undefined
   }
+  setScopeUserId(userId: string | null | undefined): void {
+    this.scopeUserId = userId
+  }
+  private scopeMeetingSql(col = 'id'): { sql: string; args: string[] } {
+    if (this.scopeUserId === undefined) return { sql: '', args: [] }
+    if (this.scopeUserId === null) return { sql: ` AND ${col} IN (SELECT id FROM meetings WHERE user_id IS NULL)`, args: [] }
+    return { sql: ` AND ${col} IN (SELECT id FROM meetings WHERE user_id IS NULL OR user_id = ?)`, args: [this.scopeUserId] }
+  }
   meetings({ before, limit }: { before?: number; limit: number }): Meeting[] {
+    const scope = this.scopeMeetingSql('id')
     const rows = before == null
-      ? this.db.prepare('SELECT * FROM meetings WHERE trashed_at IS NULL ORDER BY started_at DESC, rowid DESC LIMIT ?').all(limit)
-      : this.db.prepare('SELECT * FROM meetings WHERE trashed_at IS NULL AND started_at < ? ORDER BY started_at DESC, rowid DESC LIMIT ?').all(before, limit)
+      ? this.db.prepare(`SELECT * FROM meetings WHERE trashed_at IS NULL${scope.sql} ORDER BY started_at DESC, rowid DESC LIMIT ?`).all(...scope.args, limit)
+      : this.db.prepare(`SELECT * FROM meetings WHERE trashed_at IS NULL${scope.sql} AND started_at < ? ORDER BY started_at DESC, rowid DESC LIMIT ?`).all(...scope.args, before, limit)
     return (rows as Row[]).map(r => this.readMeeting(r))
   }
 
@@ -607,6 +621,7 @@ export class Store {
     const edited = patch.edited ?? cur.edited
     this.db.prepare('INSERT INTO notes (meeting_id, mine, enhanced, edited) VALUES (?, ?, ?, ?) ON CONFLICT(meeting_id) DO UPDATE SET mine = excluded.mine, enhanced = excluded.enhanced, edited = excluded.edited')
       .run(meetingId, mine, enhanced, edited ? 1 : 0)
+    this.db.prepare("UPDATE meetings SET updated_at = ?, sync_status = 'pending' WHERE id = ?").run(Date.now(), meetingId)
   }
 
   /** Who was at the meeting when the enhanced notes were last written (null: not recorded) */
@@ -636,8 +651,9 @@ export class Store {
       (SELECT json_group_array(json_object('id', id, 'name', name, 'icon', icon, 'color', color)) FROM
         (SELECT f.id, f.name, f.icon, f.color FROM folders f JOIN folder_meetings fm ON fm.folder_id = f.id
           WHERE fm.meeting_id = m.id ORDER BY f.name COLLATE NOCASE, f.created_at)) AS card_folders`
-    const from = `FROM meetings m LEFT JOIN notes n ON n.meeting_id = m.id${folder == null ? '' : ' JOIN folder_meetings sm ON sm.meeting_id = m.id AND sm.folder_id = ?'} WHERE m.trashed_at IS NULL`
-    const sp = folder == null ? [] : [folder]
+    const scope = this.scopeMeetingSql('m.id')
+    const from = `FROM meetings m LEFT JOIN notes n ON n.meeting_id = m.id${folder == null ? '' : ' JOIN folder_meetings sm ON sm.meeting_id = m.id AND sm.folder_id = ?'} WHERE m.trashed_at IS NULL${scope.sql}`
+    const sp = [...(folder == null ? [] : [folder]), ...scope.args]
     const rows = before == null
       ? this.db.prepare(`SELECT ${cols} ${from} ORDER BY m.started_at DESC, m.id DESC LIMIT ?`).all(...sp, limit)
       : this.db.prepare(`SELECT ${cols} ${from} AND (m.started_at < ? OR (m.started_at = ? AND m.id < ?)) ORDER BY m.started_at DESC, m.id DESC LIMIT ?`)
@@ -655,7 +671,8 @@ export class Store {
   }
 
   searchPeople(): Person[] {
-    const rows = this.db.prepare('SELECT attendees FROM meetings WHERE trashed_at IS NULL ORDER BY started_at DESC, id DESC').all()
+    const scope = this.scopeMeetingSql('id')
+    const rows = this.db.prepare(`SELECT attendees FROM meetings WHERE trashed_at IS NULL${scope.sql} ORDER BY started_at DESC, id DESC`).all(...scope.args)
     const attendees = uniqueSearchPeople(rows.flatMap(r => JSON.parse(String(r.attendees)) as Person[]))
     return resolvePeople(this.db, attendees)
       .filter(p => p.name.trim() || p.email?.trim())
@@ -667,10 +684,12 @@ export class Store {
     const people = uniqueSearchPeople([...(options.people ?? []), ...parsedPeople.matches.map(m => m.person)])
     const { words, date } = parseSearchQuery(parsedPeople.text, options)
     if (!words.length && !date && !people.length) return []
+    const scope = this.scopeMeetingSql('')
     const inScope = (col: string) => notTrashed(col)
+      + (this.scopeUserId === undefined ? '' : this.scopeUserId === null ? ` AND ${col} IN (SELECT id FROM meetings WHERE user_id IS NULL)` : ` AND ${col} IN (SELECT id FROM meetings WHERE user_id IS NULL OR user_id = ?)`)
       + (folder == null ? '' : ` AND ${col} IN (SELECT meeting_id FROM folder_meetings WHERE folder_id = ?)`)
       + (date ? ` AND ${col} IN (SELECT id FROM meetings WHERE started_at >= ? AND started_at < ?)` : '')
-    const args = [...(folder == null ? [] : [folder]), ...(date ? [date.start, date.end] : [])]
+    const args = [...scope.args, ...(folder == null ? [] : [folder]), ...(date ? [date.start, date.end] : [])]
     const rows = this.db.prepare(`SELECT id, title, attendees, started_at,
       (SELECT group_concat(f.name, char(10)) FROM folders f JOIN folder_meetings fm ON fm.folder_id = f.id WHERE fm.meeting_id = meetings.id) AS folders
       FROM meetings WHERE 1${inScope('id')} ORDER BY started_at DESC, id DESC`).all(...args) as Row[]
@@ -771,7 +790,9 @@ export class Store {
 
   /** The chosen order, or alphabetical until the first reorder. */
   folders(): Folder[] {
-    return (this.db.prepare(`SELECT ${FOLDER_COLS} FROM folders sp ORDER BY sp.position IS NULL, sp.position, sp.name COLLATE NOCASE, sp.created_at`).all() as Row[]).map(toFolder)
+    const where = this.scopeUserId === undefined ? '' : this.scopeUserId === null ? 'WHERE sp.user_id IS NULL ' : 'WHERE (sp.user_id IS NULL OR sp.user_id = ?) '
+    const args = this.scopeUserId ? [this.scopeUserId] : []
+    return (this.db.prepare(`SELECT ${FOLDER_COLS} FROM folders sp ${where}ORDER BY sp.position IS NULL, sp.position, sp.name COLLATE NOCASE, sp.created_at`).all(...args) as Row[]).map(toFolder)
   }
   reorderFolders(ids: string[]): boolean {
     const current = this.folders().map(f => f.id)
@@ -789,9 +810,13 @@ export class Store {
     const r = this.db.prepare(`SELECT ${FOLDER_COLS} FROM folders sp WHERE sp.id = ?`).get(id) as Row | undefined
     return r ? toFolder(r) : undefined
   }
+  folderUserId(id: string): string | null {
+    const r = this.db.prepare('SELECT user_id FROM folders WHERE id = ?').get(id) as Row | undefined
+    return r?.user_id == null ? null : String(r.user_id)
+  }
   createFolder(name: string, appearance: FolderAppearance = DEFAULT_FOLDER_APPEARANCE): Folder {
     const s = { id: randomUUID(), name: folderName(name), createdAt: Date.now(), count: 0, icon: appearance.icon, color: appearance.color }
-    this.db.prepare('INSERT INTO folders (id, name, created_at, icon, color, position) VALUES (?, ?, ?, ?, ?, (SELECT MAX(position) + 1 FROM folders))').run(s.id, s.name, s.createdAt, s.icon, s.color)
+    this.db.prepare('INSERT INTO folders (id, name, created_at, icon, color, position, user_id) VALUES (?, ?, ?, ?, ?, (SELECT MAX(position) + 1 FROM folders), ?)').run(s.id, s.name, s.createdAt, s.icon, s.color, this.scopeUserId ?? null)
     return s
   }
   setFolderAppearance(id: string, appearance: FolderAppearance) {
@@ -805,9 +830,10 @@ export class Store {
   /** The folder goes; its meetings stay where they are (only the links go, by ON DELETE CASCADE) */
   deleteFolder(id: string) { this.db.prepare('DELETE FROM folders WHERE id = ?').run(id) }
   folderMeetingChoices(folderId: string) {
+    const scope = this.scopeMeetingSql('m.id')
     const rows = this.db.prepare(`SELECT m.id, m.title, m.started_at, fm.folder_id FROM meetings m
       LEFT JOIN folder_meetings fm ON fm.meeting_id = m.id AND fm.folder_id = ?
-      WHERE m.trashed_at IS NULL ORDER BY m.started_at DESC, m.id DESC`).all(folderId)
+      WHERE m.trashed_at IS NULL${scope.sql} ORDER BY m.started_at DESC, m.id DESC`).all(folderId, ...scope.args)
     return rows.map(row => ({ id: String(row.id), title: String(row.title), startedAt: Number(row.started_at), inFolder: row.folder_id != null }))
   }
   addMeetingsToFolder(folderId: string, ids: string[]): boolean {
@@ -860,15 +886,18 @@ export class Store {
     this.db.prepare('INSERT INTO sync_queue (entity_type, entity_id, action, payload, created_at) VALUES (?, ?, ?, ?, ?)')
       .run(entityType, entityId, action, json, Date.now())
   }
-  pendingSyncMeetings(limit = 50): Meeting[] {
+  pendingSyncMeetings(limit = 50, userId?: string | null): Meeting[] {
+    if (userId === null) return []
+    const ownerFilter = userId ? ' AND (user_id IS NULL OR user_id = ?)' : ''
+    const args = userId ? [userId, limit] : [limit]
     const rows = this.db.prepare(`
       SELECT * FROM meetings
       WHERE trashed_at IS NULL
         AND state IN ('done', 'stopped')
-        AND (sync_status IS NULL OR sync_status != 'synced')
+        AND (sync_status IS NULL OR sync_status != 'synced')${ownerFilter}
       ORDER BY started_at DESC
       LIMIT ?
-    `).all(limit) as Row[]
+    `).all(...args) as Row[]
     return rows.map((r) => this.readMeeting(r))
   }
   peekSyncQueue(limit = 20): SyncQueueItem[] {
@@ -894,7 +923,15 @@ export class Store {
     const r = this.db.prepare('SELECT count(*) as c FROM sync_queue').get() as Row | undefined
     return Number(r?.c ?? 0)
   }
-  setMeetingSyncStatus(id: string, status: 'pending' | 'synced' | 'failed', version?: number) {
+  setMeetingSyncStatus(id: string, status: 'pending' | 'synced' | 'failed', version?: number, claimUserId?: string | null) {
+    if (status === 'synced' && claimUserId) {
+      if (version !== undefined) {
+        this.db.prepare('UPDATE meetings SET sync_status = ?, sync_version = ?, user_id = COALESCE(user_id, ?) WHERE id = ?').run(status, version, claimUserId, id)
+      } else {
+        this.db.prepare('UPDATE meetings SET sync_status = ?, user_id = COALESCE(user_id, ?) WHERE id = ?').run(status, claimUserId, id)
+      }
+      return
+    }
     if (version !== undefined) {
       this.db.prepare('UPDATE meetings SET sync_status = ?, sync_version = ? WHERE id = ?').run(status, version, id)
     } else {
@@ -951,15 +988,16 @@ export class Store {
       return true
     })
   }
-  upsertFolderFromCloud(folder: Folder): boolean {
+  upsertFolderFromCloud(folder: Folder, userId?: string | null): boolean {
     return this.writeAtomically(() => {
       const existing = this.db.prepare('SELECT id FROM folders WHERE id = ?').get(folder.id)
+      const ownerId = userId ?? this.scopeUserId ?? null
       if (existing) {
-        this.db.prepare('UPDATE folders SET name = ?, icon = ?, color = ? WHERE id = ?')
-          .run(folder.name, folder.icon, folder.color, folder.id)
+        this.db.prepare('UPDATE folders SET name = ?, icon = ?, color = ?, user_id = COALESCE(user_id, ?) WHERE id = ?')
+          .run(folder.name, folder.icon, folder.color, ownerId, folder.id)
       } else {
-        this.db.prepare('INSERT INTO folders (id, name, created_at, icon, color) VALUES (?, ?, ?, ?, ?)')
-          .run(folder.id, folder.name, folder.createdAt, folder.icon, folder.color)
+        this.db.prepare('INSERT INTO folders (id, name, created_at, icon, color, user_id) VALUES (?, ?, ?, ?, ?, ?)')
+          .run(folder.id, folder.name, folder.createdAt, folder.icon, folder.color, ownerId)
       }
       return true
     })

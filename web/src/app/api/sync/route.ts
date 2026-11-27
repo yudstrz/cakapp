@@ -35,6 +35,7 @@ const SyncBodySchema = z.discriminatedUnion('kind', [
       attendees: z.array(AttendeeSchema).max(200).optional().default([]),
       state: z.enum(['prepared', 'recording', 'stopped', 'done']).default('done'),
       language: z.string().max(32).nullable().optional(),
+      updatedAt: z.number().int().min(0).optional(),
     }),
     segments: z.array(SegmentSchema).max(10_000).optional().default([]),
     notes: z
@@ -205,9 +206,21 @@ export async function POST(req: NextRequest) {
     }
 
     const { meeting: m, segments, notes } = parsed.data;
-    const existing = (await sql`SELECT user_id FROM meetings WHERE id = ${m.id} LIMIT 1`) as Array<{ user_id?: string | null }>;
+    const existing = (await sql`
+      SELECT user_id, EXTRACT(EPOCH FROM updated_at) * 1000 AS updated_at_ms
+      FROM meetings
+      WHERE id = ${m.id}
+      LIMIT 1
+    `) as Array<{ user_id?: string | null; updated_at_ms?: number | string | null }>;
     if (existing[0]?.user_id && existing[0].user_id !== authUser.userId) {
       throw new AiProxyError('UNAUTHORIZED', 'Rapat milik pengguna lain tidak dapat ditimpa.', 403);
+    }
+    if (
+      m.updatedAt !== undefined &&
+      existing[0]?.updated_at_ms != null &&
+      Number(existing[0].updated_at_ms) > m.updatedAt
+    ) {
+      return NextResponse.json({ ok: true, skipped: 'stale' }, { status: 200, headers: getSecurityHeaders(req) });
     }
 
     const attendeesJson = JSON.stringify(m.attendees ?? []);

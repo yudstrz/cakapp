@@ -28,7 +28,9 @@ function hasAuthHeader(headers: Record<string, string>): boolean {
 
 export class SyncEngine {
   private lastSyncedAt: number | null = null
+  private lastPulledAt: number | null = null
   private timer: NodeJS.Timeout | null = null
+  private pushTimers = new Map<string, NodeJS.Timeout>()
   private isSyncing = false
   private isOnline = true
 
@@ -137,6 +139,7 @@ export class SyncEngine {
 
   private async syncOneMeeting(meeting: ReturnType<Store['meeting']>, transport: NonNullable<RemoteTransport>): Promise<boolean> {
     if (!meeting) return false
+    if (meeting.userId && meeting.userId !== this.getUserId()) return false
     const segments = this.store.segments(meeting.id)
     const notes = this.store.notes(meeting.id)
 
@@ -155,7 +158,15 @@ export class SyncEngine {
     const resp = await fetch(`${transport.baseUrl}/api/sync`, {
       method: 'POST',
       headers: { ...transport.headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind: 'meeting', meeting, segments, notes }),
+      body: JSON.stringify({
+        kind: 'meeting',
+        meeting: {
+          ...meeting,
+          updatedAt: meeting.updatedAt ?? meeting.endedAt ?? meeting.startedAt,
+        },
+        segments,
+        notes,
+      }),
     })
     if (!resp.ok) return false
 
@@ -194,16 +205,42 @@ export class SyncEngine {
     return { meetings: data.meetings ?? [], folders: data.folders ?? [] }
   }
 
+  private clearPushTimers(): void {
+    for (const timer of this.pushTimers.values()) clearTimeout(timer)
+    this.pushTimers.clear()
+  }
+
+  /** Clear cursors and queued debounced pushes when the signed-in account changes. */
+  resetAccount(): void {
+    this.lastSyncedAt = null
+    this.lastPulledAt = null
+    this.clearPushTimers()
+  }
+
+  /** Coalesce rapid title/note edits into a single background sync push. */
+  schedulePushMeeting(meetingId: string, delayMs = 3000): void {
+    const prev = this.pushTimers.get(meetingId)
+    if (prev) clearTimeout(prev)
+    const timer = setTimeout(() => {
+      this.pushTimers.delete(meetingId)
+      void this.pushMeeting(meetingId).catch(err => console.warn('[syncEngine] scheduled push failed:', err))
+    }, delayMs)
+    timer.unref?.()
+    this.pushTimers.set(meetingId, timer)
+  }
+
   async pushMeeting(meetingId: string): Promise<boolean> {
     const meeting = this.store.meeting(meetingId)
     if (!meeting) return false
+    const activeUser = this.getUserId()
+    if (meeting.userId && meeting.userId !== activeUser) return false
 
     const transport = this.isOnline ? await this.resolveTransport() : null
     if (transport) {
       try {
         const ok = await this.syncOneMeeting(meeting, transport)
         if (ok) {
-          this.store.setMeetingSyncStatus(meetingId, 'synced')
+          this.store.setMeetingSyncStatus(meetingId, 'synced', undefined, activeUser)
           this.lastSyncedAt = Date.now()
           return true
         }
@@ -221,6 +258,9 @@ export class SyncEngine {
   async pushFolder(folderId: string): Promise<boolean> {
     const folder = this.store.folder(folderId)
     if (!folder) return false
+    const activeUser = this.getUserId()
+    const owner = this.store.folderUserId(folderId)
+    if (owner && owner !== activeUser) return false
 
     const transport = this.isOnline ? await this.resolveTransport() : null
     if (transport) {
@@ -244,15 +284,18 @@ export class SyncEngine {
     if (!transport) return { pulled: 0, errors: 0 }
 
     try {
+      const activeUser = this.getUserId()
+      const sinceTs = since ?? this.lastPulledAt ?? undefined
       const remote =
         transport.mode === 'neon'
-          ? await neon.fetchMeetingsFromNeon(this.getUserId(), since ?? this.lastSyncedAt ?? undefined)
-          : (await this.fetchHttpBundle(transport.baseUrl, transport.headers, since ?? this.lastSyncedAt ?? undefined))?.meetings ?? []
+          ? await neon.fetchMeetingsFromNeon(activeUser, sinceTs)
+          : (await this.fetchHttpBundle(transport.baseUrl, transport.headers, sinceTs))?.meetings ?? []
 
       let pulled = 0
       for (const item of remote) {
+        const meeting = item.meeting.userId || !activeUser ? item.meeting : { ...item.meeting, userId: activeUser }
         const updated = this.store.upsertMeetingFromCloud(
-          item.meeting,
+          meeting,
           item.segments,
           item.notes,
           item.updatedAt
@@ -260,7 +303,9 @@ export class SyncEngine {
         if (updated) pulled++
       }
 
-      this.lastSyncedAt = Date.now()
+      const now = Date.now()
+      this.lastPulledAt = now
+      this.lastSyncedAt = now
       if (pulled > 0 && this.onChanged) this.onChanged()
       return { pulled, errors: 0 }
     } catch (err) {
@@ -274,14 +319,15 @@ export class SyncEngine {
     if (!transport) return { pulled: 0, errors: 0 }
 
     try {
+      const activeUser = this.getUserId()
       const folders =
         transport.mode === 'neon'
-          ? await neon.fetchFoldersFromNeon(this.getUserId())
+          ? await neon.fetchFoldersFromNeon(activeUser)
           : (await this.fetchHttpBundle(transport.baseUrl, transport.headers))?.folders ?? []
 
       let pulled = 0
       for (const folder of folders) {
-        const updated = this.store.upsertFolderFromCloud(folder)
+        const updated = this.store.upsertFolderFromCloud(folder, activeUser)
         if (updated) pulled++
       }
 
@@ -305,6 +351,7 @@ export class SyncEngine {
     this.isSyncing = true
     let processed = 0
     let failed = 0
+    const activeUser = this.getUserId()
 
     try {
       const items = this.store.peekSyncQueue(50)
@@ -317,9 +364,10 @@ export class SyncEngine {
               processed++
               continue
             }
+            if (m.userId && m.userId !== activeUser) continue
             const ok = await this.syncOneMeeting(m, transport)
             if (ok) {
-              this.store.setMeetingSyncStatus(m.id, 'synced')
+              this.store.setMeetingSyncStatus(m.id, 'synced', undefined, activeUser)
               this.store.dequeueSync(item.id)
               processed++
             } else {
@@ -333,6 +381,8 @@ export class SyncEngine {
               processed++
               continue
             }
+            const owner = this.store.folderUserId(item.entityId)
+            if (owner && owner !== activeUser) continue
             const ok = await this.syncOneFolder(f, transport)
             if (ok) {
               this.store.dequeueSync(item.id)
@@ -362,7 +412,7 @@ export class SyncEngine {
   async syncAll(): Promise<{ pushed: number; pulled: number; queueFlushed: number }> {
     const transport = this.isOnline ? await this.resolveTransport() : null
     if (transport) {
-      for (const m of this.store.pendingSyncMeetings(50)) {
+      for (const m of this.store.pendingSyncMeetings(50, this.getUserId())) {
         this.store.enqueueSync('meeting', m.id, 'upsert')
       }
     }
@@ -381,5 +431,6 @@ export class SyncEngine {
       clearInterval(this.timer)
       this.timer = null
     }
+    this.clearPushTimers()
   }
 }

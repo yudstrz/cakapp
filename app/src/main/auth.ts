@@ -5,6 +5,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { app, ipcMain, type SafeStorage } from 'electron'
 import { loadAppEnv } from './env'
 import { getNeonClient, isNeonConfigured } from './neon'
+import { clearAllByokKeys } from './byokKey'
 
 const loadBetterAuth = () => import('./betterAuthClient')
 
@@ -379,6 +380,7 @@ export function hookAuth(d: {
 
   const signOut = async (): Promise<AuthResult> => {
     try {
+      clearAllByokKeys()
       if (hasBetterAuth()) {
         const { getBetterAuthClient } = await loadBetterAuth()
         await getBetterAuthClient().signOut().catch(() => {})
