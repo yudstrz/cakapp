@@ -1,4 +1,4 @@
-import { asrCandidates, pick, pickAsr, pickBySpeed, speedKey, type Catalog, type CatalogAsr, type Choice, type Hardware } from '@yogurt/picker'
+import { asrCandidates, pick, pickAsr, pickBySpeed, speedKey, type Catalog, type CatalogAsr, type Choice, type Hardware } from '@cakapp/picker'
 import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'

@@ -1,4 +1,4 @@
-import type { Hardware } from '@yogurt/picker'
+import type { Hardware } from '@cakapp/picker'
 import { t } from '../shared/i18n'
 
 /**

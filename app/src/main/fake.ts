@@ -1,7 +1,7 @@
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { userDataDir } from './paths'
 import { basename, dirname, join } from 'node:path'
-import type { Hardware } from '@yogurt/picker'
+import type { Hardware } from '@cakapp/picker'
 import { DiskSpaceError, type DownloadDeps } from './downloader'
 import type { Helper } from './calendar'
 import type { Reading } from './detectSignals'

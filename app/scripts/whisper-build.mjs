@@ -47,8 +47,8 @@ if (!existsSync(out) || newer(script, out) || newer(patch, out) || newer(vadPatc
   git('checkout', '--quiet', '--force', WHISPER_COMMIT)
   const head = spawnSync('git', ['-C', dir, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim()
   if (head !== WHISPER_COMMIT) { console.error(`whisper.cpp is not at ${WHISPER_COMMIT}`); process.exit(1) }
-  git('apply', patch)
-  git('apply', vadPatch)
+  git('apply', '--ignore-whitespace', patch)
+  git('apply', '--ignore-whitespace', vadPatch)
 
   const build = join(dir, 'build')
   rmSync(build, { recursive: true, force: true })

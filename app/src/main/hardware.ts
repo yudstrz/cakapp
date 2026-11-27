@@ -1,5 +1,5 @@
 import os from 'node:os'
-import { asrCandidates, pick, pickAsr, type Catalog, type Hardware, type OS } from '@yogurt/picker'
+import { asrCandidates, pick, pickAsr, type Catalog, type Hardware, type OS } from '@cakapp/picker'
 import { realDeps } from './downloader'
 import { tooWeak } from './localCheck'
 import type { Installed, SpeedResult } from './setup'

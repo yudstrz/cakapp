@@ -1,4 +1,4 @@
-import { validateCatalog, type Catalog } from '@yogurt/picker'
+import { validateCatalog, type Catalog } from '@cakapp/picker'
 
 /**
  * The catalog that shipped with this build. Nothing is fetched at launch: nothing leaves the Mac except the update
