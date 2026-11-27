@@ -24,7 +24,8 @@ files:
   - out/**
   - package.json
   # compile-time llama.cpp source bundle, templates, linker files, source maps, and types are unused at runtime
-  - "!**/node_modules/node-llama-cpp/llama/**"
+  - "!**/node_modules/node-llama-cpp/llama/{addon,cmake,patches,profiles,toolchains,xpack}/**"
+  - "!**/node_modules/node-llama-cpp/llama/gitRelease.bundle"
   - "!**/node_modules/node-llama-cpp/templates/**"
   - "!**/node_modules/@node-llama-cpp/**/*.{lib,exp}"
   - "!**/node_modules/**/*.{map,d.ts,d.mts,d.cts,md,markdown}"
@@ -68,7 +69,8 @@ mac:
     # this Mac build only needs the Apple Silicon engine binaries
     - "!**/node_modules/@node-llama-cpp/{linux,win,mac-x64}*/**"
     - "!**/node_modules/node-llama-cpp/bins/{linux,win,mac-x64}*/**"
-    - "!**/node_modules/node-llama-cpp/llama/**"
+    - "!**/node_modules/node-llama-cpp/llama/{addon,cmake,patches,profiles,toolchains,xpack}/**"
+    - "!**/node_modules/node-llama-cpp/llama/gitRelease.bundle"
     - "!**/node_modules/node-llama-cpp/templates/**"
     - "!**/node_modules/@node-llama-cpp/**/*.{lib,exp}"
     - "!**/node_modules/**/*.{map,d.ts,d.mts,d.cts,md,markdown}"
@@ -110,7 +112,8 @@ win:
     # this Windows build only needs the x64 Windows engine binaries
     - "!**/node_modules/@node-llama-cpp/{linux,mac,win-arm64}*/**"
     - "!**/node_modules/node-llama-cpp/bins/{linux,mac,win-arm64}*/**"
-    - "!**/node_modules/node-llama-cpp/llama/**"
+    - "!**/node_modules/node-llama-cpp/llama/{addon,cmake,patches,profiles,toolchains,xpack}/**"
+    - "!**/node_modules/node-llama-cpp/llama/gitRelease.bundle"
     - "!**/node_modules/node-llama-cpp/templates/**"
     - "!**/node_modules/@node-llama-cpp/**/*.{lib,exp}"
     - "!**/node_modules/**/*.{map,d.ts,d.mts,d.cts,md,markdown}"
@@ -145,7 +148,8 @@ linux:
     # this Linux build only needs the x64 Linux engine binaries
     - "!**/node_modules/@node-llama-cpp/{mac,win,linux-arm,linux-riscv}*/**"
     - "!**/node_modules/node-llama-cpp/bins/{mac,win,linux-arm,linux-riscv}*/**"
-    - "!**/node_modules/node-llama-cpp/llama/**"
+    - "!**/node_modules/node-llama-cpp/llama/{addon,cmake,patches,profiles,toolchains,xpack}/**"
+    - "!**/node_modules/node-llama-cpp/llama/gitRelease.bundle"
     - "!**/node_modules/node-llama-cpp/templates/**"
     - "!**/node_modules/@node-llama-cpp/**/*.{lib,exp}"
     - "!**/node_modules/**/*.{map,d.ts,d.mts,d.cts,md,markdown}"

@@ -48,3 +48,9 @@ it("only Windows and Linux carry the speed check's clip: a Mac never times its s
 it('the Linux build starts through the launcher that picks X11 on Wayland (#8)', () => {
   expect(config).toMatch(/^afterPack: scripts\/linux-launcher\.cjs$/m)
 })
+
+it('keeps node-llama-cpp runtime files (binariesGithubRelease.json and grammars) in all builds', () => {
+  expect(config).not.toContain('!**/node_modules/node-llama-cpp/llama/**')
+  expect(config).toContain('!**/node_modules/node-llama-cpp/llama/{addon,cmake,patches,profiles,toolchains,xpack}/**')
+  expect(config).toContain('!**/node_modules/node-llama-cpp/llama/gitRelease.bundle')
+})
