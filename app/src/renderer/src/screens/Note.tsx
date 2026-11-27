@@ -34,6 +34,7 @@ import { useSmoothText } from '../useSmoothText'
 import { NoteAutosave, registerAutosave } from '../noteAutosave'
 import { People } from '../components/People'
 import { NoteDate } from '../components/NoteDate'
+import { dayLabel, timeOf } from '../dates'
 import { MicMenu } from '../components/MicMenu'
 import { SpokenMenu } from '../components/SpokenMenu'
 import { RecordingHint } from '../components/RecordingHint'
@@ -354,6 +355,8 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
     void window.yogurt.notes.writeAgain(id, note)
   }
   const hasSummary = !!notes.enhanced?.trim()
+  const summaryUpdatedAt = notes.updatedAt ?? m.updatedAt
+  const summaryUpdatedLabel = summaryUpdatedAt != null ? `${dayLabel(summaryUpdatedAt)}, ${timeOf(summaryUpdatedAt)}` : undefined
   const transcribing=transcriptionBusy(m.transcriptionState)
   const runTranscript=async(again=false)=>{if(!await saveAll())return;try{const started=await window.yogurt.transcript.run(id,again);if(started)setPrimary('transcript')}catch{toasts.add({title:t("Cakapp couldn't transcribe this file.")})}}
   const transcriptReason=recording||m.stopSavePending?t('Available after recording'):transcribing?t('Transcribing…'):summarizing?t('Summarizing…'):!hasAudio?t('Audio is unavailable.'):undefined
@@ -456,6 +459,32 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
             </div>
             {hasEnhanced && summaryPending && <span id="note-summary-phase" hidden>{notes.status === 'waiting' ? t('Preparing…') : t('Writing the summary')}</span>}
             {primary === 'transcript' && <div ref={setTranscriptToolbar} className="note-primary-tools" />}
+            {primary === 'notes' && shown === 'enhanced' && hasEnhanced && (summaryUpdatedLabel || generation) && (
+              <div className="note-primary-tools justify-end gap-3">
+                {hasSummary && summaryUpdatedLabel && (
+                  <span data-testid="note-summary-updated" className="text-[11px] text-muted whitespace-nowrap">
+                    {t('Updated {time}', { time: summaryUpdatedLabel })}
+                  </span>
+                )}
+                {generation && (
+                  <button
+                    type="button"
+                    data-testid="summary-regenerate-button"
+                    disabled={!!generation.reason}
+                    title={generation.reason ?? generation.label}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={() => {
+                      if (hasSummary && rewriteOpen) setRewriteOpen(false)
+                      else requestRewrite()
+                    }}
+                    className="ghost-btn flex items-center gap-1.5 px-2.5 text-xs font-medium text-ink disabled:opacity-45"
+                  >
+                    <RotateCcw size={13} aria-hidden="true" />
+                    <span>{generation.label}</span>
+                  </button>
+                )}
+              </div>
+            )}
             <span data-testid="note-tab-indicator" className="note-tab-indicator" aria-hidden="true" />
           </div>
         </header>

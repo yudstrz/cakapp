@@ -792,5 +792,6 @@
   "Send feedback": "Надіслати відгук",
   "Help and settings": "Довідка й налаштування",
   "Cakapp menu": "Меню Cakapp",
-  "Restart to update · {version}": "Перезапустити для оновлення · {version}"
+  "Restart to update · {version}": "Перезапустити для оновлення · {version}",
+  "Updated {time}": "Оновлено {time}"
 }

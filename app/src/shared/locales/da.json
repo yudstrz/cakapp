@@ -764,5 +764,6 @@
   "Send feedback": "Send feedback",
   "Help and settings": "Hjælp og indstillinger",
   "Cakapp menu": "Cakapp-menu",
-  "Restart to update · {version}": "Genstart for at opdatere · {version}"
+  "Restart to update · {version}": "Genstart for at opdatere · {version}",
+  "Updated {time}": "Opdateret {time}"
 }

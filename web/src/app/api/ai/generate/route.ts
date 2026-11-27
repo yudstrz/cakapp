@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   AiProxyError,
   getProviderAdapter,
+  getServerApiKey,
   resolveProviderApiKey,
   type AiProviderId,
   type TokenUsage,
@@ -126,8 +127,36 @@ export async function POST(req: NextRequest) {
     }
 
     const system = getSystemPromptForTask(task);
-    const adapter = getProviderAdapter(provider);
+    let activeProvider: AiProviderId = provider;
     const fallbackModelId = pickDefaultVerifiedModel(verified, provider);
+    const isRetryableError = (err: unknown): boolean =>
+      err instanceof AiProxyError &&
+      (err.code === 'MODEL_UNAVAILABLE' ||
+        err.code === 'RATE_LIMITED' ||
+        err.code === 'PROVIDER_ERROR' ||
+        err.code === 'TIMEOUT');
+    async function* alternateTargets(): AsyncGenerator<{ provider: AiProviderId; model: string; apiKey: string }> {
+      if (model !== fallbackModelId) {
+        yield { provider, model: fallbackModelId, apiKey };
+      }
+      if (!isByok) {
+        for (const altProvider of ['gemini', 'openai', 'anthropic'] as const) {
+          if (altProvider === provider) continue;
+          const altKey = getServerApiKey(altProvider);
+          if (!altKey) continue;
+          const altRes = await getVerifiedModelsForProvider(altProvider, {
+            cache,
+            allowPremium: isPremiumAllowed(),
+          }).catch(() => ({ models: [] }));
+          if (altRes.models.length === 0) continue;
+          yield {
+            provider: altProvider,
+            model: pickDefaultVerifiedModel(altRes.models, altProvider),
+            apiKey: altKey,
+          };
+        }
+      }
+    }
 
     // 55s internal timeout stays inside Vercel's 60s maxDuration.
     const controller = new AbortController();
@@ -140,19 +169,36 @@ export async function POST(req: NextRequest) {
       try {
         let result;
         try {
-          result = await adapter.generate({ model, system, input, signal: controller.signal, apiKey });
+          result = await getProviderAdapter(provider).generate({ model, system, input, signal: controller.signal, apiKey });
         } catch (err) {
-          if (err instanceof AiProxyError && err.code === 'MODEL_UNAVAILABLE' && model !== fallbackModelId) {
-            activeModel = fallbackModelId;
-            result = await adapter.generate({ model: fallbackModelId, system, input, signal: controller.signal, apiKey });
-          } else {
-            throw err;
+          if (controller.signal.aborted || !isRetryableError(err)) throw err;
+          let resolved;
+          let lastErr: unknown = err;
+          for await (const target of alternateTargets()) {
+            if (controller.signal.aborted) break;
+            try {
+              activeProvider = target.provider;
+              activeModel = target.model;
+              resolved = await getProviderAdapter(target.provider).generate({
+                model: target.model,
+                system,
+                input,
+                signal: controller.signal,
+                apiKey: target.apiKey,
+              });
+              break;
+            } catch (nextErr) {
+              lastErr = nextErr;
+              if (!isRetryableError(nextErr)) throw nextErr;
+            }
           }
+          if (!resolved) throw lastErr;
+          result = resolved;
         }
 
         if (!isByok) {
           await recordGlobalSpend({
-            provider,
+            provider: activeProvider,
             model: activeModel,
             inputTokens: result.usage.inputTokens,
             outputTokens: result.usage.outputTokens,
@@ -163,7 +209,7 @@ export async function POST(req: NextRequest) {
           JSON.stringify({
             event: 'ai_generate',
             userId,
-            provider,
+            provider: activeProvider,
             model: activeModel,
             task,
             inputTokens: result.usage.inputTokens,
@@ -204,9 +250,9 @@ export async function POST(req: NextRequest) {
             sendEvent('token', { text: token });
           };
 
-          const canFallback = model !== fallbackModelId;
-          const attemptSignal = canFallback ? AbortSignal.any([controller.signal, attemptController.signal]) : controller.signal;
-          if (canFallback) {
+          const hasBackupPath = model !== fallbackModelId || !isByok;
+          const attemptSignal = hasBackupPath ? AbortSignal.any([controller.signal, attemptController.signal]) : controller.signal;
+          if (hasBackupPath) {
             firstTokenTimer = setTimeout(() => {
               if (!firstTokenArrived) {
                 stalled = true;
@@ -216,27 +262,38 @@ export async function POST(req: NextRequest) {
           }
 
           try {
-            usage = await adapter.stream({ model, system, input, signal: attemptSignal, apiKey }, { onToken });
+            usage = await getProviderAdapter(provider).stream({ model, system, input, signal: attemptSignal, apiKey }, { onToken });
           } catch (err) {
             if (firstTokenTimer) clearTimeout(firstTokenTimer);
-            const shouldFallback =
-              canFallback &&
-              !firstTokenArrived &&
-              !controller.signal.aborted &&
-              (stalled || (err instanceof AiProxyError && err.code === 'MODEL_UNAVAILABLE'));
-            if (shouldFallback) {
-              activeModel = fallbackModelId;
-              usage = await adapter.stream({ model: fallbackModelId, system, input, signal: controller.signal, apiKey }, { onToken });
-            } else {
-              throw err;
+            const canRecover = !firstTokenArrived && !controller.signal.aborted && (stalled || isRetryableError(err));
+            if (!canRecover) throw err;
+
+            let streamedUsage: TokenUsage | undefined;
+            let lastErr: unknown = err;
+            for await (const target of alternateTargets()) {
+              if (controller.signal.aborted || firstTokenArrived) break;
+              try {
+                activeProvider = target.provider;
+                activeModel = target.model;
+                streamedUsage = await getProviderAdapter(target.provider).stream(
+                  { model: target.model, system, input, signal: controller.signal, apiKey: target.apiKey },
+                  { onToken },
+                );
+                break;
+              } catch (nextErr) {
+                lastErr = nextErr;
+                if (firstTokenArrived || !isRetryableError(nextErr)) throw nextErr;
+              }
             }
+            if (!streamedUsage) throw lastErr;
+            usage = streamedUsage;
           } finally {
             if (firstTokenTimer) clearTimeout(firstTokenTimer);
           }
 
           if (!isByok) {
             await recordGlobalSpend({
-              provider,
+              provider: activeProvider,
               model: activeModel,
               inputTokens: usage.inputTokens,
               outputTokens: usage.outputTokens,
@@ -247,7 +304,7 @@ export async function POST(req: NextRequest) {
             JSON.stringify({
               event: 'ai_generate_stream',
               userId,
-              provider,
+              provider: activeProvider,
               model: activeModel,
               task,
               inputTokens: usage.inputTokens,

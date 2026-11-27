@@ -412,16 +412,18 @@ export function createCloudLlm(
         if (signal?.aborted) throw err
         const notice = formatFallbackNotice(err)
         console.warn('[Cloud AI] Beralih otomatis ke AI Lokal:', err instanceof Error ? err.message : String(err))
-        emitAiFallbackNotice(notice)
 
         if (getLocalFallback) {
           const localLlm = await getLocalFallback().catch(() => null)
           if (localLlm) {
+            emitAiFallbackNotice(notice)
             return localLlm.chat(prompt, onToken, opts)
           }
+          emitAiFallbackNotice('Layanan Cloud AI sedang penuh/tidak terjangkau dan AI Lokal belum terpasang.')
           throw err
         }
 
+        emitAiFallbackNotice(notice)
         const local = globalAiManager.getProvider('local')
         return local.streamChat({
           messages: [{ role: 'user', content: fullInput }],

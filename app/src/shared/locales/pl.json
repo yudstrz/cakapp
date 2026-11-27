@@ -800,5 +800,6 @@
   "Send feedback": "Wyślij opinię",
   "Help and settings": "Pomoc i ustawienia",
   "Cakapp menu": "Menu Cakapp",
-  "Restart to update · {version}": "Uruchom ponownie, aby zaktualizować · {version}"
+  "Restart to update · {version}": "Uruchom ponownie, aby zaktualizować · {version}",
+  "Updated {time}": "Zaktualizowano {time}"
 }

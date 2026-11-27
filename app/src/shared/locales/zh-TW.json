@@ -722,5 +722,6 @@
   "Send feedback": "傳送意見回饋",
   "Help and settings": "說明與設定",
   "Cakapp menu": "Cakapp 選單",
-  "Restart to update · {version}": "重新啟動以更新 · {version}"
+  "Restart to update · {version}": "重新啟動以更新 · {version}",
+  "Updated {time}": "更新於 {time}"
 }

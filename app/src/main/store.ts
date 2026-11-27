@@ -276,7 +276,9 @@ export class Store {
       for (const r of this.db.prepare('SELECT id, title, event_id FROM meetings').all() as Row[]) set.run(sourceOf(String(r.title), r.event_id == null ? null : String(r.event_id)), String(r.id))
     }
     // who was at the meeting when its notes were written (a "names" column from voice naming is left as it is, unread)
-    if (!(this.db.prepare('PRAGMA table_info(notes)').all() as Row[]).some((r) => r.name === 'written_with')) this.db.exec('ALTER TABLE notes ADD COLUMN written_with TEXT')
+    const noteCols = (this.db.prepare('PRAGMA table_info(notes)').all() as Row[]).map((r) => String(r.name))
+    if (!noteCols.includes('written_with')) this.db.exec('ALTER TABLE notes ADD COLUMN written_with TEXT')
+    if (!noteCols.includes('enhanced_updated_at')) this.db.exec('ALTER TABLE notes ADD COLUMN enhanced_updated_at INTEGER')
     const segmentCols = (this.db.prepare('PRAGMA table_info(segments)').all() as Row[]).map((r) => String(r.name))
     if (!segmentCols.includes('hidden')) this.db.exec('ALTER TABLE segments ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0')
     if (!segmentCols.includes('echo_confident')) {
@@ -614,13 +616,21 @@ export class Store {
     const r = this.db.prepare('SELECT mine, enhanced, edited FROM notes WHERE meeting_id = ?').get(meetingId) as Row | undefined
     return r ? { mine: String(r.mine), enhanced: r.enhanced == null ? null : String(r.enhanced), edited: Number(r.edited) === 1 } : { mine: '', enhanced: null, edited: false }
   }
+  /** When the enhanced summary was last generated or edited, if known */
+  notesUpdatedAt(meetingId: string): number | undefined {
+    const r = this.db.prepare('SELECT enhanced, enhanced_updated_at FROM notes WHERE meeting_id = ?').get(meetingId) as Row | undefined
+    if (!r || r.enhanced == null) return undefined
+    return r.enhanced_updated_at != null ? Number(r.enhanced_updated_at) : undefined
+  }
   setNotes(meetingId: string, patch: Partial<Notes>) {
     const cur = this.notes(meetingId)
     const mine = patch.mine ?? cur.mine
     const enhanced = patch.enhanced === undefined ? cur.enhanced : patch.enhanced
     const edited = patch.edited ?? cur.edited
-    this.db.prepare('INSERT INTO notes (meeting_id, mine, enhanced, edited) VALUES (?, ?, ?, ?) ON CONFLICT(meeting_id) DO UPDATE SET mine = excluded.mine, enhanced = excluded.enhanced, edited = excluded.edited')
-      .run(meetingId, mine, enhanced, edited ? 1 : 0)
+    const prevUpdatedAt = (this.db.prepare('SELECT enhanced_updated_at FROM notes WHERE meeting_id = ?').get(meetingId) as Row | undefined)?.enhanced_updated_at
+    const enhancedUpdatedAt = patch.enhanced !== undefined ? (patch.enhanced === null ? null : Date.now()) : (prevUpdatedAt != null ? Number(prevUpdatedAt) : null)
+    this.db.prepare('INSERT INTO notes (meeting_id, mine, enhanced, edited, enhanced_updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(meeting_id) DO UPDATE SET mine = excluded.mine, enhanced = excluded.enhanced, edited = excluded.edited, enhanced_updated_at = excluded.enhanced_updated_at')
+      .run(meetingId, mine, enhanced, edited ? 1 : 0, enhancedUpdatedAt)
     this.db.prepare("UPDATE meetings SET updated_at = ?, sync_status = 'pending' WHERE id = ?").run(Date.now(), meetingId)
   }
 

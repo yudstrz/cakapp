@@ -752,5 +752,6 @@
   "Send feedback": "फ़ीडबैक भेजें",
   "Help and settings": "सहायता और सेटिंग",
   "Cakapp menu": "Cakapp मेन्यू",
-  "Restart to update · {version}": "अपडेट के लिए रीस्टार्ट करें · {version}"
+  "Restart to update · {version}": "अपडेट के लिए रीस्टार्ट करें · {version}",
+  "Updated {time}": "अपडेट किया गया {time}"
 }

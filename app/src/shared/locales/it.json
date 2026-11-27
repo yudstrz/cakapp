@@ -783,5 +783,6 @@
   "Send feedback": "Invia feedback",
   "Help and settings": "Aiuto e impostazioni",
   "Cakapp menu": "Menu di Cakapp",
-  "Restart to update · {version}": "Riavvia per aggiornare · {version}"
+  "Restart to update · {version}": "Riavvia per aggiornare · {version}",
+  "Updated {time}": "Aggiornato {time}"
 }

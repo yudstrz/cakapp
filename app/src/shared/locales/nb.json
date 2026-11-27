@@ -764,5 +764,6 @@
   "Send feedback": "Send tilbakemelding",
   "Help and settings": "Hjelp og innstillinger",
   "Cakapp menu": "Cakapp-meny",
-  "Restart to update · {version}": "Start på nytt for å oppdatere · {version}"
+  "Restart to update · {version}": "Start på nytt for å oppdatere · {version}",
+  "Updated {time}": "Oppdatert {time}"
 }

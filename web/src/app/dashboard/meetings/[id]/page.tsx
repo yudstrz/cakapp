@@ -40,7 +40,7 @@ export default async function MeetingDetailPage({
     share_token: string | null;
     workspace_id: string | null;
   };
-  let notes: { mine?: string; enhanced?: string } | null = null;
+  let notes: { mine?: string; enhanced?: string; updated_at?: string | number | null } | null = null;
   let transcriptRows: Array<{
     id: number;
     speaker: string;
@@ -96,7 +96,7 @@ export default async function MeetingDetailPage({
       FROM notes
       WHERE meeting_id = ${id}
       LIMIT 1
-    `) as Array<{ mine?: string; enhanced?: string }>;
+    `) as Array<{ mine?: string; enhanced?: string; updated_at?: string | number | null }>;
     notes = noteRows[0] || null;
 
     const rawTranscripts = (await sql`
@@ -209,6 +209,7 @@ export default async function MeetingDetailPage({
       <CloudAiMeetingSection
         meetingId={id}
         initialContent={notes?.enhanced || notes?.mine || ''}
+        initialUpdatedAt={notes?.updated_at != null ? String(notes.updated_at) : null}
         transcripts={transcriptRows}
         readOnly={isShowcase || !canEdit}
       />

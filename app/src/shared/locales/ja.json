@@ -722,5 +722,6 @@
   "Send feedback": "フィードバックを送信",
   "Help and settings": "ヘルプと設定",
   "Cakapp menu": "Cakapp メニュー",
-  "Restart to update · {version}": "再起動してアップデート · {version}"
+  "Restart to update · {version}": "再起動してアップデート · {version}",
+  "Updated {time}": "更新: {time}"
 }

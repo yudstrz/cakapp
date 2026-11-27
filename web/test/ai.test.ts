@@ -507,7 +507,9 @@ describe('AI Backend Proxy & Protections', () => {
         );
       }
 
-      geminiBodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+      if (u.includes('generativelanguage.googleapis.com') && init?.body) {
+        geminiBodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+      }
 
       if (u.includes('gemini-3.8-flash:streamGenerateContent')) {
         return new Promise<Response>((_resolve, reject) => {
@@ -562,5 +564,69 @@ describe('AI Backend Proxy & Protections', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('recovers automatically when selected Gemini model returns 503 UNAVAILABLE and falls back across providers when Gemini is congested', async () => {
+    globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
+      const u = String(url);
+      if (u.includes('generativelanguage.googleapis.com/v1beta/models?')) {
+        return new Response(
+          JSON.stringify({
+            models: [
+              { name: 'models/gemini-3.5-flash-lite', supportedGenerationMethods: ['generateContent'] },
+              { name: 'models/gemini-3.8-flash', supportedGenerationMethods: ['generateContent'] },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      if (u.includes('api.openai.com/v1/models')) {
+        return new Response(JSON.stringify({ data: [{ id: 'gpt-6-luna' }] }), { status: 200 });
+      }
+      if (u.includes('gemini-3.8-flash:streamGenerateContent')) {
+        return new Response(
+          JSON.stringify({ error: { code: 503, message: 'This model is currently experiencing high demand.', status: 'UNAVAILABLE' } }),
+          { status: 503 },
+        );
+      }
+      if (u.includes('gemini-3.5-flash-lite:streamGenerateContent')) {
+        return new Response(
+          JSON.stringify({ error: { code: 503, message: 'High demand', status: 'UNAVAILABLE' } }),
+          { status: 503 },
+        );
+      }
+      if (u.includes('api.openai.com/v1/responses')) {
+        const encoder = new TextEncoder();
+        const sse = [
+          'data: {"type":"response.output_text.delta","delta":"Disetujui pemegang saham."}\n\n',
+          'data: {"type":"response.completed","response":{"usage":{"input_tokens":15,"output_tokens":4}}}\n\n',
+        ].join('');
+        return new Response(
+          new ReadableStream({
+            start(ctrl) {
+              ctrl.enqueue(encoder.encode(sse));
+              ctrl.close();
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+        );
+      }
+      return new Response('Not found', { status: 404 });
+    }) as unknown as typeof fetch;
+
+    const req = makeRequest('http://localhost:3000/api/ai/generate', {
+      body: {
+        provider: 'gemini',
+        model: 'gemini-3.8-flash',
+        task: 'tanya',
+        input: 'What was decided?',
+        stream: true,
+      },
+    });
+    const res = await generatePost(req);
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain('Disetujui pemegang saham.');
+    expect(body).toContain('"model":"gpt-6-luna"');
   });
 });

@@ -750,5 +750,6 @@
   "auth-rate-limit": "Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.",
   "auth-email-unconfirmed": "Konfirmasi email Anda sebelum masuk.",
   "auth-oauth-callback-failed": "Login Google belum selesai. Kembali ke Cakapp lalu coba lagi.",
-  "auth-generic-error": "Login tidak dapat diselesaikan. Periksa koneksi lalu coba lagi."
+  "auth-generic-error": "Login tidak dapat diselesaikan. Periksa koneksi lalu coba lagi.",
+  "Updated {time}": "Diperbarui {time}"
 }

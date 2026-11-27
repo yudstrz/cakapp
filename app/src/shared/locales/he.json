@@ -774,5 +774,6 @@
   "Send feedback": "שליחת משוב",
   "Help and settings": "עזרה והגדרות",
   "Cakapp menu": "תפריט Cakapp",
-  "Restart to update · {version}": "הפעלה מחדש לעדכון · {version}"
+  "Restart to update · {version}": "הפעלה מחדש לעדכון · {version}",
+  "Updated {time}": "עודכן {time}"
 }

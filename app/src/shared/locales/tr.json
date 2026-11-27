@@ -752,5 +752,6 @@
   "Send feedback": "Geri bildirim gönder",
   "Help and settings": "Yardım ve ayarlar",
   "Cakapp menu": "Cakapp menüsü",
-  "Restart to update · {version}": "Güncellemek için yeniden başlat · {version}"
+  "Restart to update · {version}": "Güncellemek için yeniden başlat · {version}",
+  "Updated {time}": "Güncellendi {time}"
 }

@@ -764,5 +764,6 @@
   "Send feedback": "Magpadala ng feedback",
   "Help and settings": "Tulong at mga setting",
   "Cakapp menu": "Menu ng Cakapp",
-  "Restart to update · {version}": "I-restart para mag-update · {version}"
+  "Restart to update · {version}": "I-restart para mag-update · {version}",
+  "Updated {time}": "Na-update {time}"
 }

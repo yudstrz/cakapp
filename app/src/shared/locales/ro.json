@@ -781,5 +781,6 @@
   "Send feedback": "Trimite feedback",
   "Help and settings": "Ajutor și setări",
   "Cakapp menu": "Meniul Cakapp",
-  "Restart to update · {version}": "Repornește pentru actualizare · {version}"
+  "Restart to update · {version}": "Repornește pentru actualizare · {version}",
+  "Updated {time}": "Actualizat {time}"
 }

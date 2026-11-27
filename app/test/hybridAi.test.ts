@@ -119,7 +119,7 @@ Dimas (QA): Tolong follow up action item jadwal deployment dan PIC pengujian ke 
   describe('TC-3.3: Chunking Map-Reduce & Smart Fallback Otomatis ke AI Lokal', () => {
     it('chunks long transcripts into map-reduce requests via server proxy transport', async () => {
       const seenTasks: string[] = []
-      const transport = vi.fn(async (req: { task: 'notulen' | 'ringkasan'; model: string; onToken?: (t: string) => void }) => {
+      const transport = vi.fn(async (req: { task: 'notulen' | 'ringkasan' | 'tanya'; model: string; onToken?: (t: string) => void }) => {
         seenTasks.push(req.task)
         const text = req.task === 'ringkasan' ? 'Intisari bagian' : '### Ringkasan Eksekutif\nNotulen final proxy'
         req.onToken?.(text)

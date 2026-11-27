@@ -88,9 +88,12 @@ describe('store', () => {
     const s = fresh()
     const m = s.createMeeting({ ...base, startedAt: 1 })
     expect(s.notes(m.id)).toEqual({ mine: '', enhanced: null, edited: false })
+    expect(s.notesUpdatedAt(m.id)).toBeUndefined()
     s.setNotes(m.id, { mine: 'hello' })
+    expect(s.notesUpdatedAt(m.id)).toBeUndefined()
     s.setNotes(m.id, { enhanced: '# Summary' })
     expect(s.notes(m.id)).toEqual({ mine: 'hello', enhanced: '# Summary', edited: false })
+    expect(s.notesUpdatedAt(m.id)).toBeTypeOf('number')
     // the person changed the enhanced notes: "Write again" asks first
     s.setNotes(m.id, { enhanced: '# Mine now', edited: true })
     expect(s.notes(m.id)).toEqual({ mine: 'hello', enhanced: '# Mine now', edited: true })

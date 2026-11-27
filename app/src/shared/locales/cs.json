@@ -795,5 +795,6 @@
   "Send feedback": "Odeslat zpětnou vazbu",
   "Help and settings": "Nápověda a nastavení",
   "Cakapp menu": "Nabídka Cakapp",
-  "Restart to update · {version}": "Restartovat a aktualizovat · {version}"
+  "Restart to update · {version}": "Restartovat a aktualizovat · {version}",
+  "Updated {time}": "Aktualizováno {time}"
 }

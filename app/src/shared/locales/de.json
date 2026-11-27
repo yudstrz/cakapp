@@ -764,5 +764,6 @@
   "Send feedback": "Feedback senden",
   "Help and settings": "Hilfe und Einstellungen",
   "Cakapp menu": "Cakapp-Menü",
-  "Restart to update · {version}": "Zum Aktualisieren neu starten · {version}"
+  "Restart to update · {version}": "Zum Aktualisieren neu starten · {version}",
+  "Updated {time}": "Aktualisiert {time}"
 }

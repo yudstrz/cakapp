@@ -820,5 +820,6 @@
   "Send feedback": "إرسال ملاحظات",
   "Help and settings": "المساعدة والإعدادات",
   "Cakapp menu": "قائمة Cakapp",
-  "Restart to update · {version}": "إعادة التشغيل للتحديث · {version}"
+  "Restart to update · {version}": "إعادة التشغيل للتحديث · {version}",
+  "Updated {time}": "تم التحديث {time}"
 }

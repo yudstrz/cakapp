@@ -770,5 +770,6 @@
   "Send feedback": "Lähetä palautetta",
   "Help and settings": "Ohje ja asetukset",
   "Cakapp menu": "Cakapp-valikko",
-  "Restart to update · {version}": "Käynnistä uudelleen ja päivitä · {version}"
+  "Restart to update · {version}": "Käynnistä uudelleen ja päivitä · {version}",
+  "Updated {time}": "Päivitetty {time}"
 }

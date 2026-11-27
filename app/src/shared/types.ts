@@ -472,6 +472,8 @@ export type NoteSide = 'mine' | 'enhanced'
 export type NoteSaveResult = { revision: number; status: 'saved' | 'failed'; retained?: boolean; reason?: 'too-long' }
 export type NoteView = {
   meetingId: string; mine: string; enhanced: string | null; edited: boolean; status: NoteStatus; draft: string
+  /** timestamp when enhanced summary was last written or edited */
+  updatedAt?: number
   /** a long meeting is read in parts before the notes are written: which one */
   part?: { part: number; of: number }
   /** Windows and Linux: waiting while the notes model loads (it can take a while there) */

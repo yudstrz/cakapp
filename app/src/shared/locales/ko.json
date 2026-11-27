@@ -722,5 +722,6 @@
   "Send feedback": "의견 보내기",
   "Help and settings": "도움말 및 설정",
   "Cakapp menu": "Cakapp 메뉴",
-  "Restart to update · {version}": "다시 시작하여 업데이트 · {version}"
+  "Restart to update · {version}": "다시 시작하여 업데이트 · {version}",
+  "Updated {time}": "업데이트됨: {time}"
 }

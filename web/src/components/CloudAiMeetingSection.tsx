@@ -47,16 +47,19 @@ export interface WebAiPreferences {
 export default function CloudAiMeetingSection({
   meetingId,
   initialContent,
+  initialUpdatedAt = null,
   transcripts,
   readOnly = false,
 }: {
   meetingId: string;
   initialContent: string;
+  initialUpdatedAt?: string | null;
   transcripts: TranscriptItem[];
   readOnly?: boolean;
 }) {
   const router = useRouter();
   const [content, setContent] = useState(initialContent);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(initialUpdatedAt);
   const [localTranscripts, setLocalTranscripts] = useState<TranscriptItem[]>(transcripts);
   const [provider, setProvider] = useState<ClientAiProviderId>('gemini');
   const [sttProvider, setSttProvider] = useState<WebSttProviderId>('gemini');
@@ -289,6 +292,7 @@ export default function CloudAiMeetingSection({
       });
 
       setContent(result.text);
+      setLastUpdatedAt(String(Date.now()));
       setPartInfo('');
 
       await fetch(`/api/meetings/${encodeURIComponent(meetingId)}/notes`, {
@@ -329,6 +333,13 @@ export default function CloudAiMeetingSection({
 
   const activeModels = modelsByProvider[provider] ?? [];
   const activeModelId = selectedModels[provider] ?? '';
+  const hasExistingSummary = Boolean(content.trim());
+  const formattedUpdated = lastUpdatedAt
+    ? new Date(Number.isFinite(Number(lastUpdatedAt)) ? Number(lastUpdatedAt) : lastUpdatedAt).toLocaleString('id-ID', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      })
+    : '';
 
   return (
     <div className="rounded-2xl border border-line bg-card p-5 sm:p-7">
@@ -337,6 +348,11 @@ export default function CloudAiMeetingSection({
           <h2 className="font-display text-base sm:text-lg font-semibold text-ink">
             Notulen & Ringkasan Rapat
           </h2>
+          {formattedUpdated && hasExistingSummary && (
+            <p className="mt-1 text-xs text-muted">
+              Terakhir diperbarui: {formattedUpdated}
+            </p>
+          )}
           {!readOnly && hasByok && (
             <p className="mt-1 text-xs font-medium text-accent">
               Mode BYOK aktif pada sesi ini
@@ -447,7 +463,7 @@ export default function CloudAiMeetingSection({
               onClick={() => void handleGenerate('notulen')}
               className="min-h-[44px] sm:min-h-[38px] rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-ink hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
-              {busyTask === 'notulen' ? partInfo || 'Menyusun Notulen...' : 'Buat Notulen'}
+              {busyTask === 'notulen' ? partInfo || 'Menyusun Notulen...' : hasExistingSummary ? 'Buat Ulang Notulen' : 'Buat Notulen'}
             </button>
             <button
               type="button"
@@ -455,7 +471,7 @@ export default function CloudAiMeetingSection({
               onClick={() => void handleGenerate('ringkasan')}
               className="min-h-[44px] sm:min-h-[38px] rounded-xl border border-control bg-paper px-4 py-2 text-xs font-semibold text-ink hover:bg-chrome disabled:opacity-50 transition-colors"
             >
-              {busyTask === 'ringkasan' ? partInfo || 'Meringkas...' : 'Buat Ringkasan'}
+              {busyTask === 'ringkasan' ? partInfo || 'Meringkas...' : hasExistingSummary ? 'Ringkas Ulang' : 'Buat Ringkasan'}
             </button>
             <button
               type="button"

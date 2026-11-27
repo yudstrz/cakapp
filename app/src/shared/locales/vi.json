@@ -722,5 +722,6 @@
   "Send feedback": "Gửi ý kiến phản hồi",
   "Help and settings": "Trợ giúp và cài đặt",
   "Cakapp menu": "Menu Cakapp",
-  "Restart to update · {version}": "Khởi động lại để cập nhật · {version}"
+  "Restart to update · {version}": "Khởi động lại để cập nhật · {version}",
+  "Updated {time}": "Đã cập nhật {time}"
 }
