@@ -122,13 +122,44 @@ export function getDailyBudgetUsd(): number {
 
 export interface RateCheckResult {
   remainingMinute: number;
-  remainingDailyReq: number;
-  remainingDailyTokens: number;
+  unlimited: true;
+}
+
+async function enforceGlobalAndIpLimits(params: {
+  ip: string;
+  ipPrefix: string;
+  ipPerMinute: number;
+  ipExceededMessage: string;
+  budgetExceededMessage: string;
+  redis?: Redis | null;
+}): Promise<RateCheckResult> {
+  if (isKillSwitchActive()) {
+    throw new AiProxyError('BUDGET_EXCEEDED', 'Layanan Cloud AI sedang dinonaktifkan sementara oleh administrator.', 503, 300);
+  }
+
+  const redis = params.redis !== undefined ? params.redis : getRedis();
+  if (!redis) {
+    return { remainingMinute: params.ipPerMinute, unlimited: true };
+  }
+
+  const { dayKey, secondsUntilMidnight } = getWibDayInfo();
+  const currentSpend = Number((await redis.get<number>(`ai:budget:usd:${dayKey}`)) ?? 0);
+  if (currentSpend >= getDailyBudgetUsd()) {
+    throw new AiProxyError('BUDGET_EXCEEDED', params.budgetExceededMessage, 429, secondsUntilMidnight);
+  }
+
+  const ipRes = await getSlidingLimiter(redis, params.ipPrefix, params.ipPerMinute).limit(params.ip || 'unknown');
+  if (!ipRes.success) {
+    const retryAfter = Math.max(1, Math.ceil((ipRes.reset - Date.now()) / 1000));
+    throw new AiProxyError('RATE_LIMITED', params.ipExceededMessage, 429, retryAfter);
+  }
+
+  return { remainingMinute: ipRes.remaining, unlimited: true };
 }
 
 /**
- * Enforce kill switch, daily global USD budget, per-IP sliding window, per-user minute window, and WIB daily quota.
- * ponytail: when Redis env is unset in local dev, fails open so offline dev works without Upstash.
+ * Enforce kill switch, global daily USD cap, and per-IP anti-flood window only.
+ * Per-account request and token quotas are disabled.
  */
 export async function enforceAiLimits(params: {
   userId: string;
@@ -137,92 +168,14 @@ export async function enforceAiLimits(params: {
   estimatedInputTokens: number;
   redis?: Redis | null;
 }): Promise<RateCheckResult> {
-  if (isKillSwitchActive()) {
-    throw new AiProxyError('BUDGET_EXCEEDED', 'Layanan Cloud AI sedang dinonaktifkan sementara oleh administrator.', 503, 300);
-  }
-
-  const tier: UserTier = params.tier ?? 'free';
-  const limits = TIER_LIMITS[tier];
-  const redis = params.redis !== undefined ? params.redis : getRedis();
-
-  if (!redis) {
-    return {
-      remainingMinute: limits.reqPerMinute,
-      remainingDailyReq: limits.reqPerDay,
-      remainingDailyTokens: limits.inputTokensPerDay,
-    };
-  }
-
-  const { dayKey, secondsUntilMidnight } = getWibDayInfo();
-
-  const budgetKey = `ai:budget:usd:${dayKey}`;
-  const currentSpend = Number((await redis.get<number>(budgetKey)) ?? 0);
-  if (currentSpend >= getDailyBudgetUsd()) {
-    throw new AiProxyError(
-      'BUDGET_EXCEEDED',
-      'Batas anggaran harian Cloud AI global telah tercapai. Silakan gunakan AI Lokal.',
-      429,
-      secondsUntilMidnight,
-    );
-  }
-
-  const ipLimiter = getSlidingLimiter(redis, 'ai:rl:ip', IP_REQ_PER_MINUTE);
-  const ipRes = await ipLimiter.limit(params.ip || 'unknown');
-  if (!ipRes.success) {
-    const retryAfter = Math.max(1, Math.ceil((ipRes.reset - Date.now()) / 1000));
-    throw new AiProxyError('RATE_LIMITED', 'Terlalu banyak permintaan dari IP ini. Coba lagi sebentar.', 429, retryAfter);
-  }
-
-  const userLimiter = getSlidingLimiter(redis, `ai:rl:user:${tier}`, limits.reqPerMinute);
-  const userRes = await userLimiter.limit(params.userId);
-  if (!userRes.success) {
-    const retryAfter = Math.max(1, Math.ceil((userRes.reset - Date.now()) / 1000));
-    throw new AiProxyError(
-      'RATE_LIMITED',
-      `Batas ${limits.reqPerMinute} permintaan per menit tercapai. Tunggu ${retryAfter} detik.`,
-      429,
-      retryAfter,
-    );
-  }
-
-  const reqKey = `ai:daily:req:${dayKey}:${params.userId}`;
-  const tokKey = `ai:daily:tok:${dayKey}:${params.userId}`;
-  const [usedReqRaw, usedTokRaw] = await Promise.all([
-    redis.get<number>(reqKey),
-    redis.get<number>(tokKey),
-  ]);
-  const usedReq = Number(usedReqRaw ?? 0);
-  const usedTok = Number(usedTokRaw ?? 0);
-
-  if (usedReq >= limits.reqPerDay) {
-    throw new AiProxyError(
-      'QUOTA_EXCEEDED',
-      `Kuota harian (${limits.reqPerDay} request/hari) sudah habis. Reset pukul 00:00 WIB.`,
-      429,
-      secondsUntilMidnight,
-    );
-  }
-
-  if (usedTok + params.estimatedInputTokens > limits.inputTokensPerDay) {
-    throw new AiProxyError(
-      'QUOTA_EXCEEDED',
-      `Kuota token input harian (${limits.inputTokensPerDay.toLocaleString('id-ID')} token/hari) tidak mencukupi. Reset pukul 00:00 WIB.`,
-      429,
-      secondsUntilMidnight,
-    );
-  }
-
-  const newReq = await redis.incr(reqKey);
-  if (newReq === 1) await redis.expire(reqKey, secondsUntilMidnight);
-
-  const newTok = await redis.incrby(tokKey, params.estimatedInputTokens);
-  if (newTok === params.estimatedInputTokens) await redis.expire(tokKey, secondsUntilMidnight);
-
-  return {
-    remainingMinute: userRes.remaining,
-    remainingDailyReq: Math.max(0, limits.reqPerDay - newReq),
-    remainingDailyTokens: Math.max(0, limits.inputTokensPerDay - newTok),
-  };
+  return enforceGlobalAndIpLimits({
+    ip: params.ip,
+    ipPrefix: 'ai:rl:ip',
+    ipPerMinute: IP_REQ_PER_MINUTE,
+    ipExceededMessage: 'Terlalu banyak permintaan dari IP ini. Coba lagi sebentar.',
+    budgetExceededMessage: 'Batas anggaran harian Cloud AI global telah tercapai. Silakan gunakan AI Lokal.',
+    redis: params.redis,
+  });
 }
 
 export async function recordRawUsdSpend(costUsd: number, redisArg?: Redis | null): Promise<number> {
@@ -253,109 +206,31 @@ export async function enforceSttLimits(params: {
   ip: string;
   tier?: UserTier;
   redis?: Redis | null;
-}): Promise<{ remainingMinute: number; remainingDailyChunks: number }> {
-  if (isKillSwitchActive()) {
-    throw new AiProxyError('BUDGET_EXCEEDED', 'Layanan Cloud AI sedang dinonaktifkan sementara oleh administrator.', 503, 300);
-  }
-
-  const tier: UserTier = params.tier ?? 'free';
-  const limits = TIER_LIMITS[tier];
-  const redis = params.redis !== undefined ? params.redis : getRedis();
-
-  if (!redis) {
-    return {
-      remainingMinute: limits.sttChunksPerMinute,
-      remainingDailyChunks: limits.sttChunksPerDay,
-    };
-  }
-
-  const { dayKey, secondsUntilMidnight } = getWibDayInfo();
-
-  const budgetKey = `ai:budget:usd:${dayKey}`;
-  const currentSpend = Number((await redis.get<number>(budgetKey)) ?? 0);
-  if (currentSpend >= getDailyBudgetUsd()) {
-    throw new AiProxyError(
-      'BUDGET_EXCEEDED',
-      'Batas anggaran harian Cloud AI global telah tercapai. Beralih ke Whisper Lokal.',
-      429,
-      secondsUntilMidnight,
-    );
-  }
-
-  const ipLimiter = getSlidingLimiter(redis, 'ai:rl:stt:ip', IP_STT_REQ_PER_MINUTE);
-  const ipRes = await ipLimiter.limit(params.ip || 'unknown');
-  if (!ipRes.success) {
-    const retryAfter = Math.max(1, Math.ceil((ipRes.reset - Date.now()) / 1000));
-    throw new AiProxyError('RATE_LIMITED', 'Terlalu banyak potongan audio per menit dari IP ini.', 429, retryAfter);
-  }
-
-  const userLimiter = getSlidingLimiter(redis, `ai:rl:stt:user:${tier}`, limits.sttChunksPerMinute);
-  const userRes = await userLimiter.limit(params.userId);
-  if (!userRes.success) {
-    const retryAfter = Math.max(1, Math.ceil((userRes.reset - Date.now()) / 1000));
-    throw new AiProxyError('RATE_LIMITED', `Batas transkripsi ${limits.sttChunksPerMinute} potongan/menit tercapai.`, 429, retryAfter);
-  }
-
-  const sttDayKey = `ai:daily:stt:${dayKey}:${params.userId}`;
-  const usedChunks = Number((await redis.get<number>(sttDayKey)) ?? 0);
-  if (usedChunks >= limits.sttChunksPerDay) {
-    throw new AiProxyError(
-      'QUOTA_EXCEEDED',
-      `Kuota transkripsi suara harian (${limits.sttChunksPerDay} potongan/hari) habis. Reset pukul 00:00 WIB.`,
-      429,
-      secondsUntilMidnight,
-    );
-  }
-
-  const nextChunks = await redis.incr(sttDayKey);
-  if (nextChunks === 1) await redis.expire(sttDayKey, secondsUntilMidnight);
-
-  return {
-    remainingMinute: userRes.remaining,
-    remainingDailyChunks: Math.max(0, limits.sttChunksPerDay - nextChunks),
-  };
+}): Promise<RateCheckResult> {
+  return enforceGlobalAndIpLimits({
+    ip: params.ip,
+    ipPrefix: 'ai:rl:stt:ip',
+    ipPerMinute: IP_STT_REQ_PER_MINUTE,
+    ipExceededMessage: 'Terlalu banyak potongan audio per menit dari IP ini.',
+    budgetExceededMessage: 'Batas anggaran harian Cloud AI global telah tercapai. Beralih ke Whisper Lokal.',
+    redis: params.redis,
+  });
 }
 
-export async function getUserUsage(userId: string, tier: UserTier = 'free', redis: Redis | null = getRedis()) {
-  const limits = TIER_LIMITS[tier];
-  const { dayKey, resetAtIso } = getWibDayInfo();
-
-  if (!redis) {
-    return {
-      tier,
-      usedRequests: 0,
-      limitRequests: limits.reqPerDay,
-      remainingRequests: limits.reqPerDay,
-      usedInputTokens: 0,
-      limitInputTokens: limits.inputTokensPerDay,
-      remainingInputTokens: limits.inputTokensPerDay,
-      usedSttChunks: 0,
-      limitSttChunks: limits.sttChunksPerDay,
-      remainingSttChunks: limits.sttChunksPerDay,
-      resetAt: resetAtIso,
-    };
-  }
-
-  const [usedReqRaw, usedTokRaw, usedSttRaw] = await Promise.all([
-    redis.get<number>(`ai:daily:req:${dayKey}:${userId}`),
-    redis.get<number>(`ai:daily:tok:${dayKey}:${userId}`),
-    redis.get<number>(`ai:daily:stt:${dayKey}:${userId}`),
-  ]);
-  const usedRequests = Number(usedReqRaw ?? 0);
-  const usedInputTokens = Number(usedTokRaw ?? 0);
-  const usedSttChunks = Number(usedSttRaw ?? 0);
-
+export async function getUserUsage(_userId: string, _tier: UserTier = 'free', _redis: Redis | null = getRedis()) {
+  const { resetAtIso } = getWibDayInfo();
   return {
-    tier,
-    usedRequests,
-    limitRequests: limits.reqPerDay,
-    remainingRequests: Math.max(0, limits.reqPerDay - usedRequests),
-    usedInputTokens,
-    limitInputTokens: limits.inputTokensPerDay,
-    remainingInputTokens: Math.max(0, limits.inputTokensPerDay - usedInputTokens),
-    usedSttChunks,
-    limitSttChunks: limits.sttChunksPerDay,
-    remainingSttChunks: Math.max(0, limits.sttChunksPerDay - usedSttChunks),
+    unlimited: true,
+    tier: 'unlimited',
+    usedRequests: 0,
+    limitRequests: null,
+    remainingRequests: null,
+    usedInputTokens: 0,
+    limitInputTokens: null,
+    remainingInputTokens: null,
+    usedSttChunks: 0,
+    limitSttChunks: null,
+    remainingSttChunks: null,
     resetAt: resetAtIso,
   };
 }

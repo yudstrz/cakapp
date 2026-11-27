@@ -121,7 +121,6 @@ export async function POST(req: NextRequest) {
       });
       rateHeaders = {
         'X-RateLimit-Remaining': String(limitRes.remainingMinute),
-        'X-Daily-Quota-Remaining': String(limitRes.remainingDailyReq),
       };
     }
 

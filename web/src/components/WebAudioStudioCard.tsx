@@ -18,7 +18,6 @@ export default function WebAudioStudioCard() {
   const router = useRouter();
   const [sttProvider, setSttProvider] = useState<WebSttProviderId>('gemini');
   const [saveAudioToCloud, setSaveAudioToCloud] = useState(true);
-  const [quotaLabel, setQuotaLabel] = useState('');
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
@@ -41,17 +40,6 @@ export default function WebAudioStudioCard() {
     } catch {
       // Ignore corrupt storage.
     }
-
-    void fetch('/api/ai/usage')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((u: { remainingRequests?: number; limitRequests?: number; remainingSttChunks?: number; limitSttChunks?: number } | null) => {
-        if (u && u.remainingRequests !== undefined) {
-          setQuotaLabel(
-            `Sisa kuota hari ini: ${u.remainingRequests}/${u.limitRequests} notulen · ${u.remainingSttChunks ?? 0}/${u.limitSttChunks ?? 180} potongan suara`,
-          );
-        }
-      })
-      .catch(() => {});
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -227,9 +215,7 @@ export default function WebAudioStudioCard() {
             Perekam Mikrofon Browser & Unggah Audio
           </h2>
           <p className="mt-0.5 text-xs text-written">
-            {quotaLabel
-              ? `${quotaLabel} · Rekam suara dari mikrofon perangkat ini atau unggah audio ke Cloud AI.`
-              : 'Rekam rapat tatap muka lewat mikrofon perangkat ini atau unggah file rekaman ke Cloud AI (untuk Zoom/Teams desktop otomatis gunakan Cakapp Desktop).'}
+            Rekam rapat tatap muka lewat mikrofon perangkat ini atau unggah file rekaman ke Cloud AI (untuk Zoom/Teams desktop otomatis gunakan Cakapp Desktop).
           </p>
         </div>
       </div>

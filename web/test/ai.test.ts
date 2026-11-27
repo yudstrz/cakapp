@@ -298,7 +298,7 @@ describe('AI Backend Proxy & Protections', () => {
     expect(calls[0].headers.get('x-goog-api-key')).toBe('AIzaSyTestServerGeminiSecretKey123456789');
   });
 
-  it('enforces per-IP limit, per-minute user limit, daily req & token quotas, global budget, and kill switch', async () => {
+  it('enforces kill switch, global budget, and IP flood limit while keeping per-account tokens and requests unlimited', async () => {
     const redisArg = mockRedis as unknown as Parameters<typeof enforceAiLimits>[0]['redis'];
 
     process.env.AI_KILL_SWITCH = 'true';
@@ -320,29 +320,30 @@ describe('AI Backend Proxy & Protections', () => {
     ).rejects.toMatchObject({ code: 'RATE_LIMITED', status: 429 });
     mockIpRateLimitSuccess = true;
 
+    // Per-account rate limit and daily token/request counters no longer block requests
     mockUserRateLimitSuccess = false;
+    mockRedisStore.set(`ai:daily:tok:${dayKey}:u1`, 10_000_000);
+    mockRedisStore.set(`ai:daily:req:${dayKey}:user-1`, 999);
     await expect(
-      enforceAiLimits({ userId: 'u1', ip: '1.1.1.1', estimatedInputTokens: 100, redis: redisArg }),
-    ).rejects.toMatchObject({ code: 'RATE_LIMITED', status: 429 });
+      enforceAiLimits({ userId: 'u1', ip: '1.1.1.1', estimatedInputTokens: 50_000, redis: redisArg }),
+    ).resolves.toMatchObject({ unlimited: true });
     mockUserRateLimitSuccess = true;
 
-    mockRedisStore.set(`ai:daily:tok:${dayKey}:u1`, 299_950);
-    await expect(
-      enforceAiLimits({ userId: 'u1', ip: '1.1.1.1', estimatedInputTokens: 100, redis: redisArg }),
-    ).rejects.toMatchObject({ code: 'QUOTA_EXCEEDED', status: 429 });
-    mockRedisStore.set(`ai:daily:tok:${dayKey}:u1`, 0);
-
-    mockRedisStore.set(`ai:daily:req:${dayKey}:user-1`, 30);
-    const reqExceeded = makeRequest('http://localhost:3000/api/ai/generate', {
+    const reqUnlimited = makeRequest('http://localhost:3000/api/ai/generate', {
       body: { provider: 'openai', model: 'gpt-6-luna', task: 'ringkasan', input: 'halo', stream: false },
     });
-    globalThis.fetch = vi.fn(async () =>
-      new Response(JSON.stringify({ data: [{ id: 'gpt-6-luna' }] }), { status: 200 }),
-    ) as unknown as typeof fetch;
-    const quotaRes = await generatePost(reqExceeded);
-    expect(quotaRes.status).toBe(429);
-    expect(quotaRes.headers.get('Retry-After')).toBeTruthy();
-    expect(quotaRes.headers.get('X-RateLimit-Remaining')).toBe('0');
+    globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
+      if (String(url).includes('/models')) {
+        return new Response(JSON.stringify({ data: [{ id: 'gpt-6-luna' }] }), { status: 200 });
+      }
+      return new Response(
+        JSON.stringify({ choices: [{ message: { content: 'Ringkasan tanpa kuota' } }], usage: { prompt_tokens: 10, completion_tokens: 5 } }),
+        { status: 200 },
+      );
+    }) as unknown as typeof fetch;
+    const unlimitedRes = await generatePost(reqUnlimited);
+    expect(unlimitedRes.status).toBe(200);
+    expect(unlimitedRes.headers.get('X-Daily-Quota-Remaining')).toBeNull();
 
     const spend = await recordGlobalSpend({
       provider: 'openai',
@@ -386,8 +387,8 @@ describe('AI Backend Proxy & Protections', () => {
     }) as unknown as typeof fetch;
 
     const usageRes = await usageGet(makeRequest('http://localhost:3000/api/ai/usage', { method: 'GET' }));
-    expect(usageRes.status).toBe(200);
-    expect((await usageRes.json()).limitRequests).toBe(30);
+    expect(usageRes.status).toBe(410);
+    expect((await usageRes.json()).unlimited).toBe(true);
 
     const modelsRes = await modelsGet(makeRequest('http://localhost:3000/api/ai/models', { method: 'GET' }));
     const modelsJson = await modelsRes.json();
@@ -440,7 +441,7 @@ describe('AI Backend Proxy & Protections', () => {
     expect(mapRed.text).toBe('Notulen akhir');
   });
 
-  it('transcribes audio chunks via Gemini and OpenAI (with whisper-1 fallback) and enforces STT size & quota', async () => {
+  it('transcribes audio chunks via Gemini and OpenAI (with whisper-1 fallback) without per-account STT quotas', async () => {
     globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
       const u = String(url);
       if (u.includes('/models?')) {
@@ -481,11 +482,12 @@ describe('AI Backend Proxy & Protections', () => {
     expect((await resOpenAi.json()).text).toBe('Transkrip OpenAI berhasil');
 
     const { dayKey } = getWibDayInfo();
-    mockRedisStore.set(`ai:daily:stt:${dayKey}:user-1`, 180);
-    const formQuota = new FormData();
-    formQuota.set('file', new Blob([new Uint8Array(128)], { type: 'audio/wav' }), 'chunk.wav');
-    formQuota.set('provider', 'gemini');
-    const resQuota = await transcribePost(new NextRequest('http://localhost:3000/api/ai/transcribe', { method: 'POST', body: formQuota }));
-    expect(resQuota.status).toBe(429);
+    mockRedisStore.set(`ai:daily:stt:${dayKey}:user-1`, 9999);
+    const formNoQuota = new FormData();
+    formNoQuota.set('file', new Blob([new Uint8Array(128)], { type: 'audio/wav' }), 'chunk.wav');
+    formNoQuota.set('provider', 'gemini');
+    const resNoQuota = await transcribePost(new NextRequest('http://localhost:3000/api/ai/transcribe', { method: 'POST', body: formNoQuota }));
+    expect(resNoQuota.status).toBe(200);
+    expect(resNoQuota.headers.get('X-Daily-Stt-Remaining')).toBeNull();
   });
 });

@@ -28,15 +28,6 @@ interface TranscriptItem {
   text: string;
 }
 
-interface UsageData {
-  remainingRequests: number;
-  limitRequests: number;
-  remainingInputTokens: number;
-  limitInputTokens: number;
-  remainingSttChunks?: number;
-  limitSttChunks?: number;
-}
-
 const PROVIDER_LABELS: Record<ClientAiProviderId, string> = {
   gemini: 'Google Gemini',
   openai: 'OpenAI',
@@ -75,7 +66,6 @@ export default function CloudAiMeetingSection({
     openai: [],
     anthropic: [],
   });
-  const [usage, setUsage] = useState<UsageData | null>(null);
   const [loadingMeta, setLoadingMeta] = useState(!readOnly);
   const [busyTask, setBusyTask] = useState<ClientAiTask | 'health' | 'stt' | null>(null);
   const [partInfo, setPartInfo] = useState('');
@@ -102,10 +92,7 @@ export default function CloudAiMeetingSection({
     setLoadingMeta(true);
     try {
       const byokHeaders = buildWebByokHeaders(activeProv);
-      const [modelsRes, usageRes] = await Promise.all([
-        fetch('/api/ai/models', { headers: byokHeaders }),
-        fetch('/api/ai/usage'),
-      ]);
+      const modelsRes = await fetch('/api/ai/models', { headers: byokHeaders });
 
       if (modelsRes.ok) {
         const data = (await modelsRes.json()) as { models?: Record<ClientAiProviderId, VerifiedClientModel[]> };
@@ -119,12 +106,8 @@ export default function CloudAiMeetingSection({
           savePrefs({ provider: activeProv, models: nextMap });
         }
       }
-
-      if (usageRes.ok) {
-        setUsage((await usageRes.json()) as UsageData);
-      }
     } catch {
-      setErrorMsg('Gagal memuat daftar model dan kuota Cloud AI.');
+      setErrorMsg('Gagal memuat daftar model Cloud AI.');
     } finally {
       setLoadingMeta(false);
     }
@@ -262,7 +245,7 @@ export default function CloudAiMeetingSection({
       setErrorMsg(
         err instanceof Error
           ? err.message
-          : 'Gagal memproses file suara. Untuk transkripsi offline tanpa kuota, gunakan aplikasi desktop Cakapp.',
+          : 'Gagal memproses file suara. Untuk transkripsi offline tanpa internet, gunakan aplikasi desktop Cakapp.',
       );
     } finally {
       setBusyTask(null);
@@ -354,15 +337,9 @@ export default function CloudAiMeetingSection({
           <h2 className="font-display text-base sm:text-lg font-semibold text-ink">
             Notulen & Ringkasan Rapat
           </h2>
-          {!readOnly && usage && !hasByok && (
-            <p className="mt-1 text-xs text-written">
-              Sisa {usage.remainingRequests}/{usage.limitRequests} request notulen
-              {usage.remainingSttChunks !== undefined ? ` · ${usage.remainingSttChunks}/${usage.limitSttChunks} potongan suara` : ''} hari ini (reset 00:00 WIB)
-            </p>
-          )}
           {!readOnly && hasByok && (
             <p className="mt-1 text-xs font-medium text-accent">
-              Mode BYOK aktif pada sesi ini (tidak mengurangi kuota bersama)
+              Mode BYOK aktif pada sesi ini
             </p>
           )}
         </div>
@@ -496,7 +473,7 @@ export default function CloudAiMeetingSection({
             </summary>
             <div className="mt-2.5 space-y-2">
               <p className="text-written">
-                Kunci bersama sudah dikelola oleh server. Isi hanya jika Anda ingin memakai API key pribadi pada sesi tab ini tanpa memotong kuota bersama.
+                Kunci bersama sudah dikelola oleh server. Isi hanya jika Anda ingin memakai API key pribadi pada sesi tab ini.
               </p>
               <div className="flex flex-col sm:flex-row gap-2">
                 <input

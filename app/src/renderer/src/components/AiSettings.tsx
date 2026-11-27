@@ -26,19 +26,6 @@ interface AiConfigState {
   fallbackAvailable: boolean
 }
 
-interface UsageInfo {
-  usedRequests: number
-  limitRequests: number
-  remainingRequests: number
-  usedInputTokens: number
-  limitInputTokens: number
-  remainingInputTokens: number
-  usedSttChunks?: number
-  limitSttChunks?: number
-  remainingSttChunks?: number
-  resetAt: string
-}
-
 const PROVIDER_NAMES: Record<CloudProvider, string> = {
   gemini: 'Google Gemini',
   openai: 'OpenAI',
@@ -52,7 +39,6 @@ export function AiSettings() {
     openai: [],
     anthropic: [],
   })
-  const [usage, setUsage] = useState<UsageInfo | null>(null)
   const [loadingCloud, setLoadingCloud] = useState(false)
   const [cloudNote, setCloudNote] = useState('')
   const [byokInput, setByokInput] = useState('')
@@ -66,10 +52,7 @@ export function AiSettings() {
     setLoadingCloud(true)
     setCloudNote('')
     try {
-      const [modelsRes, usageRes] = await Promise.all([
-        window.yogurt.ai.getModels({ force, provider }),
-        window.yogurt.ai.getUsage(),
-      ])
+      const modelsRes = await window.yogurt.ai.getModels({ force, provider })
 
       if (modelsRes.config) {
         setConfig(modelsRes.config as AiConfigState)
@@ -78,12 +61,6 @@ export function AiSettings() {
         setModelsMap(modelsRes.models)
       } else if (modelsRes.error) {
         setCloudNote(modelsRes.error)
-      }
-
-      if (usageRes.ok && usageRes.usage) {
-        setUsage(usageRes.usage)
-      } else {
-        setUsage(null)
       }
     } catch {
       setCloudNote('Tidak dapat memuat daftar model dari server. Pastikan Anda sudah masuk akun dan terhubung ke internet.')
@@ -345,16 +322,16 @@ export function AiSettings() {
                 <p className="font-medium text-ink">
                   {hasByok
                     ? `Mode Kunci Pribadi Aktif (${byokMask})`
-                    : usage
-                      ? `Sisa ${usage.remainingRequests}/${usage.limitRequests} request hari ini`
-                      : 'Kuota Harian Cloud AI'}
+                    : verifiedList.length > 0
+                      ? 'Cloud AI Terkelola Aktif'
+                      : 'Cloud AI Siap Digunakan'}
                 </p>
                 <p className="text-muted mt-0.5">
                   {hasByok
-                    ? 'Permintaan sesi ini memakai kunci Anda sendiri dan tidak mengurangi kuota bersama.'
-                    : usage
-                      ? `Token input: ${usage.remainingInputTokens.toLocaleString('id-ID')}/${usage.limitInputTokens.toLocaleString('id-ID')}${usage.remainingSttChunks !== undefined ? ` · Transkripsi suara: ${usage.remainingSttChunks}/${usage.limitSttChunks} potongan` : ''} (reset 00:00 WIB)`
-                      : cloudNote || 'Masuk ke akun Cakapp di bagian atas untuk memuat kuota dan model aktif.'}
+                    ? 'Permintaan sesi ini memakai kunci API pribadi Anda.'
+                    : verifiedList.length > 0
+                      ? `${verifiedList.length} model terverifikasi aktif tanpa batas token atau kuota akun.`
+                      : cloudNote || 'Masuk ke akun Cakapp di bagian atas untuk memuat daftar model aktif.'}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -436,7 +413,7 @@ export function AiSettings() {
               </summary>
               <div className="mt-3 space-y-2.5">
                 <p className="text-muted">
-                  Tidak wajib diisi. Jika diisi, permintaan sesi ini dikirim menggunakan kunci pribadi Anda tanpa memotong kuota bersama, dan otomatis dihapus saat aplikasi ditutup.
+                  Tidak wajib diisi. Jika diisi, permintaan sesi ini dikirim menggunakan kunci pribadi Anda, dan otomatis dihapus saat aplikasi ditutup.
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <input
@@ -474,7 +451,7 @@ export function AiSettings() {
                 <strong>Kunci Terkelola di Server:</strong> Kunci API Cloud dikelola terpusat di backend Cakapp dan tidak pernah disimpan di perangkat pengguna.
               </p>
               <p className="text-ink">
-                <strong>Smart Fallback Otomatis:</strong> Jika kuota harian habis, batas permintaan tercapai, atau jaringan terputus, pembuatan notulen otomatis beralih ke AI Lokal tanpa henti paksa.
+                <strong>Smart Fallback Otomatis:</strong> Jika layanan Cloud AI sedang penuh atau jaringan terputus, pembuatan notulen otomatis beralih ke AI Lokal tanpa henti paksa.
               </p>
             </div>
           </div>
@@ -541,11 +518,6 @@ export function AiSettings() {
                   </button>
                 </div>
               </div>
-              {usage?.remainingSttChunks !== undefined && (
-                <p className="text-muted">
-                  Sisa kuota transkripsi hari ini: {usage.remainingSttChunks}/{usage.limitSttChunks} potongan suara (otomatis beralih ke Whisper Lokal jika habis).
-                </p>
-              )}
             </div>
           )}
         </div>

@@ -11,7 +11,10 @@ export async function GET(req: NextRequest) {
   try {
     const authUser = await requireAuth(req);
     const usage = await getUserUsage(authUser.userId, authUser.tier);
-    return NextResponse.json(usage, { status: 200, headers: getSecurityHeaders(req) });
+    return NextResponse.json(
+      { ...usage, error: { code: 'QUOTA_DISABLED', message: 'Kuota pemakaian AI per akun dinonaktifkan.' } },
+      { status: 410, headers: getSecurityHeaders(req) },
+    );
   } catch (err) {
     return errorJsonResponse(err, req);
   }
