@@ -9,6 +9,8 @@ export type SyncStatus = {
   error?: string
 }
 
+export type AudioUploadResolver = (meetingId: string) => Promise<{ filePath: string; mimeType: string } | null> | { filePath: string; mimeType: string } | null
+
 export class SyncEngine {
   private lastSyncedAt: number | null = null
   private timer: NodeJS.Timeout | null = null
@@ -19,7 +21,8 @@ export class SyncEngine {
     private store: Store,
     private getUserId: () => string | null,
     private onChanged?: () => void,
-    autoStartIntervalMs = 60_000
+    autoStartIntervalMs = 60_000,
+    private resolveAudio?: AudioUploadResolver
   ) {
     if (autoStartIntervalMs > 0) {
       this.timer = setInterval(() => {
@@ -57,16 +60,28 @@ export class SyncEngine {
     }
   }
 
+  private async syncOneMeeting(meeting: ReturnType<Store['meeting']>): Promise<boolean> {
+    if (!meeting) return false
+    const segments = this.store.segments(meeting.id)
+    const notes = this.store.notes(meeting.id)
+    const ok = await neon.syncMeetingToNeon(meeting, segments, notes)
+    if (!ok) return false
+    if (this.resolveAudio) {
+      const audio = await Promise.resolve(this.resolveAudio(meeting.id)).catch(() => null)
+      if (audio) {
+        await neon.syncMeetingAudioToNeon(meeting.id, audio.filePath, audio.mimeType)
+      }
+    }
+    return true
+  }
+
   async pushMeeting(meetingId: string): Promise<boolean> {
     const meeting = this.store.meeting(meetingId)
     if (!meeting) return false
 
-    const segments = this.store.segments(meetingId)
-    const notes = this.store.notes(meetingId)
-
     if (this.isOnline && neon.isNeonConfigured()) {
       try {
-        const ok = await neon.syncMeetingToNeon(meeting, segments, notes)
+        const ok = await this.syncOneMeeting(meeting)
         if (ok) {
           this.store.setMeetingSyncStatus(meetingId, 'synced')
           this.lastSyncedAt = Date.now()
@@ -176,9 +191,7 @@ export class SyncEngine {
               processed++
               continue
             }
-            const segs = this.store.segments(m.id)
-            const notes = this.store.notes(m.id)
-            const ok = await neon.syncMeetingToNeon(m, segs, notes)
+            const ok = await this.syncOneMeeting(m)
             if (ok) {
               this.store.setMeetingSyncStatus(m.id, 'synced')
               this.store.dequeueSync(item.id)

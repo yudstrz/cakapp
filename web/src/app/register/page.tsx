@@ -54,19 +54,19 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="mx-auto max-w-md px-4 py-16 sm:py-24">
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 sm:p-8 backdrop-blur-sm">
+    <div className="mx-auto max-w-md px-4 py-12 sm:py-20">
+      <div className="rounded-2xl border border-line bg-card p-6 sm:p-8">
         <div className="text-center mb-6">
-          <h1 className="text-xl sm:text-2xl font-semibold text-zinc-100 tracking-tight">
+          <h1 className="font-display text-2xl font-semibold text-ink tracking-tight">
             Buat Akun Cakapp
           </h1>
-          <p className="mt-2 text-xs sm:text-sm text-zinc-400">
-            Daftar untuk mengamankan dan menyinkronkan seluruh riwayat rapat Anda.
+          <p className="mt-2 text-xs sm:text-sm text-written">
+            Daftar untuk menyinkronkan dan membagikan riwayat notulen rapat Anda.
           </p>
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg border border-red-900/60 bg-red-950/40 p-3 text-xs text-red-300">
+          <div role="alert" className="mb-4 rounded-lg border border-red-700/40 bg-red-500/10 p-3 text-xs text-ink">
             {error}
           </div>
         )}
@@ -75,7 +75,7 @@ export default function RegisterPage() {
           type="button"
           disabled={loading}
           onClick={handleGoogle}
-          className="mb-4 flex w-full items-center justify-center gap-2.5 rounded-lg border border-zinc-700 bg-zinc-800/80 py-2.5 text-xs font-medium text-zinc-100 transition-colors hover:bg-zinc-700 disabled:opacity-50"
+          className="mb-4 flex min-h-[44px] w-full items-center justify-center gap-2.5 rounded-xl border border-control bg-float py-2.5 text-xs font-semibold text-ink transition-colors hover:bg-chrome disabled:opacity-50"
         >
           <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
             <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z" />
@@ -87,14 +87,14 @@ export default function RegisterPage() {
         </button>
 
         <div className="relative my-4 flex items-center">
-          <div className="flex-grow border-t border-zinc-800" />
-          <span className="mx-3 text-[11px] text-zinc-500">atau email</span>
-          <div className="flex-grow border-t border-zinc-800" />
+          <div className="flex-grow border-t border-line" />
+          <span className="mx-3 text-xs text-muted">atau email</span>
+          <div className="flex-grow border-t border-line" />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-zinc-300 mb-1.5" htmlFor="fullName">
+            <label className="block text-xs font-medium text-ink mb-1.5" htmlFor="fullName">
               Nama Lengkap
             </label>
             <input
@@ -103,13 +103,13 @@ export default function RegisterPage() {
               required
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              placeholder="Budi Santoso"
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800/80 px-3.5 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              placeholder="Nama Anda"
+              className="w-full min-h-[44px] rounded-xl border border-control bg-float px-3.5 py-2 text-sm text-ink placeholder:text-muted"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-zinc-300 mb-1.5" htmlFor="email">
+            <label className="block text-xs font-medium text-ink mb-1.5" htmlFor="email">
               Email Kantor / Pribadi
             </label>
             <input
@@ -118,13 +118,13 @@ export default function RegisterPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="budi@perusahaan.com"
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800/80 px-3.5 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              placeholder="email@perusahaan.com"
+              className="w-full min-h-[44px] rounded-xl border border-control bg-float px-3.5 py-2 text-sm text-ink placeholder:text-muted"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-zinc-300 mb-1.5" htmlFor="password">
+            <label className="block text-xs font-medium text-ink mb-1.5" htmlFor="password">
               Password (Minimal 8 karakter)
             </label>
             <input
@@ -134,23 +134,23 @@ export default function RegisterPage() {
               minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800/80 px-3.5 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              placeholder="Minimal 8 karakter"
+              className="w-full min-h-[44px] rounded-xl border border-control bg-float px-3.5 py-2 text-sm text-ink placeholder:text-muted"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-zinc-100 py-2.5 text-xs font-semibold text-zinc-950 transition-colors hover:bg-white disabled:opacity-50"
+            className="w-full min-h-[44px] rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-ink hover:opacity-90 disabled:opacity-50 transition-opacity"
           >
             {loading ? 'Mendaftarkan...' : 'Daftar Sekarang'}
           </button>
         </form>
 
-        <div className="mt-6 border-t border-zinc-800/80 pt-5 text-center text-xs text-zinc-400">
+        <div className="mt-6 border-t border-line pt-5 text-center text-xs text-written">
           Sudah memiliki akun?{' '}
-          <a href="/login" className="font-medium text-zinc-200 hover:text-white underline">
+          <a href="/login" className="font-semibold text-accent hover:underline">
             Masuk di sini
           </a>
         </div>

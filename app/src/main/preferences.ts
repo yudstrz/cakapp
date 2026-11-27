@@ -60,7 +60,7 @@ export function hookPreferences(d: { file: string; permissions: Permissions; ask
     // what the Mac says, so a change in System Settings shows here
     // locale: every window (main, card, widget) shows the interface language
     // language: the one picked ('' is the Mac's); locale: the one in use; systemLocale: the Mac's, for the picker
-    return { theme: s.theme ?? 'system', openAtLogin: d.loginOn(s.openAtLogin), showInMenuBar: visible.showInMenuBar, showNextMeeting: s.showNextMeeting !== false, showRecordingPill: visible.showRecordingPill, appVisibility: !visible.showInMenuBar ? 'dock' : visible.showInDock ? 'both' : 'menu-bar', language: isLocale(s.language) ? s.language : '', locale: localeOf(s, systemLocale()), systemLocale: systemLocale(), myName: s.myName?.trim() || d.macName(), macName: d.macName(), accountProfile: s.accountProfile, stopWhenCallEnds: stopsWhenCallEnds(s), recordingReminder: recordingReminderOn(s), includeRecordingCredit: includesRecordingCredit(s), keepRecordings: s.keepRecordings !== false, jargon: cleanJargon(s.jargon), spoken: spokenSetting(s), summaryLanguage: summaryLanguageSetting(s) }
+    return { theme: s.theme ?? 'system', openAtLogin: d.loginOn(s.openAtLogin), showInMenuBar: visible.showInMenuBar, showNextMeeting: s.showNextMeeting !== false, showRecordingPill: visible.showRecordingPill, appVisibility: !visible.showInMenuBar ? 'dock' : visible.showInDock ? 'both' : 'menu-bar', language: isLocale(s.language) ? s.language : '', locale: localeOf(s, systemLocale()), systemLocale: systemLocale(), myName: s.myName?.trim() || d.macName(), macName: d.macName(), accountProfile: s.accountProfile, stopWhenCallEnds: stopsWhenCallEnds(s), recordingReminder: recordingReminderOn(s), includeRecordingCredit: includesRecordingCredit(s), keepRecordings: s.keepRecordings !== false, cloudAudioUpload: s.cloudAudioUpload === true, jargon: cleanJargon(s.jargon), spoken: spokenSetting(s), summaryLanguage: summaryLanguageSetting(s) }
   }
   ipcMain.handle('settings:get', read)
   // what the person is called in meetings (who "You" is when naming voices); blank: the Mac's full name again
@@ -106,6 +106,10 @@ export function hookPreferences(d: { file: string; permissions: Permissions; ask
     const s = loadSettings(d.file)
     updateSettings(d.file, { keepRecordings: on ? undefined : false,
       recordingsOffAt: on ? undefined : s.keepRecordings === false && s.recordingsOffAt != null ? s.recordingsOffAt : Date.now() })
+  })
+  ipcMain.handle('settings:cloud-audio-upload', (_e, on: unknown) => {
+    if (typeof on !== 'boolean') return
+    updateSettings(d.file, { cloudAudioUpload: on ? true : undefined })
   })
   // the whole list each time, cleaned the same way the page cleans it; what was kept comes back
   const setJargon = (v: unknown): string[] => {

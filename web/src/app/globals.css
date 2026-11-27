@@ -3,19 +3,63 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #09090b;
+  --bg: #FAF7F2;
+  --chrome: #F2EDE4;
+  --card: #F4EFE6;
+  --float: #FFFDF9;
+  --ink: #1C1917;
+  --written: #44403C;
+  --muted: #5F5952;
+  --line: #E5DFD3;
+  --control-border: #8A8277;
+  --accent: #B84A27;
+  --accent-soft: #F7E5DD;
+  --primary: #B84A27;
+  --primary-ink: #FFFDF9;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #09090b;
-    --foreground: #fafafa;
-  }
+html.dark {
+  --bg: #171513;
+  --chrome: #1F1C19;
+  --card: #23201C;
+  --float: #2A2622;
+  --ink: #F2ECE3;
+  --written: #C9C1B6;
+  --muted: #A39B91;
+  --line: #36312B;
+  --control-border: #6E655A;
+  --accent: #E08B6C;
+  --accent-soft: #3B241B;
+  --primary: #B84A27;
+  --primary-ink: #FFFDF9;
+}
+
+html {
+  overflow-x: clip;
+  scroll-behavior: smooth;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  overflow-x: clip;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

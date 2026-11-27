@@ -10,11 +10,24 @@ export default {
   theme: {
     extend: {
       colors: {
+        paper: 'var(--bg)',
+        chrome: 'var(--chrome)',
+        card: 'var(--card)',
+        float: 'var(--float)',
+        ink: 'var(--ink)',
+        written: 'var(--written)',
+        muted: 'var(--muted)',
+        line: 'var(--line)',
+        control: 'var(--control-border)',
+        accent: 'var(--accent)',
         primary: {
-          DEFAULT: '#3b82f6',
-          dark: '#1d4ed8',
-          light: '#60a5fa',
+          DEFAULT: 'var(--primary)',
+          ink: 'var(--primary-ink)',
         },
+      },
+      fontFamily: {
+        display: ['var(--font-display)', 'Georgia', 'serif'],
+        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
       },
     },
   },

@@ -48,6 +48,8 @@ export type Settings = { theme?: 'light' | 'dark'; language?: string; /** what t
   keepRecordings?: boolean
   /** Only meetings ending after this opt-out may lose their audio automatically. */
   recordingsOffAt?: number
+  /** Upload finished meeting audio to Neon cloud storage for web playback; off unless opted in. */
+  cloudAudioUpload?: boolean
   /** the mic to record with (its Core Audio UID); Auto, the Mac's own input, when left out or not plugged in */
   mic?: string
   /** Calendars excluded from Cakapp's agenda and meeting detection. Others stay visible. */

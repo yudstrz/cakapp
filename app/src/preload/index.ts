@@ -290,6 +290,7 @@ const api: CakappApi = {
     setIncludeRecordingCredit: (on) => ipcRenderer.invoke('settings:recording-credit', on),
     setRecordingReminder: (on) => ipcRenderer.invoke('settings:recording-reminder', on),
     setKeepRecordings: (on) => ipcRenderer.invoke('settings:keep-recordings', on),
+    setCloudAudioUpload: (on) => ipcRenderer.invoke('settings:cloud-audio-upload', on),
     setJargon: (terms) => ipcRenderer.invoke('settings:jargon', terms),
     setLanguage: (id) => ipcRenderer.invoke('settings:language', id),
     setSummaryLanguage: (id) => ipcRenderer.invoke('settings:summary-language', id),

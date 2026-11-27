@@ -6,6 +6,7 @@ import type { UserTier } from './limits';
 
 export interface AuthenticatedUser {
   userId: string;
+  email: string;
   tier: UserTier;
 }
 
@@ -76,7 +77,7 @@ export async function requireAuth(req: NextRequest | Request): Promise<Authentic
   if (session?.user?.id) {
     const rawTier = (session.user as { tier?: unknown }).tier;
     const tier: UserTier = rawTier === 'pro' ? 'pro' : 'free';
-    return { userId: session.user.id, tier };
+    return { userId: session.user.id, email: session.user.email ?? '', tier };
   }
 
   const authHeader = req.headers.get('authorization') ?? '';
@@ -85,13 +86,14 @@ export async function requireAuth(req: NextRequest | Request): Promise<Authentic
     const sql = getDb();
     if (sql) {
       const rows = (await sql`
-        SELECT user_id
-        FROM sessions
-        WHERE token = ${bearerMatch[1]} AND expires_at > now()
+        SELECT s.user_id, p.email
+        FROM sessions s
+        LEFT JOIN profiles p ON p.id = s.user_id
+        WHERE s.token = ${bearerMatch[1]} AND s.expires_at > now()
         LIMIT 1
-      `.catch(() => [])) as Array<{ user_id?: string }>;
+      `.catch(() => [])) as Array<{ user_id?: string; email?: string | null }>;
       if (rows[0]?.user_id) {
-        return { userId: rows[0].user_id, tier: 'free' };
+        return { userId: rows[0].user_id, email: rows[0].email ?? '', tier: 'free' };
       }
     }
   }

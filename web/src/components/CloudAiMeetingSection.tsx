@@ -357,37 +357,37 @@ export default function CloudAiMeetingSection({
   const activeModelId = selectedModels[provider] ?? '';
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-6 sm:p-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-zinc-800/80">
+    <div className="rounded-2xl border border-line bg-card p-5 sm:p-7">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-line">
         <div>
-          <h2 className="text-sm sm:text-base font-semibold text-zinc-100">
-            Notulen, Ringkasan & Speech-to-Text
+          <h2 className="font-display text-base sm:text-lg font-semibold text-ink">
+            Notulen & Ringkasan Rapat
           </h2>
           {!readOnly && usage && !hasByok && (
-            <p className="mt-1 text-xs text-zinc-300">
+            <p className="mt-1 text-xs text-written">
               Sisa {usage.remainingRequests}/{usage.limitRequests} request notulen
               {usage.remainingSttChunks !== undefined ? ` · ${usage.remainingSttChunks}/${usage.limitSttChunks} potongan suara` : ''} hari ini (reset 00:00 WIB)
             </p>
           )}
           {!readOnly && hasByok && (
-            <p className="mt-1 text-xs text-emerald-300">
+            <p className="mt-1 text-xs font-medium text-accent">
               Mode BYOK aktif pada sesi ini (tidak mengurangi kuota bersama)
             </p>
           )}
         </div>
 
         {readOnly && (
-          <span className="text-xs text-zinc-400">
-            Contoh Notulen Terstruktur
+          <span className="text-xs text-muted">
+            Tampilan Hanya Baca
           </span>
         )}
       </div>
 
       {!readOnly && (
-        <div className="mb-6 rounded-xl border border-zinc-800 bg-zinc-950/60 p-4 space-y-4">
+        <div className="mb-6 rounded-xl border border-line bg-float p-4 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
             <div className="space-y-1.5">
-              <span className="block text-xs font-medium text-zinc-300">Provider Notulen Cloud AI</span>
+              <span className="block text-xs font-semibold text-ink">Provider Notulen Cloud AI</span>
               <div className="flex flex-wrap gap-2">
                 {(['gemini', 'openai', 'anthropic'] as const).map((p) => (
                   <button
@@ -395,10 +395,10 @@ export default function CloudAiMeetingSection({
                     type="button"
                     disabled={busyTask !== null}
                     onClick={() => handleProviderChange(p)}
-                    className={`min-h-[36px] rounded-lg px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-300 ${
+                    className={`min-h-[44px] sm:min-h-[36px] rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
                       provider === p
-                        ? 'bg-zinc-100 text-zinc-950'
-                        : 'border border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800'
+                        ? 'bg-ink text-paper'
+                        : 'border border-control bg-paper text-ink hover:bg-chrome'
                     }`}
                   >
                     {PROVIDER_LABELS[p]}
@@ -408,7 +408,7 @@ export default function CloudAiMeetingSection({
             </div>
 
             <div className="space-y-1.5 min-w-[220px]">
-              <label htmlFor="web-ai-model" className="block text-xs font-medium text-zinc-300">
+              <label htmlFor="web-ai-model" className="block text-xs font-semibold text-ink">
                 Model Aktif
               </label>
               <select
@@ -416,7 +416,7 @@ export default function CloudAiMeetingSection({
                 value={activeModelId}
                 disabled={busyTask !== null || loadingMeta || activeModels.length === 0}
                 onChange={(e) => handleModelChange(e.target.value)}
-                className="w-full min-h-[36px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-300"
+                className="w-full min-h-[44px] sm:min-h-[36px] rounded-lg border border-control bg-paper px-3 py-1.5 text-xs text-ink"
               >
                 {loadingMeta && <option value="">Memuat daftar model aktif...</option>}
                 {!loadingMeta && activeModels.length === 0 && (
@@ -431,12 +431,12 @@ export default function CloudAiMeetingSection({
             </div>
           </div>
 
-          <div className="pt-3 border-t border-zinc-800/80 space-y-2.5">
+          <div className="pt-3 border-t border-line space-y-2.5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <p className="text-xs font-medium text-zinc-200">Pengaturan Default Suara ke Teks (Speech-to-Text)</p>
-                <p className="text-[11px] text-zinc-400">
-                  Pilih preferensi default transkripsi Anda atau unggah file rekaman suara untuk diubah menjadi teks.
+                <p className="text-xs font-semibold text-ink">Pengaturan Default Suara ke Teks (Speech-to-Text)</p>
+                <p className="text-xs text-written">
+                  Pilih preferensi default transkripsi Anda atau unggah file rekaman suara.
                 </p>
               </div>
               <div className="flex flex-wrap gap-1.5">
@@ -444,10 +444,10 @@ export default function CloudAiMeetingSection({
                   type="button"
                   disabled={busyTask !== null}
                   onClick={() => handleSttModeChange('local')}
-                  className={`min-h-[34px] rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                  className={`min-h-[44px] sm:min-h-[34px] rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
                     sttMode === 'local'
-                      ? 'bg-zinc-100 text-zinc-950'
-                      : 'border border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800'
+                      ? 'bg-ink text-paper'
+                      : 'border border-control bg-paper text-ink hover:bg-chrome'
                   }`}
                 >
                   Default: Whisper Lokal (PC)
@@ -456,31 +456,31 @@ export default function CloudAiMeetingSection({
                   type="button"
                   disabled={busyTask !== null}
                   onClick={() => handleSttModeChange('cloud')}
-                  className={`min-h-[34px] rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                  className={`min-h-[44px] sm:min-h-[34px] rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
                     sttMode === 'cloud'
-                      ? 'bg-zinc-100 text-zinc-950'
-                      : 'border border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800'
+                      ? 'bg-ink text-paper'
+                      : 'border border-control bg-paper text-ink hover:bg-chrome'
                   }`}
                 >
-                  Default: Cloud AI (API Key Server)
+                  Default: Cloud AI (Server)
                 </button>
               </div>
             </div>
 
             {sttMode === 'cloud' && (
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-800 bg-zinc-900/50 p-2.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-zinc-300">Provider Suara:</span>
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-paper p-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-written">Provider Suara:</span>
                   {(['gemini', 'openai'] as const).map((sp) => (
                     <button
                       key={sp}
                       type="button"
                       disabled={busyTask !== null}
                       onClick={() => handleSttProviderChange(sp)}
-                      className={`min-h-[32px] rounded-md px-2.5 py-1 text-xs font-medium ${
+                      className={`min-h-[44px] sm:min-h-[32px] rounded-md px-2.5 py-1 text-xs font-medium ${
                         sttProvider === sp
-                          ? 'bg-zinc-200 text-zinc-950'
-                          : 'border border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800'
+                          ? 'bg-ink text-paper'
+                          : 'border border-control bg-float text-ink hover:bg-chrome'
                       }`}
                     >
                       {sp === 'gemini' ? 'Google Gemini' : 'OpenAI'}
@@ -488,7 +488,7 @@ export default function CloudAiMeetingSection({
                   ))}
                 </div>
 
-                <label className="inline-flex min-h-[34px] cursor-pointer items-center justify-center rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-100 hover:bg-zinc-700">
+                <label className="inline-flex min-h-[44px] sm:min-h-[34px] cursor-pointer items-center justify-center rounded-lg border border-control bg-float px-3 py-1.5 text-xs font-semibold text-ink hover:bg-chrome">
                   <span>{busyTask === 'stt' ? partInfo || 'Mentranskripsi...' : 'Unggah Suara ke Teks'}</span>
                   <input
                     type="file"
@@ -507,7 +507,7 @@ export default function CloudAiMeetingSection({
               type="button"
               disabled={busyTask !== null || activeModels.length === 0 || localTranscripts.length === 0}
               onClick={() => void handleGenerate('notulen')}
-              className="min-h-[38px] rounded-lg bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-white disabled:opacity-50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-300"
+              className="min-h-[44px] sm:min-h-[38px] rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-ink hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
               {busyTask === 'notulen' ? partInfo || 'Menyusun Notulen...' : 'Buat Notulen'}
             </button>
@@ -515,7 +515,7 @@ export default function CloudAiMeetingSection({
               type="button"
               disabled={busyTask !== null || activeModels.length === 0 || localTranscripts.length === 0}
               onClick={() => void handleGenerate('ringkasan')}
-              className="min-h-[38px] rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2 text-xs font-medium text-zinc-100 hover:bg-zinc-800 disabled:opacity-50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-300"
+              className="min-h-[44px] sm:min-h-[38px] rounded-xl border border-control bg-paper px-4 py-2 text-xs font-semibold text-ink hover:bg-chrome disabled:opacity-50 transition-colors"
             >
               {busyTask === 'ringkasan' ? partInfo || 'Meringkas...' : 'Buat Ringkasan'}
             </button>
@@ -523,18 +523,18 @@ export default function CloudAiMeetingSection({
               type="button"
               disabled={busyTask !== null}
               onClick={() => void handleTestConnection()}
-              className="min-h-[38px] rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2 text-xs font-medium text-zinc-200 hover:bg-zinc-800 disabled:opacity-50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-300"
+              className="min-h-[44px] sm:min-h-[38px] rounded-xl border border-control bg-paper px-3.5 py-2 text-xs font-medium text-ink hover:bg-chrome disabled:opacity-50 transition-colors"
             >
               {busyTask === 'health' ? 'Menguji...' : 'Uji Koneksi'}
             </button>
           </div>
 
-          <details className="pt-2 border-t border-zinc-800/80 text-xs text-zinc-300">
-            <summary className="cursor-pointer select-none font-medium text-zinc-300 hover:text-zinc-100 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-300">
+          <details className="pt-2 border-t border-line text-xs text-written">
+            <summary className="cursor-pointer select-none font-medium text-ink py-1">
               Opsi Lanjutan: Gunakan API Key Sendiri (Opsional)
             </summary>
             <div className="mt-2.5 space-y-2">
-              <p className="text-zinc-400">
+              <p className="text-written">
                 Kunci bersama sudah dikelola oleh server. Isi hanya jika Anda ingin memakai API key pribadi pada sesi tab ini tanpa memotong kuota bersama.
               </p>
               <div className="flex flex-col sm:flex-row gap-2">
@@ -544,13 +544,13 @@ export default function CloudAiMeetingSection({
                   onChange={(e) => setByokInput(e.target.value)}
                   placeholder={`API Key ${PROVIDER_LABELS[provider]} (opsional)`}
                   aria-label={`API Key ${PROVIDER_LABELS[provider]}`}
-                  className="flex-1 min-h-[36px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-300"
+                  className="flex-1 min-h-[44px] sm:min-h-[36px] rounded-lg border border-control bg-paper px-3 py-1.5 text-xs text-ink placeholder:text-muted"
                 />
                 <button
                   type="button"
                   disabled={!byokInput.trim() || busyTask !== null}
                   onClick={handleSaveByok}
-                  className="min-h-[36px] rounded-lg border border-zinc-700 bg-zinc-800 px-3.5 py-1.5 text-xs font-medium text-zinc-100 hover:bg-zinc-700 disabled:opacity-50"
+                  className="min-h-[44px] sm:min-h-[36px] rounded-lg border border-control bg-paper px-3.5 py-1.5 text-xs font-semibold text-ink hover:bg-chrome disabled:opacity-50"
                 >
                   Pakai Key Ini
                 </button>
@@ -559,7 +559,7 @@ export default function CloudAiMeetingSection({
                     type="button"
                     disabled={busyTask !== null}
                     onClick={handleClearByok}
-                    className="min-h-[36px] rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-1.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800"
+                    className="min-h-[44px] sm:min-h-[36px] rounded-lg border border-control bg-paper px-3.5 py-1.5 text-xs font-medium text-ink hover:bg-chrome"
                   >
                     Reset ke Server
                   </button>
@@ -569,12 +569,12 @@ export default function CloudAiMeetingSection({
           </details>
 
           {statusMsg && (
-            <p role="status" className="text-xs text-emerald-300">
+            <p role="status" className="text-xs text-ink font-medium">
               {statusMsg}
             </p>
           )}
           {errorMsg && (
-            <p role="alert" className="text-xs text-amber-300">
+            <p role="alert" className="text-xs text-accent font-medium">
               {errorMsg}
             </p>
           )}

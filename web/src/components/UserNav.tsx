@@ -16,7 +16,7 @@ export default function UserNav({ user }: { user: UserProfile | null }) {
       router.push('/');
       router.refresh();
     } catch {
-      // ignore
+      // Ignore signout error.
     } finally {
       setLoggingOut(false);
     }
@@ -25,20 +25,21 @@ export default function UserNav({ user }: { user: UserProfile | null }) {
   if (user) {
     const initial = user.full_name ? user.full_name[0].toUpperCase() : 'U';
     return (
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-xs text-zinc-300">
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-700 text-[10px] font-semibold text-zinc-100">
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs text-ink">
+          <span className="flex h-5 w-5 items-center justify-center rounded-md bg-accent/15 text-[11px] font-semibold text-accent">
             {initial}
           </span>
-          <span className="max-w-[120px] truncate font-medium">{user.full_name}</span>
+          <span className="max-w-[110px] truncate font-medium">{user.full_name}</span>
         </div>
 
         <button
+          type="button"
           onClick={handleLogout}
           disabled={loggingOut}
-          className="rounded-lg border border-zinc-800 bg-zinc-900/80 px-2.5 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
+          className="min-h-[44px] sm:min-h-[36px] rounded-lg border border-control bg-float px-3 py-1.5 text-xs font-medium text-ink hover:bg-chrome transition-colors"
         >
-          {loggingOut ? '...' : 'Keluar'}
+          {loggingOut ? 'Keluar...' : 'Keluar'}
         </button>
       </div>
     );
@@ -48,15 +49,15 @@ export default function UserNav({ user }: { user: UserProfile | null }) {
     <div className="flex items-center gap-2">
       <a
         href="/login"
-        className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
+        className="inline-flex min-h-[44px] sm:min-h-[36px] items-center justify-center rounded-lg border border-control bg-float px-3 py-1.5 text-xs font-medium text-ink hover:bg-chrome transition-colors"
       >
-        Login
+        Masuk
       </a>
       <a
         href="/register"
-        className="rounded-lg bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-white transition-colors"
+        className="inline-flex min-h-[44px] sm:min-h-[36px] items-center justify-center rounded-lg bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-ink hover:opacity-90 transition-opacity"
       >
-        Register
+        Daftar Akun
       </a>
     </div>
   );

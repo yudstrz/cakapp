@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getDb } from '@/lib/neon';
 import { errorJsonResponse, getSecurityHeaders, requireAuth } from '@/lib/ai/auth';
 import { AiProxyError } from '@/lib/ai/providers';
+import { getMeetingAccess } from '@/lib/meetings';
 
 export const runtime = 'nodejs';
 
@@ -31,14 +32,12 @@ export async function POST(
       throw new AiProxyError('PROVIDER_ERROR', 'Database cloud belum dikonfigurasi.', 503);
     }
 
-    const owned = (await sql`
-      SELECT id FROM meetings
-      WHERE id = ${id} AND user_id = ${authUser.userId}
-      LIMIT 1
-    `) as Array<{ id: string }>;
-
-    if (owned.length === 0) {
+    const access = await getMeetingAccess(sql, id, authUser.userId, authUser.email);
+    if (!access) {
       throw new AiProxyError('UNAUTHORIZED', 'Anda tidak memiliki akses ke rapat ini.', 403);
+    }
+    if (access.role === 'viewer') {
+      throw new AiProxyError('UNAUTHORIZED', 'Peran Viewer hanya dapat membaca notulen.', 403);
     }
 
     await sql`

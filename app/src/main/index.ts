@@ -795,7 +795,14 @@ app.whenReady().then(() => {
   })
   setup.onState(() => {uploads.resume();savedTranscriptions.resume()})
   onMeetingStart(m => {store.clearTranscriptionState(m.id);savedTranscriptions.pause()})
-  const syncEngine = new SyncEngine(store, getUserId, () => win?.webContents.send('meetings:changed'))
+  const syncEngine = new SyncEngine(store, getUserId, () => win?.webContents.send('meetings:changed'), 60_000, async (meetingId) => {
+    if (loadSettings(settingsFile).cloudAudioUpload !== true) return null
+    await Promise.all([recordingSettled(meetingId), rejoined])
+    const filePath = trackFile(meetingDir(meetingId), 'them', audioKinds) ?? trackFile(meetingDir(meetingId), 'me', audioKinds)
+    if (!filePath) return null
+    const mimeType = filePath.endsWith('.m4a') ? 'audio/mp4' : filePath.endsWith('.wav') ? 'audio/wav' : 'audio/ogg'
+    return { filePath, mimeType }
+  })
   onMeetingStopSaved((m) => {
     uploads.resume(); savedTranscriptions.resume()
     void syncEngine.pushMeeting(m.id).catch(err => console.warn('[syncEngine] push meeting failed:', err))

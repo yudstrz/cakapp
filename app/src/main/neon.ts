@@ -1,6 +1,10 @@
+import { readFileSync, statSync } from 'node:fs'
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless'
 import { loadAppEnv } from './env'
 import type { Folder, Meeting, Notes, Segment } from './store'
+
+const MAX_CLOUD_AUDIO_BYTES = 25 * 1024 * 1024
+const MAX_AUDIO_CHUNK_BYTES = 1_500_000
 
 loadAppEnv()
 
@@ -109,6 +113,23 @@ export async function initNeonSchema(): Promise<void> {
       updated_at TIMESTAMPTZ DEFAULT now()
     )
   `
+  await sql`ALTER TABLE meetings ADD COLUMN IF NOT EXISTS workspace_id TEXT`
+  await sql`ALTER TABLE meetings ADD COLUMN IF NOT EXISTS share_token TEXT`
+  await sql`ALTER TABLE meetings ADD COLUMN IF NOT EXISTS share_mode TEXT NOT NULL DEFAULT 'private'`
+  await sql`ALTER TABLE meetings ADD COLUMN IF NOT EXISTS audio_url TEXT`
+  await sql`ALTER TABLE meetings ADD COLUMN IF NOT EXISTS audio_mime TEXT`
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_meetings_share_token ON meetings(share_token) WHERE share_token IS NOT NULL`
+  await sql`
+    CREATE TABLE IF NOT EXISTS meeting_audio_chunks (
+      meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+      chunk_index INT NOT NULL,
+      mime_type TEXT NOT NULL,
+      data BYTEA NOT NULL,
+      total_bytes INT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT now(),
+      PRIMARY KEY (meeting_id, chunk_index)
+    )
+  `
   await sql`CREATE INDEX IF NOT EXISTS idx_meetings_user ON meetings(user_id)`
   await sql`CREATE INDEX IF NOT EXISTS idx_transcripts_meeting ON transcripts(meeting_id)`
   await sql`CREATE INDEX IF NOT EXISTS idx_folders_user ON folders(user_id)`
@@ -190,6 +211,48 @@ export async function syncMeetingToNeon(m: Meeting, segments: Segment[] = [], no
     return true
   } catch (err) {
     console.error('Failed to sync meeting to Neon:', err)
+    return false
+  }
+}
+
+export async function syncMeetingAudioToNeon(meetingId: string, filePath: string, mimeType: string): Promise<boolean> {
+  if (!isNeonConfigured()) return false
+  try {
+    const stat = statSync(filePath)
+    if (!stat.isFile() || stat.size === 0) return false
+    if (stat.size > MAX_CLOUD_AUDIO_BYTES) {
+      console.warn(`[neon] Skipping cloud audio upload for ${meetingId}: ${stat.size} bytes exceeds 25 MB limit`)
+      return false
+    }
+
+    await initNeonSchema()
+    const sql = getNeonClient()
+    const buf = readFileSync(filePath)
+    const totalChunks = Math.ceil(buf.length / MAX_AUDIO_CHUNK_BYTES)
+
+    await sql`DELETE FROM meeting_audio_chunks WHERE meeting_id = ${meetingId}`
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * MAX_AUDIO_CHUNK_BYTES
+      const slice = buf.subarray(start, Math.min(start + MAX_AUDIO_CHUNK_BYTES, buf.length))
+      const b64 = slice.toString('base64')
+      await sql`
+        INSERT INTO meeting_audio_chunks (meeting_id, chunk_index, mime_type, data, total_bytes)
+        VALUES (${meetingId}, ${i}, ${mimeType}, decode(${b64}, 'base64'), ${buf.length})
+        ON CONFLICT (meeting_id, chunk_index)
+        DO UPDATE SET mime_type = EXCLUDED.mime_type, data = EXCLUDED.data, total_bytes = EXCLUDED.total_bytes
+      `
+    }
+
+    await sql`
+      UPDATE meetings
+      SET audio_url = ${`/api/meetings/${meetingId}/audio`},
+          audio_mime = ${mimeType},
+          updated_at = now()
+      WHERE id = ${meetingId}
+    `
+    return true
+  } catch (err) {
+    console.error('Failed to upload meeting audio to Neon:', err)
     return false
   }
 }

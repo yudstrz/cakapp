@@ -240,6 +240,21 @@ export function Settings({ revision = 0, focus }: { revision?: number; focus?: s
             }} />
             <div className="settings-row">
               <div className="settings-row-copy">
+                <label htmlFor="cloud-audio-upload" className="settings-label">Simpan rekaman audio ke Cloud Storage</label>
+                <p id="cloud-audio-upload-description" className="settings-description">Opsional (default nonaktif). Jika aktif, file audio rapat (maks. 25 MB) disinkronkan ke web portal untuk pemutaran lintas perangkat.</p>
+              </div>
+              <button id="cloud-audio-upload" data-testid="cloud-audio-upload-toggle" role="switch" aria-checked={prefs?.cloudAudioUpload ?? false} aria-describedby="cloud-audio-upload-description"
+                disabled={!prefs || general.busy} className="settings-toggle" onClick={() => {
+                  if (!prefs) return
+                  const on = !prefs.cloudAudioUpload
+                  void general.save(async () => {
+                    await window.yogurt.settings.setCloudAudioUpload(on)
+                    setPrefs(p => p && { ...p, cloudAudioUpload: on })
+                  }, 'cloud-audio-upload-retry')
+                }}><span className="settings-toggle-knob" /></button>
+            </div>
+            <div className="settings-row">
+              <div className="settings-row-copy">
                 <label htmlFor="recording-credit" className="settings-label">{t('Add “{credit}”', { credit: t('Recorded with {app}', { app: 'Cakapp' }) })}</label>
                 <p id="recording-credit-description" className="settings-description">{t('On copied summaries and saved Markdown files.')}</p>
               </div>
