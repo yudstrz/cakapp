@@ -1088,7 +1088,7 @@ html:not(.widget) button:focus-visible, html:not(.widget) input:focus-visible { 
 button.primary:disabled { background:var(--control);border-color:transparent;box-shadow:none;color:var(--muted);opacity:1; }
 
 .app-modal[data-testid=folder-add-meetings] { width:min(440px,calc(100vw - 40px));display:flex;flex-direction:column;overscroll-behavior:contain; }
-.app-modal[data-testid=folder-add-meetings] .modal-copy h2 { display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere; }
+.app-modal[data-testid=folder-add-meetings] .modal-copy h2 { display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;overflow-wrap:anywhere; }
 .folder-meeting-choices { min-height:0;max-height:42vh;overflow-y:auto;scroll-padding-block:20px;overscroll-behavior:contain;margin:0 12px 12px;padding:2px 0; }
 .folder-meeting-choices>p { padding:8px 12px;color:var(--muted);font-size:13px; }
 .folder-meeting-choice { cursor:pointer;display:flex;align-items:center;gap:10px;border-radius:6px;min-height:36px;padding:6px 12px;font-size:13px;line-height:18px; }

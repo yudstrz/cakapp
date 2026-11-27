@@ -1,5 +1,6 @@
 {
   "edge-devtools.webhint": false,
   "css.lint.unknownVendorSpecificProperties": "ignore",
+  "css.lint.unknownAtRules": "ignore",
   "css.validate": true
 }
