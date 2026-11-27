@@ -69,7 +69,7 @@ import { cleanJargon } from '../shared/jargon'
 import { setGenericTitles } from './titles'
 import { installAppMenu } from './appMenu'
 import { hookAuth } from './auth'
-import { setupBetterAuthMain, handleAuthDeepLink, DESKTOP_SCHEME } from './betterAuthClient'
+import { setupBetterAuthMain, handleAuthDeepLink, findAuthDeepLink } from './betterAuthClient'
 import { hookAiIpc } from './aiIpc'
 import { aiKeyStore } from './aiKeyStore'
 import { checkNeonHealth, initNeonSchema, isNeonConfigured, syncMeetingToNeon } from './neon'
@@ -128,14 +128,13 @@ if (x11) { stripAppImageEnv(); app.relaunch(x11); app.exit(0) }
 // One Cakapp at a time: a second launch focuses the existing window
 else if (!app.requestSingleInstanceLock()) app.quit()
 let win: BrowserWindow | undefined
-setupBetterAuthMain(() => win)
 let allowQuit = false
 let mcpQuiet = false
 let mcpAutoQuit = false
 let relaunching = false
-let wakeDetection = () => {}
-let presentMain = (_foreground = false) => {}
-let updateMainMenu = () => {}
+let wakeDetection = () => { }
+let presentMain = (_foreground = false) => { }
+let updateMainMenu = () => { }
 let menuBar: ReturnType<typeof createTray> | undefined
 /** test runs: no window on screen, never takes focus from what the person is doing */
 const BACKGROUND = process.env.YOGURT_BACKGROUND === '1'
@@ -146,8 +145,11 @@ app.on('second-instance', (_e, argv) => {
   if (app.isReady() && !startedHidden(process.platform, argv)) showMain()
   // Forward any deep-link URL in argv to BetterAuth (Windows/Linux path)
   if (process.platform !== 'darwin') {
-    const deepLink = argv.find(arg => arg.startsWith(`${DESKTOP_SCHEME}://`))
-    if (deepLink) handleAuthDeepLink(deepLink, () => win)
+    const deepLink = findAuthDeepLink(argv)
+    if (deepLink) {
+      if (app.isReady()) showMain()
+      handleAuthDeepLink(deepLink, () => win)
+    }
   }
 })
 // macOS delivers deep links via open-url event, not second-instance
@@ -161,9 +163,9 @@ function openExternally(url: string) {
   if ((!isFake() || process.env.YOGURT_FAKE_OPEN_LINKS === '1') && /^https:\/\//.test(url)) void shell.openExternal(url)
 }
 
-let updateWidgetVisibility = () => {}
-let recordingPillChanged = (_on: boolean) => {}
-let sendWidgetTranscript = (_channel: string, _value: unknown) => {}
+let updateWidgetVisibility = () => { }
+let recordingPillChanged = (_on: boolean) => { }
+let sendWidgetTranscript = (_channel: string, _value: unknown) => { }
 function createWindow() {
   // the size and place it was left at (windowState.ts); test runs (fake mode) always start at the default, so one
   // test's resize never carries into the next
@@ -178,8 +180,10 @@ function createWindow() {
     // hidden pages would otherwise pause timers and animations
     webPreferences: { preload: join(__dirname, '../preload/index.cjs'), sandbox: false, ...(BACKGROUND ? { backgroundThrottling: false } : {}) },
   })
-  presentMain = keepMainWindow(win, { background: BACKGROUND, canClose: () => allowQuit, activate: () => app.focus({ steal: true }),
-    closeTo: () => closeAction(process.platform, menuBar?.shown() ?? true), glass: process.platform === 'darwin', lift: process.platform === 'darwin' })
+  presentMain = keepMainWindow(win, {
+    background: BACKGROUND, canClose: () => allowQuit, activate: () => app.focus({ steal: true }),
+    closeTo: () => closeAction(process.platform, menuBar?.shown() ?? true), glass: process.platform === 'darwin', lift: process.platform === 'darwin'
+  })
   if (process.platform !== 'darwin') {
     win.setMenuBarVisibility(false)
     // the window buttons follow light and dark mode
@@ -306,7 +310,7 @@ function goTo(next: string, resume = false) {
 let presented = 0
 /** fake mode: how many times the Mac's Calendar settings would have opened */
 let settingsOpened = 0
-let refreshCalendarConsumers = () => {}
+let refreshCalendarConsumers = () => { }
 /** a call is on (recording or not): the corner never offers Restart then */
 /** fake mode: the System Settings panes the permission steps and Settings would have opened */
 const systemSettings: string[] = []
@@ -570,6 +574,7 @@ function startDetection() {
 }
 
 app.whenReady().then(() => {
+  setupBetterAuthMain(() => win)
   console.info('APP', `trusting ${systemCerts} certificates from the system on top of the built-in ones`)
   // Local Electron launches need the same Dock icon as the packaged application.
   if (!app.isPackaged && process.platform === 'darwin') app.dock?.setIcon(join(__dirname, '../../build/icon.png'))
@@ -658,6 +663,7 @@ app.whenReady().then(() => {
   }
   // the person's own names, never given to the other side: the one in Settings and the Mac's
   const settingsFile = join(userDataDir(), 'settings.json')
+  let onAuthLoggedIn = () => {}
   hookAuth({
     file: settingsFile,
     safeStorage,
@@ -666,7 +672,10 @@ app.whenReady().then(() => {
       if (!loadSettings(settingsFile).myName?.trim()) updateSettings(settingsFile, { myName: name })
     },
     rememberProfile: accountProfile => updateSettings(settingsFile, { accountProfile: accountProfile ?? undefined }),
-    onChange: st => win?.webContents.send('auth:changed', st),
+    onChange: st => {
+      win?.webContents.send('auth:changed', st)
+      if (st.user) onAuthLoggedIn()
+    },
   })
   hookAiIpc({
     checkHardware: async () => {
@@ -691,7 +700,7 @@ app.whenReady().then(() => {
   setJargon(() => cleanJargon(loadSettings(settingsFile).jargon))
   // names from the call: the call app is read while a meeting records, and each line of the other side gets the name talking then
   const callNames = hookCallNames({
-    store, watch: !caps.callNames ? () => ({ stop() {} }) : isFake() ? fakeCallWatch : helperWatch(helperPath), myNames: () => [me(), macName()],
+    store, watch: !caps.callNames ? () => ({ stop() { } }) : isFake() ? fakeCallWatch : helperWatch(helperPath), myNames: () => [me(), macName()],
     transcribed: async (id) => { await recordingFinished(id); await transcriptFinished(id) },
     // people seen in the call joined the meeting: unedited notes already written get written again for them
     changed: (id) => { win?.webContents.send('transcript:speakers', id); sendWidgetTranscript('transcript:speakers', id); win?.webContents.send('meetings:changed'); notes.applyPeople(id) },
@@ -699,11 +708,12 @@ app.whenReady().then(() => {
   })
   // Windows and Linux: whisper left the graphics card in a meeting, so the speed check (timed with it) runs again next start
   onWhisperGpuOff(() => speedStore(speedFile()).forget())
-  hookTranscription({ store, modelPath: () => setup.installed()?.asr, send: (seg) => {
-    const order = seg.track === 'them' && seg.speaker ? store.speakerOrder(seg.meetingId, seg.speaker) : []
-    const colored = { ...seg, speakerColor: speakerColor(seg.track, seg.speaker, order) }
-    win?.webContents.send('transcript:segment', colored); sendWidgetTranscript('transcript:segment', colored)
-  },
+  hookTranscription({
+    store, modelPath: () => setup.installed()?.asr, send: (seg) => {
+      const order = seg.track === 'them' && seg.speaker ? store.speakerOrder(seg.meetingId, seg.speaker) : []
+      const colored = { ...seg, speakerColor: speakerColor(seg.track, seg.speaker, order) }
+      win?.webContents.send('transcript:segment', colored); sendWidgetTranscript('transcript:segment', colored)
+    },
     nameOf: (id, a, b) => callNames.nameFor(id, a, b),
     refresh: (id) => { win?.webContents.send('transcript:speakers', id); sendWidgetTranscript('transcript:speakers', id) },
     sendPartial: (part) => { win?.webContents.send('transcript:partial', part); sendWidgetTranscript('transcript:partial', part) },
@@ -718,11 +728,12 @@ app.whenReady().then(() => {
       host: { platform: process.platform, arch: process.arch, osRelease: isFake() ? (process.env.YOGURT_FAKE_SPEECH === '1' ? '25.4.0' : '24.0.0') : os.release() }, binary: audioHelperPath(),
       ui: () => localeOf(loadSettings(join(userDataDir(), 'settings.json')), systemLocale()), last: () => store.lastLanguage(),
       ...(isFake() ? { locales: async () => ({ available: true, supported: ['en-US', 'es-ES'], installed: ['en-US'] }), install: async () => true } : {}),
-    } })
-  ipcMain.handle('transcript:draft',(e,id:unknown)=>{
-    if(e.sender!==win?.webContents||!isId(id)||!store.meeting(id)?.transcriptionAgain)return []
-    const order=store.speakerOrder(id)
-    return store.transcriptionDraft(id).map((s,i)=>({...s,id:-i-1,speakerColor:speakerColor(s.track,s.speaker,order)}))
+    }
+  })
+  ipcMain.handle('transcript:draft', (e, id: unknown) => {
+    if (e.sender !== win?.webContents || !isId(id) || !store.meeting(id)?.transcriptionAgain) return []
+    const order = store.speakerOrder(id)
+    return store.transcriptionDraft(id).map((s, i) => ({ ...s, id: -i - 1, speakerColor: speakerColor(s.track, s.speaker, order) }))
   })
   ipcMain.handle('transcript:get', (_e, id: unknown, o: unknown) => {
     if (!isId(id)) return []
@@ -744,10 +755,12 @@ app.whenReady().then(() => {
     notes.refresh(id)
   })
   // each meeting's audio lives in its own folder; a crash keeps what was recorded up to the last 5 s flush
-  hookCapture({ dirOf: (id) => join(userDataDir(), 'meetings', id), onStart: onMeetingStart, onStop: onMeetingStop, speech: (id) => speechLocaleFor(id),
+  hookCapture({
+    dirOf: (id) => join(userDataDir(), 'meetings', id), onStart: onMeetingStart, onStop: onMeetingStop, speech: (id) => speechLocaleFor(id),
     mic: () => loadSettings(settingsFile).mic ?? null,
     // recording that can't go on ends the meeting, with the notes kept
-    stopMeeting: (id, reason) => { stopMeeting(id, reason) } })
+    stopMeeting: (id, reason) => { stopMeeting(id, reason) }
+  })
   // 32 GB and up: the notes model reads each meeting in as it happens (notes/readAhead.ts)
   const readsAhead = !isFake() && readAheadAllowed(os.totalmem())
   // the notes model: one job at a time, recording first; loaded when needed, the best one downloaded
@@ -813,27 +826,27 @@ app.whenReady().then(() => {
     store, ready: () => !!setup.installed()?.asr || aiKeyStore.getPublicConfig().sttMode === 'cloud', recording: () => !!activeMeeting() || !!resumingId || finishing, live: transcriptOpen,
     tracks: async id => {
       await recordingSettled(id)
-      const tracks: Partial<Record<'me'|'them',AsyncIterable<Float32Array>>> = {}
-      for(const track of ['me','them'] as const) {
-        const file=trackFile(meetingDir(id),track,audioKinds)
-        if(file?.endsWith('.wav'))tracks[track]=uploadedAudio(file)
-        else if(file)tracks[track]=helperDecode(audioHelperPath(),file)
+      const tracks: Partial<Record<'me' | 'them', AsyncIterable<Float32Array>>> = {}
+      for (const track of ['me', 'them'] as const) {
+        const file = trackFile(meetingDir(id), track, audioKinds)
+        if (file?.endsWith('.wav')) tracks[track] = uploadedAudio(file)
+        else if (file) tracks[track] = helperDecode(audioHelperPath(), file)
       }
       return tracks
     },
-    transcribe: (id,tracks,options) => transcribeRecorded(id,tracks,undefined,options),
-    draft:id=>win?.webContents.send('transcript:draft',id),
-    changed: (id,replaced) => {win?.webContents.send('meetings:changed');if(replaced){win?.webContents.send('transcript:replaced',id);void indexer.schedule()}},
-    summarize: id => {void notes.writeAgain(id)},
+    transcribe: (id, tracks, options) => transcribeRecorded(id, tracks, undefined, options),
+    draft: id => win?.webContents.send('transcript:draft', id),
+    changed: (id, replaced) => { win?.webContents.send('meetings:changed'); if (replaced) { win?.webContents.send('transcript:replaced', id); void indexer.schedule() } },
+    summarize: id => { void notes.writeAgain(id) },
   })
   const uploads = hookAudioUploads({
     root: join(userDataDir(), 'meetings'), store, window: () => win, exiting: () => allowQuit,
     recording: () => !!activeMeeting() || !!resumingId || finishing,
-    prepared: id => {void savedTranscriptions.start(id)}, changed: () => win?.webContents.send('meetings:changed'),
+    prepared: id => { void savedTranscriptions.start(id) }, changed: () => win?.webContents.send('meetings:changed'),
     userId: getUserId,
   })
-  setup.onState(() => {uploads.resume();savedTranscriptions.resume()})
-  onMeetingStart(m => {store.clearTranscriptionState(m.id);savedTranscriptions.pause()})
+  setup.onState(() => { uploads.resume(); savedTranscriptions.resume() })
+  onMeetingStart(m => { store.clearTranscriptionState(m.id); savedTranscriptions.pause() })
   const syncEngine = new SyncEngine(store, getUserId, () => win?.webContents.send('meetings:changed'), 60_000, async (meetingId) => {
     if (loadSettings(settingsFile).cloudAudioUpload !== true) return null
     await Promise.all([recordingSettled(meetingId), rejoined])
@@ -842,6 +855,7 @@ app.whenReady().then(() => {
     const mimeType = filePath.endsWith('.m4a') ? 'audio/mp4' : filePath.endsWith('.wav') ? 'audio/wav' : 'audio/ogg'
     return { filePath, mimeType }
   })
+  onAuthLoggedIn = () => { void syncEngine.syncAll().catch(err => console.warn('[syncEngine] sync after auth failed:', err)) }
   onMeetingStopSaved((m) => {
     uploads.resume(); savedTranscriptions.resume()
     void syncEngine.pushMeeting(m.id).catch(err => console.warn('[syncEngine] push meeting failed:', err))
@@ -860,16 +874,16 @@ app.whenReady().then(() => {
     if (!isId(id)) return false
     return syncEngine.pushMeeting(id)
   })
-  ipcMain.handle('transcript:run', (e,id:unknown,again:unknown) => {
-    if(e.sender!==win?.webContents||!isId(id)||typeof again!=='boolean')return false
-    const meeting=store.meeting(id)
-    if(!meeting||stopSavePending(id)||transcriptionBusy(meeting.transcriptionState))return false
-    return savedTranscriptions.start(id,again)
+  ipcMain.handle('transcript:run', (e, id: unknown, again: unknown) => {
+    if (e.sender !== win?.webContents || !isId(id) || typeof again !== 'boolean') return false
+    const meeting = store.meeting(id)
+    if (!meeting || stopSavePending(id) || transcriptionBusy(meeting.transcriptionState)) return false
+    return savedTranscriptions.start(id, again)
   })
-  ipcMain.handle('transcript:stop', async (e,id:unknown) => {
-    if(e.sender!==win?.webContents||!isId(id))return
-    const preparing=uploads.preparing(id)
-    if(preparing){await uploads.cancel(preparing.owner,preparing.file.token);return}
+  ipcMain.handle('transcript:stop', async (e, id: unknown) => {
+    if (e.sender !== win?.webContents || !isId(id)) return
+    const preparing = uploads.preparing(id)
+    if (preparing) { await uploads.cancel(preparing.owner, preparing.file.token); return }
     savedTranscriptions.stop(id)
   })
   ipcMain.handle('meetings:resume', async (_e, id: unknown): Promise<StartResult> => {
@@ -953,10 +967,12 @@ app.whenReady().then(() => {
   ipcMain.handle('chat:get', (_e, id: unknown) => isId(id) && store.meeting(id) ? { ...conversations.view(meetingChat(id)), meetingId: id } : undefined)
   ipcMain.handle('chat:ask', (_e, id: unknown, q: unknown) => { if (!askUnavailable() && isId(id) && store.meeting(id) && typeof q === 'string') conversations.ask(meetingChat(id), q) })
   ipcMain.on('chat:stop', (_e, id: unknown) => { if (isId(id) && store.meeting(id)) conversations.stop(meetingChat(id)) })
-  ipcMain.handle('chat:clear', (_e, id: unknown) => { if (isId(id) && store.meeting(id)) {
-    conversations.stop(meetingChat(id))
-    library.current([{ kind: 'meeting', id }], true); conversations.refresh()
-  } })
+  ipcMain.handle('chat:clear', (_e, id: unknown) => {
+    if (isId(id) && store.meeting(id)) {
+      conversations.stop(meetingChat(id))
+      library.current([{ kind: 'meeting', id }], true); conversations.refresh()
+    }
+  })
   ipcMain.handle('conversations:list', () => conversations.list())
   ipcMain.handle('conversations:get', (_e, id: unknown) => (isId(id) ? conversations.view(id) ?? null : null))
   ipcMain.handle('conversations:ask', (_e, id: unknown, q: unknown) => {
@@ -986,10 +1002,12 @@ app.whenReady().then(() => {
   const foldersChanged = () => { win?.webContents.send('folders:changed'); folderSuggestions.refresh() }
   hookFolders({ store, changed: foldersChanged, onFolderSync: (id) => void syncEngine.pushFolder(id) })
   // every meeting to one file and back; what an import adds shows up on home
-  hookBackup({ getRecordingPill: () => visibilityOf(loadSettings(settingsFile), platform).showRecordingPill,
+  hookBackup({
+    getRecordingPill: () => visibilityOf(loadSettings(settingsFile), platform).showRecordingPill,
     setRecordingPill: preferences.setRecordingPill, db: store.db, meetingsDir: join(userDataDir(), 'meetings'), window: () => win, recording: () => !!activeMeeting() || !!resumingId,
     changed: () => { win?.webContents.send('meetings:changed'); win?.webContents.send('conversations:list', conversations.list()); void indexer.refresh(); folderSuggestions.refresh() },
-    beforeExport: () => { notes.retryDrafts(); return notes.pendingDraftId() } })
+    beforeExport: () => { notes.retryDrafts(); return notes.pendingDraftId() }
+  })
   // AI apps change things only through the functions behind the app's own buttons
   const noteSaved = (id: string, r: ReturnType<typeof notes.replace>) => { if (r === 'saved') win?.webContents.send('meetings:changed'); return r }
   let mcpQuitTimer: NodeJS.Timeout | undefined
@@ -1073,7 +1091,7 @@ app.whenReady().then(() => {
   setup.onState(catchUp)
   // meetings recorded before the speech model was in (#30): transcribed from their saved recording once it is, one at
   // a time and never while recording (a new recording pauses it; it carries on after)
-  const transcribeWaiting = async () => {await rejoined.catch(()=>{});await savedTranscriptions.pump()}
+  const transcribeWaiting = async () => { await rejoined.catch(() => { }); await savedTranscriptions.pump() }
   setup.onState(() => void transcribeWaiting())
   // at launch too, when the model is already in and setup has nothing new to say
   void transcribeWaiting()
@@ -1118,14 +1136,16 @@ app.whenReady().then(() => {
     e.preventDefault()
     if (finishing) return
     finishing = true
-     savedTranscriptions.shutdown()
+    savedTranscriptions.shutdown()
     void (async () => {
       const flushed = await flushRenderer()
       const saved = notes.retryDrafts()
       if (!flushed || !saved) {
-        const options = { type: 'warning' as const, title: t("Cakapp couldn't finish saving"),
+        const options = {
+          type: 'warning' as const, title: t("Cakapp couldn't finish saving"),
           message: t("Cakapp couldn't finish saving"), detail: t('Return to your notes to try again. Quitting now may discard your latest changes.'),
-          buttons: [t('Return to notes'), t('Quit without saving')], defaultId: 0, cancelId: 0, noLink: true }
+          buttons: [t('Return to notes'), t('Quit without saving')], defaultId: 0, cancelId: 0, noLink: true
+        }
         const answer = win && !win.isDestroyed() ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options)
         if (answer.response !== 1) {
           const id = notes.pendingDraftId()
@@ -1141,7 +1161,7 @@ app.whenReady().then(() => {
       await Promise.all([media.resume(), settleRecording().then(() => settleTranscription())])
       allowQuit = true
       if (!mcpAutoQuit && !relaunching) {
-        try { rmSync(join(userDataDir(), LAUNCH_FILE), { force: true }) } catch {}
+        try { rmSync(join(userDataDir(), LAUNCH_FILE), { force: true }) } catch { }
       }
       finishQuit()
     })().catch((err) => console.error('quit was cancelled because saving or shutdown failed', err)).finally(() => {
@@ -1253,8 +1273,10 @@ app.whenReady().then(() => {
   const calendarList = async () => {
     const list = await calendars(), settings = loadSettings(settingsFile), hidden = settings.hiddenCalendarIds ?? []
     const linkIds = new Set(calendarLinks?.list().map((l) => l.id) ?? [])
-    return { status: calendarStatus(), systemStatus: systemCalendarStatus(), hideEventsWithoutCallLink: settings.hideEventsWithoutCallLink === true,
-      calendars: list.map((c) => ({ ...c, enabled: !hidden.includes(c.id), ...(linkIds.has(c.id) ? { link: true } : {}) })) }
+    return {
+      status: calendarStatus(), systemStatus: systemCalendarStatus(), hideEventsWithoutCallLink: settings.hideEventsWithoutCallLink === true,
+      calendars: list.map((c) => ({ ...c, enabled: !hidden.includes(c.id), ...(linkIds.has(c.id) ? { link: true } : {}) }))
+    }
   }
   ipcMain.handle('calendar:list', calendarList)
   ipcMain.handle('calendar:set-enabled', async (_e, id: unknown, enabled: unknown) => {
@@ -1352,15 +1374,24 @@ app.whenReady().then(() => {
   startDetection()
   void setup.start()
   // new versions from GitHub Releases, downloaded in the background and installed on quit
-  const updatesAvailable = updatesOn({ packaged: app.isPackaged, fake: isFake(), profile: !!process.env.YOGURT_USER_DATA, platform: process.platform, appImage: !!process.env.APPIMAGE,
+  const updatesAvailable = updatesOn({
+    packaged: app.isPackaged, fake: isFake(), profile: !!process.env.YOGURT_USER_DATA, platform: process.platform, appImage: !!process.env.APPIMAGE,
     feed: app.isPackaged && existsSync(join(process.resourcesPath, 'app-update.yml')),
-    preview: app.isPackaged && isPreviewBuild((() => { try { return readFileSync(join(app.getAppPath(), 'package.json'), 'utf8') } catch { return '' } })()) })
-  hookUpdates({ file: join(userDataDir(), 'settings.json'), available: updatesAvailable, recording: () => !!activeMeeting(),
+    preview: app.isPackaged && isPreviewBuild((() => { try { return readFileSync(join(app.getAppPath(), 'package.json'), 'utf8') } catch { return '' } })())
+  })
+  hookUpdates({
+    file: join(userDataDir(), 'settings.json'), available: updatesAvailable, recording: () => !!activeMeeting(),
     // fake mode: a test pretends a version downloaded
-    fake: isFake() && process.env.YOGURT_FAKE_UPDATE ? { version: process.env.YOGURT_FAKE_UPDATE, restarted: () => { updateRestarts++ } } : undefined })
+    fake: isFake() && process.env.YOGURT_FAKE_UPDATE ? { version: process.env.YOGURT_FAKE_UPDATE, restarted: () => { updateRestarts++ } } : undefined
+  })
     .catch((err) => console.warn("couldn't start looking for new versions", err))
   // the Dock icon: the main window, even while the widget is up
   app.on('activate', showMain)
+  // Handle deep link if Windows/Linux launched Cakapp directly from the browser callback
+  if (process.platform !== 'darwin') {
+    const coldDeepLink = findAuthDeepLink(process.argv)
+    if (coldDeepLink) { showMain(); handleAuthDeepLink(coldDeepLink, () => win) }
+  }
 })
 
 // on a Mac Cakapp lives on in the menu bar, so it still notices calls; Quit is in its menu

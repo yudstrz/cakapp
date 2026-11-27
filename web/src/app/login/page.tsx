@@ -3,24 +3,13 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authClient } from '@/lib/auth-client';
-
-function useElectronQuery() {
-  const [query, setQuery] = useState<Record<string, string>>({});
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const next: Record<string, string> = {};
-    for (const key of ['client_id', 'state', 'code_challenge']) {
-      const val = params.get(key);
-      if (val) next[key] = val;
-    }
-    setQuery(next);
-  }, []);
-  return query;
-}
+import { extractElectronQuery } from '@/lib/desktop-scheme';
 
 export default function LoginPage() {
   const router = useRouter();
-  const electronQuery = useElectronQuery();
+  const [electronQuery, setElectronQuery] = useState<Record<string, string>>({});
+  const [rawSearch, setRawSearch] = useState('');
+  const [existingUser, setExistingUser] = useState<{ email: string; full_name: string } | null>(null);
   const isElectronFlow = Boolean(electronQuery.client_id && electronQuery.code_challenge);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,9 +18,44 @@ export default function LoginPage() {
   const [handoffDone, setHandoffDone] = useState(false);
 
   useEffect(() => {
-    const id = authClient.ensureElectronRedirect();
-    return () => clearTimeout(id);
+    const search = window.location.search;
+    setRawSearch(search);
+    const parsed = extractElectronQuery(search);
+    setElectronQuery(parsed);
+    if (!parsed.client_id || !parsed.code_challenge) return;
+    let active = true;
+    void fetch('/api/auth/me', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { ok?: boolean; user?: { email: string; full_name: string } } | null) => {
+        if (active && d?.ok && d.user) setExistingUser(d.user);
+      })
+      .catch(() => {});
+    return () => { active = false; };
   }, []);
+
+  async function handleTransferExisting() {
+    setError('');
+    setLoading(true);
+    try {
+      const qs = new URLSearchParams(electronQuery).toString();
+      const res = await fetch(`/api/auth/electron/transfer-user?${qs}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ callbackURL: '/dashboard' }),
+      });
+      if (!res.ok) {
+        setError('Sesi portal belum valid. Silakan masuk ulang di bawah.');
+        setExistingUser(null);
+        return;
+      }
+      setHandoffDone(true);
+      window.dispatchEvent(new Event('cakapp:electron-handoff'));
+    } catch {
+      setError('Gagal menyambungkan sesi ke Cakapp Desktop.');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -49,6 +73,7 @@ export default function LoginPage() {
       }
       if (isElectronFlow) {
         setHandoffDone(true);
+        window.dispatchEvent(new Event('cakapp:electron-handoff'));
         return;
       }
       router.push('/dashboard');
@@ -92,6 +117,23 @@ export default function LoginPage() {
               : 'Akses seluruh transkrip dan notulen rapat Anda dari mana saja.'}
           </p>
         </div>
+
+        {isElectronFlow && existingUser && !handoffDone && (
+          <div className="mb-5 rounded-xl border border-secondary-solid/30 bg-secondary-soft/70 p-4 space-y-3">
+            <div className="text-xs text-ink">
+              <p className="font-semibold">Akun sudah masuk di browser</p>
+              <p className="mt-0.5 text-written">{existingUser.full_name || existingUser.email} ({existingUser.email})</p>
+            </div>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={handleTransferExisting}
+              className="w-full min-h-[42px] rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-ink hover:opacity-90 disabled:opacity-50 transition-opacity"
+            >
+              {loading ? 'Menyambungkan...' : 'Sambungkan ke Cakapp Desktop Sekarang'}
+            </button>
+          </div>
+        )}
 
         {handoffDone && (
           <div role="status" className="mb-4 rounded-lg border border-emerald-700/40 bg-emerald-500/10 p-3 text-xs text-ink">
@@ -168,7 +210,7 @@ export default function LoginPage() {
 
         <div className="mt-6 border-t border-line pt-5 text-center text-xs text-written">
           Belum memiliki akun?{' '}
-          <a href="/register" className="font-semibold text-accent hover:underline">
+          <a href={`/register${isElectronFlow ? rawSearch : ''}`} className="font-semibold text-accent hover:underline">
             Daftar sekarang
           </a>
         </div>

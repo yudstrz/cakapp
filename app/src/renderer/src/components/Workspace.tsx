@@ -31,15 +31,19 @@ export function Workspace({ route, meeting, folders, go, back, forward, search, 
   const [authModalOpen, setAuthModalOpen] = useState(false)
   useEffect(() => {
     let active = true
-    void window.yogurt.auth.state().then(s => { if (active) setAuth(s) }).catch(() => {})
-    const offIpc = window.yogurt.auth.onChanged(next => { if (active) setAuth(next) })
+    let loggedIn = false
+    const take = (next: AuthState) => { if (!active) return; loggedIn = !!next.user; setAuth(next) }
+    void window.yogurt.auth.state().then(take).catch(() => {})
+    const offIpc = window.yogurt.auth.onChanged(take)
     const onAuthChanged = (e: Event) => {
       const next = (e as CustomEvent<AuthState>).detail
-      if (next) setAuth(next)
-      else void window.yogurt.auth.state().then(setAuth).catch(() => {})
+      if (next) take(next)
+      else void window.yogurt.auth.state().then(take).catch(() => {})
     }
+    const onFocus = () => { if (!loggedIn) void window.yogurt.auth.state().then(take).catch(() => {}) }
     window.addEventListener('cakapp:auth-changed', onAuthChanged)
-    return () => { active = false; offIpc(); window.removeEventListener('cakapp:auth-changed', onAuthChanged) }
+    window.addEventListener('focus', onFocus)
+    return () => { active = false; offIpc(); window.removeEventListener('cakapp:auth-changed', onAuthChanged); window.removeEventListener('focus', onFocus) }
   }, [])
   useEffect(() => {
     let active = true, updated = false

@@ -207,11 +207,11 @@ export function hookAuth(d: {
   const failed = (error: unknown): AuthResult => ({ ok: false, error: authError(error) })
 
   if (d.onChange && hasBetterAuth()) {
-    void loadBetterAuth().then(({ getBetterAuthClient }) => {
+    void loadBetterAuth().then(({ getBetterAuthClient, onAuthDeepLink }) => {
+      const notify = () => { void state().then(st => d.onChange?.(st)).catch(() => {}) }
+      onAuthDeepLink(() => { notify() })
       const ba = getBetterAuthClient()
-      ba.$store?.listen?.('$sessionSignal', () => {
-        void state().then(st => d.onChange?.(st)).catch(() => {})
-      })
+      ba.$store?.listen?.('$sessionSignal', notify)
     }).catch(() => {})
   }
 

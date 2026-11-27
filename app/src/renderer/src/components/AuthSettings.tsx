@@ -15,14 +15,30 @@ export function AuthSettings({ onDone, compact }: { onDone?: () => void; compact
 
   useEffect(() => {
     let active = true
-    void window.yogurt.auth.state().then(value => { if (active) setState(value) })
+    let loggedIn = false
+    const syncState = (notifyDoneOnLogin: boolean) => {
+      void window.yogurt.auth.state().then(value => {
+        if (!active) return
+        const justSignedIn = !loggedIn && !!value.user
+        loggedIn = !!value.user
+        setState(value)
+        window.dispatchEvent(new CustomEvent('cakapp:auth-changed', { detail: value }))
+        if (notifyDoneOnLogin && justSignedIn) onDone?.()
+      }).catch(() => {})
+    }
+    syncState(false)
     const off = window.yogurt.auth.onChanged(next => {
       if (!active) return
+      loggedIn = !!next.user
       setState(next)
+      setMessage('')
+      setError('')
       window.dispatchEvent(new CustomEvent('cakapp:auth-changed', { detail: next }))
       if (next.user) onDone?.()
     })
-    return () => { active = false; off() }
+    const onFocus = () => { if (!loggedIn) syncState(true) }
+    window.addEventListener('focus', onFocus)
+    return () => { active = false; off(); window.removeEventListener('focus', onFocus) }
   }, [onDone])
 
   const finish = (result: Awaited<ReturnType<typeof window.yogurt.auth.signIn>>) => {
@@ -35,7 +51,7 @@ export function AuthSettings({ onDone, compact }: { onDone?: () => void; compact
       result.message === 'check-email'
         ? t('auth-check-email')
         : result.message === 'browser-opened'
-          ? 'Browser dibuka. Selesaikan login di browser lalu kembali ke Cakapp.'
+          ? 'Browser dibuka. Selesaikan login di browser, lalu klik Buka Cakapp Desktop jika belum kembali otomatis.'
           : ''
     )
     if (result.state.user) onDone?.()

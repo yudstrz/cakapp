@@ -188,11 +188,11 @@ export type CakappApi = {
   }
   /** the words heard in a meeting, live */
   transcript: {
-    draft(meetingId:string):Promise<Segment[]>
-    onDraft(cb:(meetingId:string)=>void):()=>void
-    onReplaced(cb:(meetingId:string)=>void):()=>void
-    run(meetingId:string,again:boolean):Promise<boolean>
-    stop(meetingId:string):Promise<void>
+    draft(meetingId: string): Promise<Segment[]>
+    onDraft(cb: (meetingId: string) => void): () => void
+    onReplaced(cb: (meetingId: string) => void): () => void
+    run(meetingId: string, again: boolean): Promise<boolean>
+    stop(meetingId: string): Promise<void>
     /** the meeting's lines; hidden: the echo lines hidden after the meeting too (each marked hidden); last: only the latest lines */
     get(meetingId: string, o?: { hidden?: boolean; last?: number }): Promise<Segment[]>
     /** brings hidden lines back: the ones given, or all of the meeting's */

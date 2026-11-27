@@ -4,6 +4,7 @@ import './globals.css';
 import { getCurrentUser } from '@/lib/auth';
 import UserNav from '@/components/UserNav';
 import ThemeToggle from '@/components/ThemeToggle';
+import ElectronRedirectGuard from '@/components/ElectronRedirectGuard';
 
 const bricolage = Bricolage_Grotesque({
   subsets: ['latin'],
@@ -99,7 +100,10 @@ export default async function RootLayout({
           </div>
         </header>
 
-        <main>{children}</main>
+        <main>
+          <ElectronRedirectGuard />
+          {children}
+        </main>
 
         <footer className="border-t border-line bg-chrome/60 py-8 text-xs text-muted">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">

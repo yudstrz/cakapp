@@ -1,16 +1,26 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authClient } from '@/lib/auth-client';
+import { extractElectronQuery } from '@/lib/desktop-scheme';
 
 export default function RegisterPage() {
   const router = useRouter();
+  const [electronQuery, setElectronQuery] = useState<Record<string, string>>({});
+  const [rawSearch, setRawSearch] = useState('');
+  const isElectronFlow = Boolean(electronQuery.client_id && electronQuery.code_challenge);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [handoffDone, setHandoffDone] = useState(false);
+
+  useEffect(() => {
+    setRawSearch(window.location.search);
+    setElectronQuery(extractElectronQuery(window.location.search));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -21,9 +31,15 @@ export default function RegisterPage() {
         name: fullName.trim(),
         email: email.trim().toLowerCase(),
         password,
+        ...(isElectronFlow ? { fetchOptions: { query: electronQuery } } : {}),
       });
       if (res.error) {
         setError(res.error.message || 'Pendaftaran gagal. Periksa data Anda.');
+        return;
+      }
+      if (isElectronFlow) {
+        setHandoffDone(true);
+        window.dispatchEvent(new Event('cakapp:electron-handoff'));
         return;
       }
       router.push('/dashboard');
@@ -42,6 +58,7 @@ export default function RegisterPage() {
       const res = await authClient.signIn.social({
         provider: 'google',
         callbackURL: '/dashboard',
+        ...(isElectronFlow ? { fetchOptions: { query: electronQuery } } : {}),
       });
       if (res?.error) {
         setError(res.error.message || 'Daftar dengan Google belum tersedia atau gagal.');
@@ -64,6 +81,12 @@ export default function RegisterPage() {
             Daftar untuk menyinkronkan dan membagikan riwayat notulen rapat Anda.
           </p>
         </div>
+
+        {handoffDone && (
+          <div role="status" className="mb-4 rounded-lg border border-emerald-700/40 bg-emerald-500/10 p-3 text-xs text-ink">
+            Akun berhasil dibuat. Mengalihkan ke aplikasi desktop Cakapp...
+          </div>
+        )}
 
         {error && (
           <div role="alert" className="mb-4 rounded-lg border border-red-700/40 bg-red-500/10 p-3 text-xs text-ink">
@@ -150,7 +173,7 @@ export default function RegisterPage() {
 
         <div className="mt-6 border-t border-line pt-5 text-center text-xs text-written">
           Sudah memiliki akun?{' '}
-          <a href="/login" className="font-semibold text-accent hover:underline">
+          <a href={`/login${isElectronFlow ? rawSearch : ''}`} className="font-semibold text-accent hover:underline">
             Masuk di sini
           </a>
         </div>

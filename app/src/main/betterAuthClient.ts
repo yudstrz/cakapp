@@ -5,29 +5,35 @@ import { createAuthClient } from 'better-auth/client'
 import { electronClient, handleDeepLink } from '@better-auth/electron/client'
 import { loadAppEnv } from './env'
 import { userDataDir } from './paths'
+import { DESKTOP_SCHEME, findAuthDeepLink, normalizeAuthDeepLink } from './authDeepLink'
 
-export const DESKTOP_SCHEME = 'com.cakapp.app'
+export { DESKTOP_SCHEME, findAuthDeepLink, normalizeAuthDeepLink }
 
 // Register the custom protocol BEFORE app is ready (Electron requirement).
 // @better-auth/electron's registerProtocolScheme does this inside whenReady,
 // which is too late, so we do it here and pass scheme:false to setupMain.
-protocol.registerSchemesAsPrivileged([{ scheme: DESKTOP_SCHEME, privileges: { secure: true, standard: false } }])
+protocol?.registerSchemesAsPrivileged?.([{ scheme: DESKTOP_SCHEME, privileges: { secure: true, standard: false } }])
 
 let cachedClient: ReturnType<typeof createBetterAuth> | undefined
 let cachedStorage: ReturnType<typeof buildSafeBetterAuthStorage> | undefined
 
 function buildSafeBetterAuthStorage() {
   const file = join(userDataDir(), 'better-auth.bin')
-  let store: Record<string, unknown> = {}
-  if (existsSync(file) && safeStorage?.isEncryptionAvailable?.()) {
-    try {
-      store = JSON.parse(safeStorage.decryptString(readFileSync(file))) as Record<string, unknown>
-    } catch {
-      store = {}
+  let store: Record<string, unknown> | undefined
+  const ensureLoaded = (): Record<string, unknown> => {
+    if (store) return store
+    store = {}
+    if (existsSync(file) && safeStorage?.isEncryptionAvailable?.()) {
+      try {
+        store = JSON.parse(safeStorage.decryptString(readFileSync(file))) as Record<string, unknown>
+      } catch {
+        store = {}
+      }
     }
+    return store
   }
   const flush = () => {
-    if (!safeStorage?.isEncryptionAvailable?.()) return
+    if (!store || !safeStorage?.isEncryptionAvailable?.()) return
     try {
       const dir = dirname(file)
       if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
@@ -35,9 +41,9 @@ function buildSafeBetterAuthStorage() {
     } catch { /* ignore */ }
   }
   return {
-    getItem: (name: string) => store[name] ?? null,
+    getItem: (name: string) => ensureLoaded()[name] ?? null,
     setItem: (name: string, value: unknown) => {
-      store[name] = value
+      ensureLoaded()[name] = value
       flush()
     },
   }
@@ -78,9 +84,23 @@ export function getBetterAuthClient() {
   return (cachedClient ??= createBetterAuth())
 }
 
+const deepLinkListeners = new Set<(err?: unknown) => void>()
+
+export function onAuthDeepLink(cb: (err?: unknown) => void): () => void {
+  deepLinkListeners.add(cb)
+  return () => { deepLinkListeners.delete(cb) }
+}
+
 /** Handle a deep-link URL (com.cakapp.app://...) arriving from the OS. */
-export function handleAuthDeepLink(url: string, getWindow: () => BrowserWindow | undefined): void {
-  if (!url.startsWith(`${DESKTOP_SCHEME}://`)) return
+export function handleAuthDeepLink(rawUrl: string, getWindow: () => BrowserWindow | undefined): void {
+  const url = normalizeAuthDeepLink(rawUrl)
+  if (!url) return
+  const w = getWindow()
+  if (w && !w.isDestroyed()) {
+    if (w.isMinimized()) w.restore()
+    w.show()
+    w.focus()
+  }
   const client = getBetterAuthClient()
   void handleDeepLink({
     $fetch: client.$fetch as Parameters<typeof handleDeepLink>[0]['$fetch'],
@@ -88,8 +108,11 @@ export function handleAuthDeepLink(url: string, getWindow: () => BrowserWindow |
     url,
     getWindow,
     clientOptions: { baseURL: getBetterAuthBaseUrl() },
+  }).then(() => {
+    for (const cb of deepLinkListeners) cb()
   }).catch((err) => {
     console.error('BetterAuth deep link error', err)
+    for (const cb of deepLinkListeners) cb(err)
   })
 }
 

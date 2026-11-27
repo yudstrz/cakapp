@@ -170,7 +170,7 @@ describe('SetupController', () => {
   })
 
   it('the bigger notes model says in the log when it starts downloading and when it is in, and logs nothing when it is already there', async () => {
-    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    const info = vi.spyOn(console, 'info').mockImplementation(() => { })
     try {
       const { c, root } = setup()
       await c.start(); await c.idle()
@@ -451,13 +451,15 @@ describe('the speed check (Windows and Linux): speech models timed on this compu
 
   it.each([m1max, cpuPc, gpuPc])('passes the model size and downloader ETA through on $os, and clears both on completion', async hw => {
     const inner = fakeDownloadDeps({ stepMs: 0 }), requested: string[] = []
-    const { c, states } = setup({ getHardware: async () => hw, download: {
-      ...inner,
-      download: (url, dir, file, onProgress, signal) => {
-        requested.push(url)
-        return inner.download(url, dir, file, p => onProgress({ ...p, etaSec: 240 }), signal)
-      },
-    } })
+    const { c, states } = setup({
+      getHardware: async () => hw, download: {
+        ...inner,
+        download: (url, dir, file, onProgress, signal) => {
+          requested.push(url)
+          return inner.download(url, dir, file, p => onProgress({ ...p, etaSec: 240 }), signal)
+        },
+      }
+    })
     await c.start(); await c.idle()
     const first = catalog.models.flatMap(m => m.builds).find(b => b.url === requested[1])!
     expect(states.find(s => s.notesFraction === 0)).toMatchObject({ notesTotalBytes: first.sizeGB * 1e9, notesEtaSec: undefined })
@@ -616,16 +618,20 @@ describe('optional better notes model', () => {
   it('stops the active transfer before removing partial files and never retries it', async () => {
     const inner = fakeDownloadDeps({ stepMs: 0 })
     let attempts = 0, stopped = false
-    const { c, root } = setup({ download: { ...inner, download: async (url, dir, file, progress, signal) => {
-      if (url !== bigUrl) return inner.download(url, dir, file, progress, signal)
-      attempts++
-      writeFileSync(join(dir, file + '.part'), 'partial')
-      progress({ fraction: .2, etaSec: 30 })
-      await new Promise<void>((_, reject) => signal!.addEventListener('abort', () => {
-        expect(existsSync(join(dir, file + '.part'))).toBe(true)
-        stopped = true; reject(signal!.reason)
-      }, { once: true }))
-    } } })
+    const { c, root } = setup({
+      download: {
+        ...inner, download: async (url, dir, file, progress, signal) => {
+          if (url !== bigUrl) return inner.download(url, dir, file, progress, signal)
+          attempts++
+          writeFileSync(join(dir, file + '.part'), 'partial')
+          progress({ fraction: .2, etaSec: 30 })
+          await new Promise<void>((_, reject) => signal!.addEventListener('abort', () => {
+            expect(existsSync(join(dir, file + '.part'))).toBe(true)
+            stopped = true; reject(signal!.reason)
+          }, { once: true }))
+        }
+      }
+    })
     await c.start()
     await vi.waitFor(() => expect(c.state.notesUpgradeFraction).toBe(.2))
     await c.skipUpgrade(); await c.idle()
@@ -642,10 +648,14 @@ describe('optional better notes model', () => {
     let release!: () => void
     let verifying = false
     const held = new Promise<void>(resolve => { release = resolve })
-    const { c, root } = setup({ download: { ...inner, hashFile: async path => {
-      if (path.endsWith(name(bigUrl))) { verifying = true; await held }
-      return 'FAKE'
-    } } })
+    const { c, root } = setup({
+      download: {
+        ...inner, hashFile: async path => {
+          if (path.endsWith(name(bigUrl))) { verifying = true; await held }
+          return 'FAKE'
+        }
+      }
+    })
     await c.start()
     await vi.waitFor(() => expect(verifying).toBe(true))
     const skipped = c.skipUpgrade()
@@ -689,14 +699,18 @@ describe('optional better notes model', () => {
     const inner = fakeDownloadDeps({ stepMs: 0 })
     let restoring = false, finish!: () => void
     const held = new Promise<void>(resolve => { finish = resolve })
-    const { c, states } = setup({ download: { ...inner, download: async (url, dir, file, progress, signal) => {
-      if (restoring && url === starterUrl) {
-        progress({ fraction: .42, etaSec: 240 })
-        await held
-        if (fail) throw new DiskSpaceError(5)
+    const { c, states } = setup({
+      download: {
+        ...inner, download: async (url, dir, file, progress, signal) => {
+          if (restoring && url === starterUrl) {
+            progress({ fraction: .42, etaSec: 240 })
+            await held
+            if (fail) throw new DiskSpaceError(5)
+          }
+          return inner.download(url, dir, file, progress, signal)
+        }
       }
-      return inner.download(url, dir, file, progress, signal)
-    } } })
+    })
     await c.start(); await c.idle()
     const bigger = c.notesPath()!
     c.notesModelLoaded(bigger)
@@ -780,10 +794,14 @@ describe('optional better notes model', () => {
   it.each(['download', 'unload'])('keeps the bigger model if fallback %s fails', async failure => {
     const inner = fakeDownloadDeps({ stepMs: 0 })
     let block = false
-    const { c } = setup({ download: { ...inner, download: async (url, ...rest) => {
-      if (block && url === starterUrl) throw new DiskSpaceError(5)
-      return inner.download(url, ...rest)
-    } } })
+    const { c } = setup({
+      download: {
+        ...inner, download: async (url, ...rest) => {
+          if (block && url === starterUrl) throw new DiskSpaceError(5)
+          return inner.download(url, ...rest)
+        }
+      }
+    })
     await c.start(); await c.idle()
     const engine = new FakeEngine()
     const model = createNotesModel({ engine, modelPath: () => c.notesPath(), onLoaded: path => c.notesModelLoaded(path) })

@@ -407,4 +407,17 @@ describe('Hari 4 Portal APIs: Audio Range, RBAC, Share, Search/Ask & Workspaces'
     );
     expect(forbiddenInvite.status).toBe(403);
   });
+
+  it('parses Electron OAuth handoff cookies across standard and __Secure prefixes', async () => {
+    const { buildDesktopCallbackUrl, extractElectronQuery, readElectronAuthCookie } = await import('@/lib/desktop-scheme');
+    expect(readElectronAuthCookie('foo=bar; better-auth.electron=tok_123')).toBe('tok_123');
+    expect(readElectronAuthCookie('__Secure-better-auth.electron=tok%5Fsec; theme=dark')).toBe('tok_sec');
+    expect(readElectronAuthCookie('theme=dark')).toBeNull();
+    expect(buildDesktopCallbackUrl('abc==')).toBe('com.cakapp.app://auth/callback#token=abc%3D%3D');
+    expect(extractElectronQuery('?client_id=electron&state=st1&code_challenge=ch1&extra=x')).toEqual({
+      client_id: 'electron',
+      state: 'st1',
+      code_challenge: 'ch1',
+    });
+  });
 });

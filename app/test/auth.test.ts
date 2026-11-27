@@ -1,5 +1,6 @@
 import { describe, expect, it, afterEach } from 'vitest'
 import { authError, hookAuth, validCredentials } from '../src/main/auth'
+import { findAuthDeepLink, normalizeAuthDeepLink } from '../src/main/authDeepLink'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -105,5 +106,14 @@ describe('store & meeting user association', () => {
 
     const fetched = store.meeting(m.id)
     expect(fetched?.userId).toBeUndefined()
+  })
+})
+
+describe('desktop deep-link URL normalization', () => {
+  it('accepts quoted, uppercase, and single-slash com.cakapp.app deep links', () => {
+    expect(normalizeAuthDeepLink('"COM.CAKAPP.APP:/auth/callback#token=abc"')).toBe('com.cakapp.app://auth/callback#token=abc')
+    expect(normalizeAuthDeepLink('com.cakapp.app://auth/callback#token=xyz')).toBe('com.cakapp.app://auth/callback#token=xyz')
+    expect(normalizeAuthDeepLink('https://cakapp.vercel.app')).toBeNull()
+    expect(findAuthDeepLink(['Cakapp.exe', '--allow-file-access', 'com.cakapp.app:/auth/callback#token=tok1'])).toBe('com.cakapp.app://auth/callback#token=tok1')
   })
 })

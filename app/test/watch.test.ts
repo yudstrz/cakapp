@@ -105,8 +105,10 @@ describe('start cards', () => {
   })
   it('offers nothing while the first run is still being set up, then offers the call once it is done', async () => {
     let ready = false
-    const x = new Watcher({ read: async () => reading, now: () => clock, active: () => active, bindApp: (_id, app) => (active = { ...active!, app }),
-      offer: (p) => log.push('offer:' + p.key), askStop: () => log.push('stop'), hide: () => log.push('hide'), ready: () => ready })
+    const x = new Watcher({
+      read: async () => reading, now: () => clock, active: () => active, bindApp: (_id, app) => (active = { ...active!, app }),
+      offer: (p) => log.push('offer:' + p.key), askStop: () => log.push('stop'), hide: () => log.push('hide'), ready: () => ready
+    })
     reading = { micApps: [zoom], events: [] }
     await x.tick(); await x.tick()
     expect(log).toEqual([])
@@ -459,9 +461,11 @@ describe('speech protects a call whose app released the mic', () => {
   })
   it('missing silence evidence cannot ask or auto-stop', async () => {
     active = meeting()
-    const x = new Watcher({ read: async () => reading, now: () => clock, active: () => active,
+    const x = new Watcher({
+      read: async () => reading, now: () => clock, active: () => active,
       bindApp: () => undefined, offer: vi.fn(), askStop: () => log.push('stop'), hide: vi.fn(),
-      autoStop: () => log.push('auto'), autoStopOn: () => true })
+      autoStop: () => log.push('auto'), autoStopOn: () => true
+    })
     reading.micApps = [zoom]; await x.tick()
     reading.micApps = []; clock += 10 * MIN; await x.tick()
     expect(log).toEqual([])
