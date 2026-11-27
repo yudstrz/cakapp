@@ -130,6 +130,7 @@ if (x11) { stripAppImageEnv(); app.relaunch(x11); app.exit(0) }
 else if (!singleInstance) app.exit(0)
 let win: BrowserWindow | undefined
 let allowQuit = false
+let appBooted = false
 let mcpQuiet = false
 let mcpAutoQuit = false
 let relaunching = false
@@ -143,12 +144,12 @@ mcpQuiet = !BACKGROUND && startedHidden(process.platform, process.argv)
 // an AI app's yogurt-mcp starting Cakapp while it was still opening (--hidden) brings no window forward.
 // Also handles deep-link callbacks (com.cakapp.app://...) arriving via second-instance on Windows/Linux.
 app.on('second-instance', (_e, argv) => {
-  if (app.isReady() && !startedHidden(process.platform, argv)) showMain()
+  if (appBooted && !startedHidden(process.platform, argv)) showMain()
   // Forward any deep-link URL in argv to BetterAuth (Windows/Linux path)
   if (process.platform !== 'darwin') {
     const deepLink = findAuthDeepLink(argv)
     if (deepLink) {
-      if (app.isReady()) showMain()
+      if (appBooted) showMain()
       handleAuthDeepLink(deepLink, () => win)
     }
   }
@@ -1376,6 +1377,7 @@ if (singleInstance) app.whenReady().then(() => {
   // opened by the Mac at login: just the menu bar, until a call or a click
   // opened by an AI app's yogurt-mcp off a Mac (--hidden): the same, so no window jumps in front of it
   if (!openedAtLogin() && !startedHidden(process.platform, process.argv)) createWindow()
+  appBooted = true
   startDetection()
   void setup.start()
   // new versions from GitHub Releases, downloaded in the background and installed on quit

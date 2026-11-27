@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach } from 'vitest'
+import { describe, expect, it, afterEach, vi } from 'vitest'
 import { authError, hookAuth, validCredentials } from '../src/main/auth'
 import { findAuthDeepLink, normalizeAuthDeepLink } from '../src/main/authDeepLink'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -115,5 +115,60 @@ describe('desktop deep-link URL normalization', () => {
     expect(normalizeAuthDeepLink('com.cakapp.app://auth/callback#token=xyz')).toBe('com.cakapp.app://auth/callback#token=xyz')
     expect(normalizeAuthDeepLink('https://cakapp.vercel.app')).toBeNull()
     expect(findAuthDeepLink(['Cakapp.exe', '--allow-file-access', 'com.cakapp.app:/auth/callback#token=tok1'])).toBe('com.cakapp.app://auth/callback#token=tok1')
+  })
+
+  it('disables userImageProxy and never calls protocol.registerSchemesAsPrivileged after app is ready', async () => {
+    vi.resetModules()
+    const registerSchemesAsPrivileged = vi.fn()
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    let capturedOptions: { userImageProxy?: { enabled?: boolean } } | undefined
+    const setupMain = vi.fn(() => {
+      if (capturedOptions?.userImageProxy?.enabled !== false) {
+        registerSchemesAsPrivileged()
+      }
+    })
+    const mockElectron = {
+      app: {
+        isPackaged: true,
+        whenReady: vi.fn(async () => {}),
+        setAsDefaultProtocolClient: vi.fn(() => true),
+        getPath: vi.fn(() => tmpdir()),
+      },
+      protocol: { registerSchemesAsPrivileged },
+      safeStorage: { isEncryptionAvailable: () => false },
+    }
+    vi.doMock('electron', () => ({ ...mockElectron, default: mockElectron }))
+    vi.doMock('@better-auth/electron/client', () => ({
+      electronClient: (opts: { userImageProxy?: { enabled?: boolean } }) => {
+        capturedOptions = opts
+        return {
+          id: 'electron',
+          getActions: () => ({
+            setupMain,
+            getCookie: () => '',
+            requestAuth: vi.fn(),
+            authenticate: vi.fn(),
+          }),
+        }
+      },
+      handleDeepLink: vi.fn(),
+    }))
+    try {
+      const mod = await import('../src/main/betterAuthClient')
+      expect(registerSchemesAsPrivileged).toHaveBeenCalledTimes(1)
+      registerSchemesAsPrivileged.mockImplementation(() => {
+        throw new Error('protocol.registerSchemesAsPrivileged should be called before app is ready')
+      })
+      expect(() => mod.setupBetterAuthMain(() => undefined)).not.toThrow()
+      expect(capturedOptions?.userImageProxy).toEqual({ enabled: false })
+      expect(setupMain).toHaveBeenCalledWith(expect.objectContaining({ csp: false, bridges: false, scheme: false }))
+      expect(errorSpy).not.toHaveBeenCalled()
+      expect(registerSchemesAsPrivileged).toHaveBeenCalledTimes(1)
+    } finally {
+      errorSpy.mockRestore()
+      vi.doUnmock('@better-auth/electron/client')
+      vi.doUnmock('electron')
+      vi.resetModules()
+    }
   })
 })

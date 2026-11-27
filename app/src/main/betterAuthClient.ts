@@ -67,6 +67,7 @@ function getElectronOptions() {
     signInURL: `${baseURL}/login`,
     protocol: { scheme: DESKTOP_SCHEME },
     storage: createSafeBetterAuthStorage(),
+    userImageProxy: { enabled: false },
   }
 }
 
@@ -132,5 +133,9 @@ export function setupBetterAuthMain(getWindow: () => BrowserWindow | undefined):
   const client = getBetterAuthClient()
   // scheme:false prevents the library from calling registerSchemesAsPrivileged
   // (already done above) and requestSingleInstanceLock (done in index.ts).
-  client.setupMain({ csp: false, bridges: false, scheme: false, getWindow })
+  try {
+    client.setupMain({ csp: false, bridges: false, scheme: false, getWindow })
+  } catch (err) {
+    console.error('BetterAuth setupMain error', err)
+  }
 }
