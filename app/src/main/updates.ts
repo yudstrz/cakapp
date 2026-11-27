@@ -1,8 +1,23 @@
 import { app, BrowserWindow, ipcMain, Notification } from 'electron'
+import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import type { AppUpdater } from 'electron-updater'
 import { t } from '../shared/i18n'
 import type { UpdateStatus } from '../shared/types'
 import { autoUpdateOn, loadSettings, updateSettings } from './settings'
+
+/** Build the Windows NSIS uninstaller command so Cakapp can launch Uninstall Saja or Uninstall Penuh (/PURGEDATA). */
+export function buildWindowsUninstallPlan(
+  exePath: string,
+  opts: { platform: string; packaged: boolean; purgeData: boolean },
+): { uninstallerPath: string; args: string[]; shellCommand: string } | null {
+  if (opts.platform !== 'win32' || !opts.packaged) return null
+  const uninstallerPath = join(dirname(exePath), 'Uninstall Cakapp.exe')
+  const args = opts.purgeData ? ['/S', '/PURGEDATA'] : ['/S']
+  const shellCommand = `ping 127.0.0.1 -n 2 > nul && "${uninstallerPath}" ${args.join(' ')}`
+  return { uninstallerPath, args, shellCommand }
+}
 
 /** checking again while Cakapp stays open for days */
 const EVERY_MS = 4 * 60 * 60 * 1000
@@ -77,6 +92,25 @@ export async function hookUpdates(d: { file: string; available: boolean; recordi
     installOnQuit = true
     app.quit()
     return true
+  })
+  ipcMain.handle('updates:uninstall', (_e, rawOpts?: { purgeData?: unknown }) => {
+    if (d.recording()) return { ok: false, reason: 'recording' as const }
+    const plan = buildWindowsUninstallPlan(process.execPath, {
+      platform: process.platform,
+      packaged: app.isPackaged,
+      purgeData: rawOpts?.purgeData === true,
+    })
+    if (!plan) return { ok: false, reason: 'unavailable' as const }
+    if (!existsSync(plan.uninstallerPath)) return { ok: false, reason: 'missing-uninstaller' as const }
+    const child = spawn('cmd.exe', ['/d', '/c', plan.shellCommand], {
+      detached: true,
+      windowsHide: true,
+      windowsVerbatimArguments: true,
+      stdio: 'ignore',
+    })
+    child.unref()
+    setImmediate(() => app.quit())
+    return { ok: true }
   })
   const check = () => { if (!d.fake && updater && autoUpdateOn(loadSettings(d.file)) && state !== 'ready') updater.checkForUpdates().catch(() => {}) }
   if (d.fake) { set('ready', d.fake.version); return }

@@ -69,7 +69,7 @@ const HELPERS_BY_OS: Record<string, Record<string, string>> = {
   linux: {},
 }
 /** Cakapp's own recorder holds the mic while it records; yogurt-system lists it like any app off a Mac */
-const OWN_BY_OS: Record<string, string[]> = { darwin: [], win32: ['yogurt-audio.exe', 'yogurt.exe', 'cakapp.exe'], linux: ['yogurt-audio', 'yogurt', 'Yogurt', 'Cakapp'] }
+const OWN_BY_OS: Record<string, string[]> = { darwin: [], win32: ['Cakapp-audio.exe', 'Cakapp.exe', 'yogurt-audio.exe', 'yogurt.exe', 'cakapp.exe'], linux: ['Cakapp-audio', 'Cakapp', 'yogurt-audio', 'yogurt', 'Yogurt', 'cakapp'] }
 let APPS = MAC_APPS
 let HELPERS = MAC_HELPERS
 let OWN: string[] = []

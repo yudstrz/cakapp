@@ -20,7 +20,7 @@ const check = (ok, what, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
 const json = (s) => { try { return JSON.parse(s) } catch { return undefined } }
 const run = (exe, args, env = {}) => spawnSync(exe, args, { encoding: 'utf8', timeout: 60_000, windowsHide: true, env: { ...process.env, ...env } })
 
-for (const name of ['yogurt-audio', 'yogurt-system', 'yogurt-mcp']) check(existsSync(bin(name)), `${name} is installed`, bin(name))
+for (const name of ['Cakapp-audio', 'Cakapp-system', 'Cakapp-mcp']) check(existsSync(bin(name)), `${name} is installed`, bin(name))
 check(existsSync(join(a.resources, 'dict', 'words')), 'the word list is installed')
 if (!a['no-whisper']) {
   check(existsSync(bin('whisper-server')), 'whisper-server is installed', bin('whisper-server'))
@@ -29,39 +29,39 @@ if (!a['no-whisper']) {
   check(libs.some((f) => /cpu/i.test(f)), "whisper-server's CPU backends are installed", libs.join(' '))
 }
 
-const audio = bin('yogurt-audio')
+const audio = bin('Cakapp-audio')
 const locales = run(audio, ['speech-locales'])
-check(locales.status === 0 && json(locales.stdout)?.available === false, 'yogurt-audio speech-locales: no Apple speech here', locales.stdout.trim())
+check(locales.status === 0 && json(locales.stdout)?.available === false, 'Cakapp-audio speech-locales: no Apple speech here', locales.stdout.trim())
 const mics = run(audio, ['mic-devices'])
-check(mics.status === 0 && Array.isArray(json(mics.stdout)?.devices), 'yogurt-audio mic-devices', mics.stdout.trim() || mics.stderr.trim())
+check(mics.status === 0 && Array.isArray(json(mics.stdout)?.devices), 'Cakapp-audio mic-devices', mics.stdout.trim() || mics.stderr.trim())
 const usage = run(audio, [])
-check(usage.status !== 0 && /usage/i.test(usage.stderr), 'yogurt-audio without a command says how to use it')
+check(usage.status !== 0 && /usage/i.test(usage.stderr), 'Cakapp-audio without a command says how to use it')
 
 // a few seconds of recording, then stop on stdin like the app
-const dir = mkdtempSync(join(tmpdir(), 'yogurt-rec-'))
+const dir = mkdtempSync(join(tmpdir(), 'cakapp-rec-'))
 const rec = await new Promise((done) => {
   const child = spawn(audio, ['record', '--dir', dir], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true })
   let out = ''
   child.stdout.on('data', (d) => { out += d.toString('latin1') })
-  child.stderr.on('data', (d) => process.stderr.write(`  yogurt-audio: ${d}`))
+  child.stderr.on('data', (d) => process.stderr.write(`  Cakapp-audio: ${d}`))
   setTimeout(() => child.stdin.write('stop\n'), 3000)
   const kill = setTimeout(() => child.kill(), 20_000)
   child.on('exit', (code) => { clearTimeout(kill); done({ code, levels: (out.match(/"t":"level"/g) ?? []).length, mic: /"t":"mic"/.test(out) }) })
 })
-check(rec.code === 0, 'yogurt-audio record stops cleanly on "stop"', `exit ${rec.code}`)
-check(rec.levels >= 15, 'yogurt-audio record sends sound levels', `${rec.levels} in 3 s`)
-check(rec.mic, 'yogurt-audio record says which mic it uses')
+check(rec.code === 0, 'Cakapp-audio record stops cleanly on "stop"', `exit ${rec.code}`)
+check(rec.levels >= 15, 'Cakapp-audio record sends sound levels', `${rec.levels} in 3 s`)
+check(rec.mic, 'Cakapp-audio record says which mic it uses')
 
-const sys = run(bin('yogurt-system'), ['running-apps', win ? 'no-such-app.exe' : 'no-such-app'])
-check(sys.status === 0 && Array.isArray(json(sys.stdout)), 'yogurt-system running-apps', sys.stdout.trim() || sys.stderr.trim())
-const apps = run(bin('yogurt-system'), ['mic-apps'])
-check(Array.isArray(json(apps.stdout)) || apps.status !== 0, 'yogurt-system mic-apps answers', apps.stdout.trim() || `exit ${apps.status}`)
+const sys = run(bin('Cakapp-system'), ['running-apps', win ? 'no-such-app.exe' : 'no-such-app'])
+check(sys.status === 0 && Array.isArray(json(sys.stdout)), 'Cakapp-system running-apps', sys.stdout.trim() || sys.stderr.trim())
+const apps = run(bin('Cakapp-system'), ['mic-apps'])
+check(Array.isArray(json(apps.stdout)) || apps.status !== 0, 'Cakapp-system mic-apps answers', apps.stdout.trim() || `exit ${apps.status}`)
 // nothing to talk to: the relay must say so and end, not hang. A copy away from the install folder, so it can't find
-// and start the installed Yogurt (it looks next to itself on Windows)
-const relay = join(mkdtempSync(join(tmpdir(), 'yogurt-mcp-')), win ? 'yogurt-mcp.exe' : 'yogurt-mcp')
-copyFileSync(bin('yogurt-mcp'), relay)
-const mcp = spawnSync(relay, [], { input: '', encoding: 'utf8', timeout: 90_000, windowsHide: true, env: { ...process.env, YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-p-')) } })
-check(mcp.status === 1 && mcp.stderr.trim().length > 0, 'yogurt-mcp ends with words when Yogurt is not open', mcp.stderr.trim().split('\n')[0])
+// and start the installed Cakapp (it looks next to itself on Windows)
+const relay = join(mkdtempSync(join(tmpdir(), 'cakapp-mcp-')), win ? 'Cakapp-mcp.exe' : 'Cakapp-mcp')
+copyFileSync(bin('Cakapp-mcp'), relay)
+const mcp = spawnSync(relay, [], { input: '', encoding: 'utf8', timeout: 90_000, windowsHide: true, env: { ...process.env, YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'cakapp-p-')) } })
+check(mcp.status === 1 && mcp.stderr.trim().length > 0, 'Cakapp-mcp ends with words when Cakapp is not open', mcp.stderr.trim().split('\n')[0])
 
 if (a.model && a.wav) {
   const here = dirname(fileURLToPath(import.meta.url))

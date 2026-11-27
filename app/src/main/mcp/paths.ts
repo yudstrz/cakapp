@@ -14,7 +14,7 @@ export const HIDDEN_ARG = '--hidden'
  * person on the same PC can't find it or take the name before Cakapp does.
  */
 export function mcpAddress(platform: string, profile: string, id: string): string {
-  return platform === 'win32' ? `\\\\.\\pipe\\yogurt-mcp-${id}` : posix.join(profile, 'mcp.sock')
+  return platform === 'win32' ? `\\\\.\\pipe\\Cakapp-mcp-${id}` : posix.join(profile, 'mcp.sock')
 }
 
 /**
@@ -33,7 +33,7 @@ export const startedHidden = (_platform: string, argv: string[]): boolean => arg
 
 /** Linux: the AppImage is mounted somewhere new each launch, so AI apps are given a copy in the profile folder */
 export function helperCopyPath(platform: string, profile: string): string | undefined {
-  return platform === 'linux' ? posix.join(profile, 'bin', 'yogurt-mcp') : undefined
+  return platform === 'linux' ? posix.join(profile, 'bin', 'Cakapp-mcp') : undefined
 }
 
 /**

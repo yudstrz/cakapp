@@ -245,6 +245,8 @@ export type CakappApi = {
     restart(): Promise<boolean>
     /** hides this version in the title bar until the app restarts; installation is unchanged */
     later(): Promise<void>
+    /** Launches the Windows uninstaller after closing Cakapp (keep data vs full purge). */
+    uninstall(opts?: { purgeData?: boolean }): Promise<{ ok: boolean; reason?: 'recording' | 'unavailable' | 'missing-uninstaller' }>
     onStatus(fn: (s: UpdateStatus) => void): () => void
   }
   backup: {

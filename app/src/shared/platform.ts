@@ -38,16 +38,18 @@ export function settingsPage(platform: string, kind: PermissionKind): boolean {
   return platform === 'darwin' || (platform === 'win32' && WINDOWS_PAGES.has(kind))
 }
 
-/** The computer Cakapp runs on. Only fake mode may pretend to be another one (YOGURT_FAKE_PLATFORM), so Mac tests can try the others' screens. */
+/** The computer Cakapp runs on. Only fake mode may pretend to be another one (Cakapp_FAKE_PLATFORM / YOGURT_FAKE_PLATFORM). */
 export function platformOf(real: string, env: Record<string, string | undefined>): string {
-  const fake = env.YOGURT_FAKE === '1' ? env.YOGURT_FAKE_PLATFORM : undefined
+  const fake =
+    (env.Cakapp_FAKE === '1' ? env.Cakapp_FAKE_PLATFORM : undefined) ??
+    (env.YOGURT_FAKE === '1' ? env.YOGURT_FAKE_PLATFORM : undefined)
   return fake === 'darwin' || fake === 'win32' || fake === 'linux' ? fake : real
 }
 
 export type HelperKind = 'system' | 'audio' | 'mcp' | 'whisper'
-/** The helper programs in resources/bin. The Mac's system helper is yogurt-mac; on Windows and Linux it is yogurt-system. */
+/** The helper programs in resources/bin. */
 export function helperFile(kind: HelperKind, platform: string): string {
-  const base = { system: platform === 'darwin' ? 'yogurt-mac' : 'yogurt-system', audio: 'yogurt-audio', mcp: 'yogurt-mcp', whisper: 'whisper-server' }[kind]
+  const base = { system: platform === 'darwin' ? 'Cakapp-mac' : 'Cakapp-system', audio: 'Cakapp-audio', mcp: 'Cakapp-mcp', whisper: 'whisper-server' }[kind]
   return platform === 'win32' ? `${base}.exe` : base
 }
 

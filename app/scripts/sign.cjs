@@ -3,10 +3,10 @@
 const { basename, join } = require('node:path')
 
 const HELPERS = {
-  'yogurt-audio': 'entitlements.audio.plist',
-  'yogurt-mac': 'entitlements.mac-helper.plist',
+  'Cakapp-audio': 'entitlements.audio.plist',
+  'Cakapp-mac': 'entitlements.mac-helper.plist',
   'whisper-server': 'entitlements.none.plist',
-  'yogurt-mcp': 'entitlements.none.plist',
+  'Cakapp-mcp': 'entitlements.none.plist',
 }
 
 /** The entitlements file for a helper; null for everything else (Electron's own files) */
@@ -38,8 +38,11 @@ async function sign(opts) {
   await retry(() => signAsync({
     ...opts,
     optionsForFile: (file) => {
+      const localSign =
+        (process.env.Cakapp_SIGN_ID === 'Cakapp Local' && process.env.Cakapp_NOTARIZE === '0') ||
+        (process.env.YOGURT_SIGN_ID === 'Yogurt Local' && process.env.YOGURT_NOTARIZE === '0')
       const base = { ...(forFile ? forFile(file) : {}),
-        ...(process.env.YOGURT_SIGN_ID === 'Yogurt Local' && process.env.YOGURT_NOTARIZE === '0' ? { timestamp: 'none' } : {}),
+        ...(localSign ? { timestamp: 'none' } : {}),
       }
       const own = helperEntitlements(file, buildDir)
       return own ? { ...base, entitlements: own } : base

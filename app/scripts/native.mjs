@@ -23,11 +23,11 @@ const win = process.platform === 'win32'
 const app = join(here, '..')
 const bin = join(app, 'resources', 'bin')
 const exe = (name) => (win ? `${name}.exe` : name)
-/** crate folder in native/, and the program it builds */
+/** crate folder in native/, cargo binary name, and the output program name in resources/bin */
 const CRATES = [
-  [win ? 'yogurt-audio-win' : 'yogurt-audio-linux', 'yogurt-audio'],
-  ['yogurt-system', 'yogurt-system'],
-  ['yogurt-mcp-relay', 'yogurt-mcp'],
+  [win ? 'yogurt-audio-win' : 'yogurt-audio-linux', 'yogurt-audio', 'Cakapp-audio'],
+  ['yogurt-system', 'yogurt-system', 'Cakapp-system'],
+  ['yogurt-mcp-relay', 'yogurt-mcp', 'Cakapp-mcp'],
 ]
 
 /** newest change to anything a crate builds from */
@@ -58,7 +58,7 @@ const hasCmake = hasCmd('cmake')
 const hasCompiler = win ? hasCmd('cl') : (hasCmd('gcc') || hasCmd('clang'))
 
 mkdirSync(bin, { recursive: true })
-for (const [crate, name] of CRATES) {
+for (const [crate, builtName, name] of CRATES) {
   const dir = join(app, 'native', crate)
   const out = join(bin, exe(name))
   if (existsSync(out) && statSync(out).mtimeMs > newest(dir)) { console.log(`${exe(name)} is up to date`); continue }
@@ -71,7 +71,7 @@ for (const [crate, name] of CRATES) {
   spawnSync('rustup', ['toolchain', 'install'], { cwd: dir, stdio: 'inherit' })
   // libopus 1.3.1 (the recorder's encoder, built from source) asks for an old CMake policy that CMake 4 refuses
   run('cargo', ['build', '--release', '--locked'], { cwd: dir, env: { ...process.env, CMAKE_POLICY_VERSION_MINIMUM: '3.5' } })
-  copyFileSync(join(dir, 'target', 'release', exe(name)), out)
+  copyFileSync(join(dir, 'target', 'release', exe(builtName)), out)
   if (!win) chmodSync(out, 0o755)
   console.log(`built ${out}`)
 }

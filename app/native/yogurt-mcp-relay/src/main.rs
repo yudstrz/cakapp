@@ -13,11 +13,11 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-const NOT_RUNNING: &str = "Yogurt isn't running, and it couldn't be opened. Open Yogurt, then try again.";
+const NOT_RUNNING: &str = "Cakapp isn't running, and it couldn't be opened. Open Cakapp, then try again.";
 #[cfg_attr(windows, allow(dead_code))]
-const TOO_LONG: &str = "Yogurt's folder path is too long for its connection.";
+const TOO_LONG: &str = "Cakapp's folder path is too long for its connection.";
 #[cfg_attr(unix, allow(dead_code))]
-const PIPE_PREFIX: &str = r"\\.\pipe\yogurt-mcp-";
+const PIPE_PREFIX: &str = r"\\.\pipe\Cakapp-mcp-";
 #[cfg_attr(windows, allow(dead_code))]
 /// a Unix socket path, its ending zero included, fits in sun_path (108 bytes on Linux)
 const SUN_PATH: usize = 108;
@@ -27,20 +27,20 @@ fn fail(s: &str) -> ! {
     exit(1)
 }
 
-/// The profile folder, where Electron puts it (appData + "Yogurt"): %APPDATA%\Yogurt on Windows,
-/// $XDG_CONFIG_HOME/Yogurt or ~/.config/Yogurt on Linux. YOGURT_USER_DATA uses a separate one (tests).
+/// The profile folder, where Electron puts it (appData + "Cakapp"): %APPDATA%\Cakapp on Windows,
+/// $XDG_CONFIG_HOME/Cakapp or ~/.config/Cakapp on Linux. CAKAPP_USER_DATA/YOGURT_USER_DATA uses a separate one.
 fn profile(windows: bool, var: impl Fn(&str) -> Option<OsString>) -> Option<PathBuf> {
     let set = |k: &str| var(k).filter(|v| !v.is_empty());
-    if let Some(p) = set("YOGURT_USER_DATA") {
+    if let Some(p) = set("CAKAPP_USER_DATA").or_else(|| set("YOGURT_USER_DATA")) {
         return Some(p.into());
     }
     if windows {
-        return set("APPDATA").map(|a| PathBuf::from(a).join("Yogurt"));
+        return set("APPDATA").map(|a| PathBuf::from(a).join("Cakapp"));
     }
     set("XDG_CONFIG_HOME")
         .map(PathBuf::from)
         .or_else(|| set("HOME").map(|h| PathBuf::from(h).join(".config")))
-        .map(|c| c.join("Yogurt"))
+        .map(|c| c.join("Cakapp"))
 }
 
 #[cfg_attr(unix, allow(dead_code))]
@@ -343,35 +343,35 @@ mod tests {
     }
 
     #[test]
-    fn only_yogurts_own_pipe_names_are_followed() {
-        assert_eq!(pipe_name("\\\\.\\pipe\\yogurt-mcp-0a1B\r\n"), Some(r"\\.\pipe\yogurt-mcp-0a1B"));
-        assert_eq!(pipe_name(r"\\.\pipe\yogurt-mcp-"), None);
+    fn only_cakapps_own_pipe_names_are_followed() {
+        assert_eq!(pipe_name("\\\\.\\pipe\\Cakapp-mcp-0a1B\r\n"), Some(r"\\.\pipe\Cakapp-mcp-0a1B"));
+        assert_eq!(pipe_name(r"\\.\pipe\Cakapp-mcp-"), None);
         assert_eq!(pipe_name(r"\\.\pipe\other"), None);
-        assert_eq!(pipe_name(r"\\.\pipe\yogurt-mcp-ab\..\other"), None);
-        assert_eq!(pipe_name(r"\\server\pipe\yogurt-mcp-ab"), None);
+        assert_eq!(pipe_name(r"\\.\pipe\Cakapp-mcp-ab\..\other"), None);
+        assert_eq!(pipe_name(r"\\server\pipe\Cakapp-mcp-ab"), None);
         assert_eq!(pipe_name(""), None);
     }
 
     #[test]
-    fn yogurt_is_started_from_where_it_said() {
-        assert_eq!(launch_target(false, Some("/home/sam/Apps/Yogurt.AppImage\n".into()), None), Some(PathBuf::from("/home/sam/Apps/Yogurt.AppImage")));
-        assert_eq!(launch_target(true, Some(r"D:\Yogurt\Yogurt.exe".into()), None), Some(PathBuf::from(r"D:\Yogurt\Yogurt.exe")));
+    fn cakapp_is_started_from_where_it_said() {
+        assert_eq!(launch_target(false, Some("/home/sam/Apps/Cakapp.AppImage\n".into()), None), Some(PathBuf::from("/home/sam/Apps/Cakapp.AppImage")));
+        assert_eq!(launch_target(true, Some(r"D:\Cakapp\Cakapp.exe".into()), None), Some(PathBuf::from(r"D:\Cakapp\Cakapp.exe")));
         // Linux with nothing recorded: no idea where the AppImage is
-        assert_eq!(launch_target(false, None, Some("/home/sam/.config/Yogurt/bin/yogurt-mcp".into())), None);
+        assert_eq!(launch_target(false, None, Some("/home/sam/.config/Cakapp/bin/Cakapp-mcp".into())), None);
         assert_eq!(launch_target(false, Some("  ".into()), None), None);
     }
 
     #[cfg(windows)]
     #[test]
     fn windows_falls_back_to_the_install_folder() {
-        let exe = PathBuf::from(r"C:\Users\sam\AppData\Local\Programs\Yogurt\resources\bin\yogurt-mcp.exe");
-        assert_eq!(launch_target(true, None, Some(exe)), Some(PathBuf::from(r"C:\Users\sam\AppData\Local\Programs\Yogurt\Yogurt.exe")));
-        assert_eq!(launch_target(true, None, Some(PathBuf::from(r"C:\tools\yogurt-mcp.exe"))), None);
+        let exe = PathBuf::from(r"C:\Users\sam\AppData\Local\Programs\Cakapp\resources\bin\Cakapp-mcp.exe");
+        assert_eq!(launch_target(true, None, Some(exe)), Some(PathBuf::from(r"C:\Users\sam\AppData\Local\Programs\Cakapp\Cakapp.exe")));
+        assert_eq!(launch_target(true, None, Some(PathBuf::from(r"C:\tools\Cakapp-mcp.exe"))), None);
     }
 
     #[test]
     fn long_socket_paths_are_caught() {
-        assert!(!socket_too_long(Path::new("/home/sam/.config/Yogurt/mcp.sock")));
+        assert!(!socket_too_long(Path::new("/home/sam/.config/Cakapp/mcp.sock")));
         assert!(socket_too_long(&PathBuf::from(format!("/{}/mcp.sock", "a".repeat(100)))));
     }
 }

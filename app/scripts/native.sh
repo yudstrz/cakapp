@@ -6,10 +6,11 @@ set -e
 [ "$(uname)" = "Darwin" ] || exit 0
 cd "$(dirname "$0")/.."
 mkdir -p resources/bin
-for name in yogurt-mac yogurt-audio yogurt-mcp; do
-  src=native/$name/main.swift
-  plist=native/$name/Info.plist
-  out=resources/bin/$name
+for srcName in yogurt-mac yogurt-audio yogurt-mcp; do
+  outName=$(echo "$srcName" | sed 's/^yogurt-/Cakapp-/')
+  src=native/$srcName/main.swift
+  plist=native/$srcName/Info.plist
+  out=resources/bin/$outName
   if [ -f "$out" ] && [ "$out" -nt "$src" ] && [ "$out" -nt "$plist" ]; then continue; fi
   # the plist is embedded so the system's Calendar, Microphone and audio recording prompts have Yogurt's words.
   # 14.4: Core Audio process taps arrived in 14.2, their permission prompt in 14.4

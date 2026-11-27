@@ -270,6 +270,7 @@ const api: CakappApi = {
     check: () => ipcRenderer.invoke('updates:check'),
     restart: () => ipcRenderer.invoke('updates:restart'),
     later: () => ipcRenderer.invoke('updates:later'),
+    uninstall: (opts) => ipcRenderer.invoke('updates:uninstall', opts),
     onStatus: (fn) => { const f = (_e: unknown, s: UpdateStatus) => fn(s); ipcRenderer.on('updates:status', f); return () => { ipcRenderer.off('updates:status', f) } },
   },
   backup: {

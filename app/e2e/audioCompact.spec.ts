@@ -8,7 +8,7 @@ import { promisify } from 'node:util'
 // CI only: the repository's no-local-E2E sentinel is enforced by playwright.config.ts.
 // These commands use committed speech fixtures and testInfo.outputPath, never a person's profile or devices.
 const run = promisify(execFile), tracks = ['me', 'them'] as const
-const helper = join(import.meta.dirname, '../resources/bin/yogurt-audio')
+const helper = join(import.meta.dirname, '../resources/bin/Cakapp-audio')
 const main = join(import.meta.dirname, '../out/main/index.js')
 type Inspection = { durationMs: number; tracks: Record<string, { formatID: number; sampleRate: number; channels: number; bitsPerSecond: number; durationMs: number }> }
 const inspect = async (dir: string): Promise<Inspection> => JSON.parse((await run(helper, ['inspect', '--dir', dir])).stdout)

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { buildWindowsUninstallPlan } from '../src/main/updates'
 
 // #126: an update runs the old version's uninstaller first. When it crashed (0xC0000374), electron-builder's installer
 // stopped with "Failed to uninstall old application files" and the person had to download the installer by hand.
@@ -22,5 +23,40 @@ describe('a Windows update whose old uninstaller fails (#126)', () => {
       expect(body).toContain('DetailPrint')
       expect(body).not.toMatch(/\bQuit\b|\bAbort\b|MessageBox/)
     }
+  })
+})
+
+describe('Windows uninstall modes (Keep Data vs Full Purge)', () => {
+  it('offers interactive choice unless Silent, supports /PURGEDATA, and deletes local data only on purge', () => {
+    const s = script()
+    const body = s.match(/!macro customUnInstall\b([\s\S]*?)!macroend/)?.[1] ?? ''
+    expect(body).toContain('${GetOptions} $R1 "/PURGEDATA"')
+    expect(body).toContain('${ElseIfNot} ${Silent}')
+    expect(body).toContain('MessageBox MB_YESNO|MB_ICONQUESTION')
+    expect(body).toContain('RMDir /r "$APPDATA\\Cakapp"')
+  })
+
+  it('builds /S or /S /PURGEDATA command cleanly for packaged Windows only', () => {
+    expect(
+      buildWindowsUninstallPlan('C:\\dev\\electron.exe', { platform: 'win32', packaged: false, purgeData: true }),
+    ).toBeNull()
+    expect(
+      buildWindowsUninstallPlan('/Applications/Cakapp.app/Contents/MacOS/Cakapp', { platform: 'darwin', packaged: true, purgeData: false }),
+    ).toBeNull()
+
+    const keep = buildWindowsUninstallPlan('C:\\Users\\SSD\\AppData\\Local\\Programs\\cakapp\\Cakapp.exe', {
+      platform: 'win32',
+      packaged: true,
+      purgeData: false,
+    })
+    expect(keep?.uninstallerPath).toBe('C:\\Users\\SSD\\AppData\\Local\\Programs\\cakapp\\Uninstall Cakapp.exe')
+    expect(keep?.args).toEqual(['/S'])
+
+    const purge = buildWindowsUninstallPlan('C:\\Users\\SSD\\AppData\\Local\\Programs\\cakapp\\Cakapp.exe', {
+      platform: 'win32',
+      packaged: true,
+      purgeData: true,
+    })
+    expect(purge?.args).toEqual(['/S', '/PURGEDATA'])
   })
 })

@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const main = join(import.meta.dirname, '../out/main/index.js')
-const helper = join(import.meta.dirname, '../resources/bin/yogurt-mcp')
+const helper = join(import.meta.dirname, '../resources/bin/Cakapp-mcp')
 
 const fake = <T>(app: ElectronApplication, fn: string, arg?: unknown): Promise<T> =>
   app.evaluate((_e, [fn, arg]) => (globalThis as unknown as Record<string, Record<string, (a?: unknown) => unknown>>).__fake__[fn as string](arg), [fn, arg] as const) as Promise<T>
@@ -52,7 +52,7 @@ test('an AI app on this Mac reads meetings through yogurt-mcp only once Settings
     await toggle.click()
     await expect(toggle).toHaveAttribute('aria-checked', 'true')
     await expect(page.getByTestId('ai-apps-clients')).toHaveText('Connected apps · Test client')
-    await expect(page.getByTestId('ai-apps-command')).toHaveValue(/yogurt-mcp$/)
+    await expect(page.getByTestId('ai-apps-command')).toHaveValue(/Cakapp-mcp$/)
     await expect(page.getByTestId('ai-apps-claude')).toHaveCount(0)
     await expect(page.getByTestId('ai-apps')).toContainText('Copy this command and add it as a local MCP server in your AI app.')
     await page.evaluate(() => {

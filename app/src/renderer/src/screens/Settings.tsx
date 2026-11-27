@@ -562,6 +562,9 @@ function AiApps() {
 function Updates() {
   const [status, setStatus] = useState<UpdateStatus>()
   const [blocked, setBlocked] = useState(false)
+  const [uninstallOpen, setUninstallOpen] = useState(false)
+  const [uninstalling, setUninstalling] = useState(false)
+  const [uninstallMsg, setUninstallMsg] = useState('')
   useEffect(() => {
     void window.yogurt.updates.status().then(setStatus)
     return window.yogurt.updates.onStatus(setStatus)
@@ -569,6 +572,24 @@ function Updates() {
   const change = useSettingSave('updates-save-retry', useCallback(() => { void window.yogurt.updates.status().then(setStatus) }, []))
   const toggle = () => status && change.save(async () => { setStatus(await window.yogurt.updates.set(!status.on)) })
   const restart = () => void window.yogurt.updates.restart().then((ok) => setBlocked(!ok))
+  const runUninstall = async (purgeData: boolean) => {
+    setUninstalling(true)
+    setUninstallMsg('')
+    try {
+      const res = await window.yogurt.updates.uninstall({ purgeData })
+      if (!res.ok) {
+        setUninstallMsg(
+          res.reason === 'recording'
+            ? 'Hentikan rekaman rapat terlebih dahulu sebelum menghapus aplikasi.'
+            : 'Fitur uninstall langsung tersedia pada aplikasi Windows yang terpasang lewat installer (.exe).'
+        )
+        setUninstalling(false)
+      }
+    } catch {
+      setUninstallMsg('Gagal menjalankan program uninstall.')
+      setUninstalling(false)
+    }
+  }
   const said = status?.available ? {
     idle: '', latest: t('Up to date'), checking: t('Checking for updates…'), error: t("Couldn't check for updates."),
     downloading: t('Downloading version {version}…', { version: status.next ?? '' }), ready: t('Cakapp {version} is ready', { version: status.next ?? '' }),
@@ -599,6 +620,71 @@ function Updates() {
           {status?.available && status.on && (status.state === 'idle' || status.state === 'latest' || status.state === 'error') &&
             <button data-testid="updates-check" onClick={() => void window.yogurt.updates.check()} className="workspace-button settings-action">{status.state === 'error' ? t('Try again') : t('Check now')}</button>}
         </div>
+
+        {window.yogurt.os === 'win32' && (
+          <div className="settings-row">
+            <div className="settings-row-copy space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="settings-label">Hapus Aplikasi (Uninstall Cakapp)</p>
+                  <p className="settings-description">
+                    Hapus aplikasi dari komputer ini. Anda bisa memilih menyimpan data rapat atau menghapus bersih seluruh data dan model offline.
+                  </p>
+                </div>
+                {!uninstallOpen && (
+                  <button
+                    type="button"
+                    data-testid="uninstall-open-btn"
+                    onClick={() => { setUninstallOpen(true); setUninstallMsg('') }}
+                    className="workspace-button settings-action"
+                  >
+                    Uninstall Aplikasi...
+                  </button>
+                )}
+              </div>
+
+              {uninstallOpen && (
+                <div className="rounded-lg border border-line bg-bg p-3 space-y-2.5 text-xs">
+                  <p className="font-medium text-ink">Pilih metode uninstall:</p>
+                  <p className="text-muted leading-relaxed">
+                    • <strong>Uninstall Saja (Simpan Data)</strong> menghapus program Cakapp tetapi menyimpan rekaman, notulen, dan model AI di komputer.
+                    <br />
+                    • <strong>Uninstall Penuh</strong> menghapus aplikasi beserta seluruh data rapat lokal, pengaturan, dan model AI offline secara permanen.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      data-testid="uninstall-keep-data-btn"
+                      disabled={uninstalling}
+                      onClick={() => void runUninstall(false)}
+                      className="workspace-button primary"
+                    >
+                      {uninstalling ? 'Memproses...' : 'Uninstall Saja (Simpan Data)'}
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="uninstall-purge-data-btn"
+                      disabled={uninstalling}
+                      onClick={() => void runUninstall(true)}
+                      className="workspace-button text-danger"
+                    >
+                      Uninstall Penuh (Hapus Semua Data)
+                    </button>
+                    <button
+                      type="button"
+                      disabled={uninstalling}
+                      onClick={() => { setUninstallOpen(false); setUninstallMsg('') }}
+                      className="workspace-button"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                  {uninstallMsg && <p role="alert" className="text-danger">{uninstallMsg}</p>}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div></LoadingContent>
     </>
   )

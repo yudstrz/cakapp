@@ -130,7 +130,7 @@ linux:
     - "!**/node_modules/@node-llama-cpp/{mac,win,linux-arm,linux-riscv}*/**"
     - "!**/node_modules/node-llama-cpp/bins/{mac,win,linux-arm,linux-riscv}*/**"
   # the default comes from the package name, which isn't a good file name
-  executableName: yogurt
+  executableName: Cakapp
   # added to the extra resources above (unlike files, these merge): the word list for lowercase respelling (scripts/native.mjs; a Mac has its own)
   extraResources:
     - { from: resources/dict, to: dict }
