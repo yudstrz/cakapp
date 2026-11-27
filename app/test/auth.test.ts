@@ -107,6 +107,58 @@ describe('auth state & guest mode fallback', () => {
       clearAllByokKeys()
     }
   })
+
+  it('resolves Guest state without throwing Supabase error when only BetterAuth is active', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cakapp-auth-packaged-'))
+    dirs.push(dir)
+    const settingsFile = join(dir, 'settings.json')
+    const fakeSafeStorage = {
+      isEncryptionAvailable: () => true,
+      getSelectedStorageBackend: () => 'basic_text',
+      encryptString: (s: string) => Buffer.from(s),
+      decryptString: (b: Buffer) => b.toString(),
+    } as any
+
+    const prevEnv = {
+      DATABASE_URL: process.env.DATABASE_URL,
+      SUPABASE_URL: process.env.SUPABASE_URL,
+      VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL,
+      SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
+      VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY,
+      BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
+    }
+    const prevFetch = globalThis.fetch
+    delete process.env.DATABASE_URL
+    delete process.env.SUPABASE_URL
+    delete process.env.VITE_SUPABASE_URL
+    delete process.env.SUPABASE_ANON_KEY
+    delete process.env.VITE_SUPABASE_ANON_KEY
+    process.env.BETTER_AUTH_URL = 'https://cakapp.vercel.app'
+    globalThis.fetch = vi.fn(async () => new Response('null', { status: 200, headers: { 'Content-Type': 'application/json' } })) as typeof fetch
+
+    try {
+      const auth = hookAuth({
+        file: settingsFile,
+        safeStorage: fakeSafeStorage,
+        openExternal: async () => {},
+        rememberName: () => {},
+        rememberProfile: () => {},
+      })
+      const st = await auth.state()
+      expect(st.configured).toBe(true)
+      expect(st.user).toBeNull()
+      expect(st.webPortalUrl).toBe('https://cakapp.vercel.app')
+
+      const out = await auth.signOut()
+      expect(out.ok).toBe(true)
+    } finally {
+      globalThis.fetch = prevFetch
+      for (const [k, v] of Object.entries(prevEnv)) {
+        if (v === undefined) delete process.env[k]
+        else process.env[k] = v
+      }
+    }
+  })
 })
 
 describe('store & meeting user association', () => {

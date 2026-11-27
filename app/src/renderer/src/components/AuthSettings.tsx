@@ -24,7 +24,11 @@ export function AuthSettings({ onDone, compact }: { onDone?: () => void; compact
         setState(value)
         window.dispatchEvent(new CustomEvent('cakapp:auth-changed', { detail: value }))
         if (notifyDoneOnLogin && justSignedIn) onDone?.()
-      }).catch(() => {})
+      }).catch(() => {
+        if (!active) return
+        setState(prev => prev ?? { configured: true, secureStorage: true, user: null })
+        setError(prev => prev || t('auth-generic-error'))
+      })
     }
     syncState(false)
     const off = window.yogurt.auth.onChanged(next => {

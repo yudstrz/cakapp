@@ -146,9 +146,16 @@ export function hookAuth(d: {
 
     // 1. Check Better Auth session (handles both web browser deep-link login and email/password)
     if (hasBetterAuth()) {
+      let timer: NodeJS.Timeout | undefined
       try {
         const { getBetterAuthClient } = await loadBetterAuth()
-        const res = await getBetterAuthClient().getSession()
+        const res = await Promise.race([
+          getBetterAuthClient().getSession(),
+          new Promise<null>((resolve) => {
+            timer = setTimeout(() => resolve(null), 5000)
+            timer.unref?.()
+          }),
+        ])
         if (res?.data?.user) {
           const user = accountUser(res.data.user)
           d.rememberProfile(user)
@@ -156,7 +163,9 @@ export function hookAuth(d: {
           return { configured: true, secureStorage: true, user, google: true, webPortalUrl }
         }
       } catch {
-        // Fallback to cached Neon session if offline or server unreachable
+        // Fallback to cached session / Guest Mode if offline or server unreachable
+      } finally {
+        if (timer) clearTimeout(timer)
       }
     }
 
@@ -197,6 +206,11 @@ export function hookAuth(d: {
         d.rememberProfile(null)
         return { configured: true, secureStorage: true, user: null, google, webPortalUrl }
       }
+    }
+
+    if (!hasSupabase()) {
+      d.rememberProfile(null)
+      return { configured: true, secureStorage: true, user: null, google, webPortalUrl }
     }
 
     const result = await getClient().auth.getSession().catch(() => ({ data: { session: null } }))
@@ -381,9 +395,14 @@ export function hookAuth(d: {
   const signOut = async (): Promise<AuthResult> => {
     try {
       clearAllByokKeys()
+      d.rememberProfile(null)
       if (hasBetterAuth()) {
-        const { getBetterAuthClient } = await loadBetterAuth()
-        await getBetterAuthClient().signOut().catch(() => {})
+        try {
+          const { getBetterAuthClient } = await loadBetterAuth()
+          await Promise.resolve(getBetterAuthClient().signOut()).catch(() => {})
+        } catch {
+          // Local profile and BYOK keys are already cleared even if remote sign-out is unavailable
+        }
       }
       if (hasNeon()) {
         const raw = await storage.getItem(NEON_SESSION_KEY)
