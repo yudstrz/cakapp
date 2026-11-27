@@ -17,7 +17,7 @@ export function buildNotesPrompt(params: GenerateNotesParams): string {
     '### STRUKTUR WAJIB:',
     '1. ### Ringkasan Eksekutif: Paragraf ikhtisar yang memuat konteks dan hasil utama rapat.',
     '2. ### Pokok Keputusan (Key Decisions): Daftar bernomor (1., 2., 3.) berisi keputusan penting dengan format: `1. **Judul Keputusan**: Penjelasan ringkas`.',
-    '3. ### Daftar Tugas & Tindak Lanjut (Action Items): Daftar checklist dengan format persis: `- [ ] **Nama PIC / Peran**: Deskripsi tugas yang harus diselesaikan`.',
+    '3. ### Daftar Tugas & Tindak Lanjut (Action Items): Daftar checklist dengan format persis: `- [ ] **Nama PIC / Peran**: Deskripsi tugas yang harus diselesaikan`. Jika keputusan rapat memiliki implikasi tindak lanjut namun nama PIC tidak disebut eksplisit, cantumkan peran terkait (mis. `Manajemen / Tim Terkait`). Jika transkrip murni informasi tanpa tugas, tulis satu poin `- [ ] **Catatan**: Tidak ada daftar tugas atau tindak lanjut spesifik dalam transkrip.` (jangan pernah meninggalkan bagian ini kosong).',
     '',
   ]
 

@@ -228,16 +228,21 @@ const CLOSING = /^\s*(?:let me know if you (?:need|want|would like)\b|let me kno
  */
 export function tidyNotes(md: string, keepProse = false): string {
   const lines = md.replace(/\r\n?/g, '\n').split('\n').filter((l) => l.trim() && !/^\s*```/.test(l))
+  while (lines.length && CLOSING.test(lines.at(-1)!)) lines.pop()
   if (keepProse) {
     // shortcut: free-form bodies need phrase-based wrapper detection; extend for other model lead-ins and sign-offs.
     while (lines.length && LEAD_IN.test(lines[0])) lines.shift()
-    while (lines.length && CLOSING.test(lines.at(-1)!)) lines.pop()
     return lines.join('\n').trim()
   }
   const first = lines.findIndex((l) => STRUCTURE.test(l))
   if (first === -1) return lines.join('\n').trim()
   let last = lines.length - 1
-  while (last > first && !STRUCTURE.test(lines[last]) && !/^\s{2,}\S/.test(lines[last])) last--
+  // Keep plain-text answers sitting right below a heading, while still stripping trailing empty headings or chatty prose.
+  while (
+    last > first &&
+    ((!STRUCTURE.test(lines[last]) && !/^\s{2,}\S/.test(lines[last]) && !/^\s*#{1,6}\s/.test(lines[last - 1] ?? '')) ||
+      /^\s*#{1,6}\s/.test(lines[last]))
+  ) last--
   return lines.slice(first, last + 1).join('\n').trim()
 }
 
@@ -297,8 +302,8 @@ export function withoutCopies(md: string, mine: string): string {
   }).join('\n')
 }
 
-/** a "- **Name:** task" bullet */
-const OWNER = /^\s*[-*]\s+\*\*[^*\n]+:\*\*/m
+/** a "- **Name:** task" or "- [ ] **Name**: task" bullet */
+const OWNER = /^\s*[-*]\s+(?:\[[ xX]\]\s+)?\*\*[^*\n]+(?::\*\*|\*\*:)/m
 
 const nextStepsPrompt = (language: string) =>
   `Now write only the "## Next steps" section (heading in ${language || 'the same language'}): one bullet per thing someone will do after the meeting, as "- **Name:** what they will do, by when" (the when only if it was said), "You" for the person these notes are for, and plain words for who they are for someone without a name ("Them" is not a name). If nobody is to do anything, answer only NONE. Nothing else.`
@@ -423,7 +428,7 @@ export async function enhance(input: EnhanceInput, llm: Llm, onToken: (text: str
   const written = md
   // the model sometimes stops before the next steps (it samples): ask for just that part, after what it wrote. Notes
   // with three sections or more and still none had none to give
-  if (md && !OWNER.test(md) && (md.match(/^## /gm) ?? []).length < 3) {
+  if (md && !OWNER.test(md) && !/^#{1,3}\s+.*(?:next steps|action items|tindak lanjut|daftar tugas)/im.test(md) && (md.match(/^#{2,3}\s+/gm) ?? []).length < 3) {
     // shown as it is written only once it starts like the section, so a chatty answer never flashes up
     let held = '', showing = false
     const show = (t: string) => {

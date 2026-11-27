@@ -219,6 +219,14 @@ describe('tidyNotes and markMine', () => {
   ])('removes rewrite wrappers while keeping the whole body (%s)', body => {
     expect(tidyNotes(`Sure! Here is the shorter version:\n\n${body}\n\nLet me know if you would like any changes.`, true)).toBe(body)
   })
+  it('keeps prose directly under a heading while stripping empty trailing headings', () => {
+    expect(tidyNotes('### Pokok Keputusan:\n1. Setuju\n### Daftar Tugas & Tindak Lanjut (Action Items):\nTidak ada tindak lanjut khusus.')).toBe(
+      '### Pokok Keputusan:\n1. Setuju\n### Daftar Tugas & Tindak Lanjut (Action Items):\nTidak ada tindak lanjut khusus.',
+    )
+    expect(tidyNotes('### Pokok Keputusan:\n1. Setuju\n### Daftar Tugas & Tindak Lanjut (Action Items):')).toBe(
+      '### Pokok Keputusan:\n1. Setuju',
+    )
+  })
   it('marks a bullet that says what the person wrote, when the model did not', () => {
     const md = markMine('## Plan\n- Ship the site on Tuesday\n- Budget is fine', '- ship site tuesday')
     expect(md).toBe('## Plan\n- <mine>Ship the site on Tuesday</mine>\n- Budget is fine')
@@ -308,6 +316,17 @@ describe('enhance', () => {
     }, () => {})
     expect(n).toBe(1)
     expect(md).toContain('## Outcome')
+  })
+  it('does not re-ask Next steps when Cloud AI already wrote checklist action items', async () => {
+    let calls = 0
+    const reply = '### Ringkasan Eksekutif:\nRapat selesai.\n### Daftar Tugas & Tindak Lanjut (Action Items):\n- [ ] **Manajemen**: Terbitkan dokumen pelaksanaan.'
+    const md = await enhance({ meeting, mine: '', segments: segs.slice(0, 2), language: 'id' }, {
+      contextSize: 100_000,
+      count: async (xs) => xs.map(words),
+      chat: async (_p, onToken) => { calls++; onToken(reply); return reply },
+    }, () => {})
+    expect(calls).toBe(1)
+    expect(md).toBe(reply)
   })
   it('summarises each piece of a long meeting, then writes from the summaries, covering start and end', async () => {
     const prompts: string[] = []

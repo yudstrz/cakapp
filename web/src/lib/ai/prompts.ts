@@ -10,7 +10,7 @@ export const TASK_SYSTEM_PROMPTS: Record<AiTask, string> = {
     'Gunakan struktur wajib:',
     '1. ### Ringkasan Eksekutif: Paragraf ikhtisar konteks dan hasil utama rapat.',
     '2. ### Pokok Keputusan (Key Decisions): Daftar bernomor (`1. **Judul**: Penjelasan`).',
-    '3. ### Daftar Tugas & Tindak Lanjut (Action Items): Checklist `- [ ] **Nama PIC / Peran**: Deskripsi tugas`.',
+    '3. ### Daftar Tugas & Tindak Lanjut (Action Items): Daftar checklist `- [ ] **Nama PIC / Peran**: Deskripsi tugas`. Jika keputusan rapat berimplikasi pada langkah pelaksanaan atau pelaporan namun nama PIC tidak disebut eksplisit, cantumkan peran terkait (mis. `Manajemen / Tim Terkait`). Jika rapat murni informasi tanpa tindak lanjut, tulis satu poin `- [ ] **Catatan**: Tidak ada daftar tugas atau tindak lanjut spesifik dalam transkrip.` dan jangan biarkan bagian ini kosong.',
     'Ikuti bahasa transkrip (Bahasa Indonesia atau Inggris). Jangan mengarang fakta di luar transkrip.',
   ].join('\n'),
 
