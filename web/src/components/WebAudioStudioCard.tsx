@@ -16,7 +16,6 @@ function formatTimer(sec: number): string {
 
 export default function WebAudioStudioCard() {
   const router = useRouter();
-  const [sttMode, setSttMode] = useState<'local' | 'cloud'>('local');
   const [sttProvider, setSttProvider] = useState<WebSttProviderId>('gemini');
   const [saveAudioToCloud, setSaveAudioToCloud] = useState(true);
   const [quotaLabel, setQuotaLabel] = useState('');
@@ -37,7 +36,6 @@ export default function WebAudioStudioCard() {
       const raw = window.localStorage.getItem(WEB_AI_PREF_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as WebAiPreferences;
-        if (parsed.sttMode === 'local' || parsed.sttMode === 'cloud') setSttMode(parsed.sttMode);
         if (parsed.sttProvider === 'gemini' || parsed.sttProvider === 'openai') setSttProvider(parsed.sttProvider);
       }
     } catch {
@@ -61,12 +59,11 @@ export default function WebAudioStudioCard() {
     };
   }, []);
 
-  const updatePref = (nextMode: 'local' | 'cloud', nextProv: WebSttProviderId) => {
-    setSttMode(nextMode);
+  const updateProviderPref = (nextProv: WebSttProviderId) => {
     setSttProvider(nextProv);
     try {
       const prev = JSON.parse(window.localStorage.getItem(WEB_AI_PREF_KEY) || '{}') as WebAiPreferences;
-      window.localStorage.setItem(WEB_AI_PREF_KEY, JSON.stringify({ ...prev, sttMode: nextMode, sttProvider: nextProv }));
+      window.localStorage.setItem(WEB_AI_PREF_KEY, JSON.stringify({ ...prev, sttProvider: nextProv }));
     } catch {
       // Ignore storage write error.
     }
@@ -227,38 +224,13 @@ export default function WebAudioStudioCard() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="font-display text-sm sm:text-base font-semibold text-ink">
-            Perekam Rapat Tatap Muka & Pengaturan Transkripsi
+            Perekam Mikrofon Browser & Unggah Audio
           </h2>
           <p className="mt-0.5 text-xs text-written">
-            {quotaLabel || 'Rekam rapat langsung dari mikrofon HP/laptop atau unggah file rekaman untuk dibuatkan notulen.'}
+            {quotaLabel
+              ? `${quotaLabel} · Rekam suara dari mikrofon perangkat ini atau unggah audio ke Cloud AI.`
+              : 'Rekam rapat tatap muka lewat mikrofon perangkat ini atau unggah file rekaman ke Cloud AI (untuk Zoom/Teams desktop otomatis gunakan Cakapp Desktop).'}
           </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            disabled={busy || recording}
-            onClick={() => updatePref('local', sttProvider)}
-            className={`min-h-[44px] sm:min-h-[34px] rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-              sttMode === 'local'
-                ? 'bg-ink text-paper'
-                : 'border border-control bg-float text-ink hover:bg-chrome'
-            }`}
-          >
-            Default: Whisper Lokal (PC)
-          </button>
-          <button
-            type="button"
-            disabled={busy || recording}
-            onClick={() => updatePref('cloud', sttProvider)}
-            className={`min-h-[44px] sm:min-h-[34px] rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-              sttMode === 'cloud'
-                ? 'bg-ink text-paper'
-                : 'border border-control bg-float text-ink hover:bg-chrome'
-            }`}
-          >
-            Default: Cloud AI (Server)
-          </button>
         </div>
       </div>
 
@@ -271,7 +243,7 @@ export default function WebAudioStudioCard() {
                 key={p}
                 type="button"
                 disabled={busy || recording}
-                onClick={() => updatePref(sttMode, p)}
+                onClick={() => updateProviderPref(p)}
                 className={`min-h-[44px] sm:min-h-[32px] rounded-md px-3 py-1 text-xs font-medium transition-colors ${
                   sttProvider === p
                     ? 'bg-ink text-paper'

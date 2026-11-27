@@ -1,0 +1,105 @@
+name: Release Desktop Installers
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      draft:
+        description: Optional existing draft release tag (e.g. v1.0.1)
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  release-windows:
+    name: Build & Publish Windows (.exe)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Setup Rust toolchain (for Cakapp-audio, Cakapp-system, Cakapp-mcp)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.90.0'
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build native Rust helpers & Electron bundle
+        run: pnpm --filter @cakapp/app run build
+
+      - name: Verify non-stub native binaries
+        shell: pwsh
+        run: |
+          $required = @('Cakapp-audio.exe', 'Cakapp-system.exe', 'Cakapp-mcp.exe', 'whisper-server.exe')
+          foreach ($f in $required) {
+            $p = Join-Path 'app/resources/bin' $f
+            if (-not (Test-Path $p)) { throw "Missing required binary: $p" }
+            $size = (Get-Item $p).Length
+            Write-Host "$f -> $size bytes"
+            if ($size -lt 10240) { throw "Binary $f is a stub ($size bytes)! Rust/CMake build did not produce a real binary." }
+          }
+
+      - name: Package & publish Windows installer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm --filter @cakapp/app exec electron-builder --win --x64 --publish always
+
+  release-linux:
+    name: Build & Publish Linux (.AppImage)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Linux audio build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libpulse-dev pkg-config
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.90.0'
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build native Rust helpers & Electron bundle
+        run: pnpm --filter @cakapp/app run build
+
+      - name: Verify non-stub native binaries
+        run: |
+          for f in Cakapp-audio Cakapp-system Cakapp-mcp whisper-server; do
+            p="app/resources/bin/$f"
+            test -s "$p" || { echo "Missing or empty binary: $p"; exit 1; }
+            size=$(wc -c < "$p")
+            echo "$f -> $size bytes"
+            test "$size" -ge 10240 || { echo "Binary $f is too small ($size bytes)"; exit 1; }
+          done
+
+      - name: Package & publish Linux AppImage
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm --filter @cakapp/app exec electron-builder --linux --x64 --publish always

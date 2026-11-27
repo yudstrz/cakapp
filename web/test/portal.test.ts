@@ -75,6 +75,7 @@ import { GET as searchGet } from '@/app/api/meetings/search/route';
 import { POST as askPost } from '@/app/api/meetings/ask/route';
 import { GET as workspacesGet, POST as workspacesPost } from '@/app/api/workspaces/route';
 import { POST as memberPost, DELETE as memberDelete } from '@/app/api/workspaces/members/route';
+import { GET as syncGet, POST as syncPost } from '@/app/api/sync/route';
 
 function makeAuthReq(
   url: string,
@@ -419,5 +420,69 @@ describe('Hari 4 Portal APIs: Audio Range, RBAC, Share, Search/Ask & Workspaces'
       state: 'st1',
       code_challenge: 'ch1',
     });
+  });
+
+  it('handles desktop HTTPS sync push, ownership isolation, and pull via /api/sync', async () => {
+    let existingOwner: string | null = 'owner-1';
+    mockSql.mockImplementation(async (strings: TemplateStringsArray) => {
+      const q = strings.join('?');
+      if (q.includes('SELECT user_id FROM meetings WHERE id')) {
+        return existingOwner ? [{ user_id: existingOwner }] : [];
+      }
+      if (q.includes('FROM meetings') && q.includes('WHERE user_id =')) {
+        return [{
+          id: 'desk-1',
+          user_id: 'owner-1',
+          title: 'Sync Desktop Call',
+          started_at: 1000,
+          ended_at: 2000,
+          event_id: null,
+          app: 'Zoom',
+          attendees: [],
+          state: 'done',
+          language: 'id',
+          updated_at_ms: 3000,
+        }];
+      }
+      if (q.includes('FROM transcripts')) {
+        return [{ id: 1, meeting_id: 'desk-1', track: 'me', start_ms: 10, end_ms: 500, text: 'Halo', speaker: null }];
+      }
+      if (q.includes('FROM notes')) {
+        return [{ meeting_id: 'desk-1', mine: 'Catatan', enhanced: 'Ringkasan' }];
+      }
+      return [];
+    });
+
+    const pushOk = await syncPost(
+      makeAuthReq('https://cakapp.test/api/sync', {
+        method: 'POST',
+        body: JSON.stringify({
+          kind: 'meeting',
+          meeting: { id: 'desk-1', title: 'Sync Desktop Call', startedAt: 1000, endedAt: 2000, app: 'Zoom', state: 'done' },
+          segments: [{ track: 'me', startMs: 10, endMs: 500, text: 'Halo', speaker: null }],
+          notes: { mine: 'Catatan', enhanced: 'Ringkasan' },
+        }),
+      }),
+    );
+    expect(pushOk.status).toBe(200);
+
+    existingOwner = 'someone-else';
+    const pushForbidden = await syncPost(
+      makeAuthReq('https://cakapp.test/api/sync', {
+        method: 'POST',
+        body: JSON.stringify({
+          kind: 'meeting',
+          meeting: { id: 'desk-other', title: 'Forbidden', startedAt: 1000, state: 'done' },
+        }),
+      }),
+    );
+    expect(pushForbidden.status).toBe(403);
+
+    const pullRes = await syncGet(new NextRequest('https://cakapp.test/api/sync?since=0'));
+    expect(pullRes.status).toBe(200);
+    const pulled = await pullRes.json();
+    expect(pulled.meetings).toHaveLength(1);
+    expect(pulled.meetings[0].segments[0].track).toBe('me');
+    expect(pulled.meetings[0].notes.enhanced).toBe('Ringkasan');
   });
 });

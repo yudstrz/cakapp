@@ -1,5 +1,11 @@
-import type { Store } from './store'
+import { readFileSync, statSync } from 'node:fs'
+import type { Folder, Meeting, Notes, Segment, Store } from './store'
 import * as neon from './neon'
+import * as cloudAi from './cloudAi'
+import { getAiApiBaseUrl } from './aiKeyStore'
+
+const MAX_CLOUD_AUDIO_BYTES = 25 * 1024 * 1024
+const MAX_AUDIO_CHUNK_BYTES = 1_500_000
 
 export type SyncStatus = {
   configured: boolean
@@ -10,6 +16,15 @@ export type SyncStatus = {
 }
 
 export type AudioUploadResolver = (meetingId: string) => Promise<{ filePath: string; mimeType: string } | null> | { filePath: string; mimeType: string } | null
+
+type RemoteTransport =
+  | { mode: 'neon' }
+  | { mode: 'http'; baseUrl: string; headers: Record<string, string> }
+  | null
+
+function hasAuthHeader(headers: Record<string, string>): boolean {
+  return Boolean(headers.Cookie || headers.Authorization)
+}
 
 export class SyncEngine {
   private lastSyncedAt: number | null = null
@@ -31,6 +46,17 @@ export class SyncEngine {
     }
   }
 
+  private async resolveTransport(): Promise<RemoteTransport> {
+    if (neon.isNeonConfigured()) {
+      return { mode: 'neon' }
+    }
+    const headers = await cloudAi.buildDesktopAuthHeaders().catch(() => ({} as Record<string, string>))
+    if (!hasAuthHeader(headers)) {
+      return null
+    }
+    return { mode: 'http', baseUrl: getAiApiBaseUrl(), headers }
+  }
+
   async setOnline(online: boolean): Promise<{ processed: number; failed: number } | undefined> {
     this.isOnline = online
     if (online) {
@@ -39,15 +65,27 @@ export class SyncEngine {
   }
 
   async getStatus(): Promise<SyncStatus> {
-    const configured = neon.isNeonConfigured()
+    const transport = await this.resolveTransport()
+    const configured = transport !== null
     let healthOnline = this.isOnline
     let error: string | undefined
 
-    if (configured && this.isOnline) {
+    if (transport?.mode === 'neon' && this.isOnline) {
       const health = await neon.checkNeonHealth()
       if (!health.ok) {
         healthOnline = false
         error = health.error
+      }
+    } else if (transport?.mode === 'http' && this.isOnline) {
+      try {
+        const resp = await fetch(`${transport.baseUrl}/api/sync?probe=1`, { headers: transport.headers })
+        if (!resp.ok) {
+          healthOnline = false
+          error = `Server sync status HTTP ${resp.status}`
+        }
+      } catch (err) {
+        healthOnline = false
+        error = err instanceof Error ? err.message : String(err)
       }
     }
 
@@ -60,28 +98,110 @@ export class SyncEngine {
     }
   }
 
-  private async syncOneMeeting(meeting: ReturnType<Store['meeting']>): Promise<boolean> {
+  private async uploadAudioHttp(
+    baseUrl: string,
+    headers: Record<string, string>,
+    meetingId: string,
+    filePath: string,
+    mimeType: string
+  ): Promise<boolean> {
+    try {
+      const stat = statSync(filePath)
+      if (!stat.isFile() || stat.size === 0 || stat.size > MAX_CLOUD_AUDIO_BYTES) return false
+      const buf = readFileSync(filePath)
+      const totalChunks = Math.max(1, Math.ceil(buf.length / MAX_AUDIO_CHUNK_BYTES))
+
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * MAX_AUDIO_CHUNK_BYTES
+        const slice = buf.subarray(start, Math.min(start + MAX_AUDIO_CHUNK_BYTES, buf.length))
+        const form = new FormData()
+        form.set('file', new Blob([new Uint8Array(slice)], { type: mimeType }), `audio-part-${i}.bin`)
+        form.set('chunkIndex', String(i))
+        form.set('totalBytes', String(buf.length))
+        form.set('mimeType', mimeType)
+        form.set('finalize', String(i === totalChunks - 1))
+
+        const resp = await fetch(`${baseUrl}/api/meetings/${encodeURIComponent(meetingId)}/audio`, {
+          method: 'POST',
+          headers,
+          body: form,
+        })
+        if (!resp.ok) return false
+      }
+      return true
+    } catch (err) {
+      console.warn(`[syncEngine] Audio upload via HTTPS failed for ${meetingId}:`, err)
+      return false
+    }
+  }
+
+  private async syncOneMeeting(meeting: ReturnType<Store['meeting']>, transport: NonNullable<RemoteTransport>): Promise<boolean> {
     if (!meeting) return false
     const segments = this.store.segments(meeting.id)
     const notes = this.store.notes(meeting.id)
-    const ok = await neon.syncMeetingToNeon(meeting, segments, notes)
-    if (!ok) return false
+
+    if (transport.mode === 'neon') {
+      const ok = await neon.syncMeetingToNeon(meeting, segments, notes)
+      if (!ok) return false
+      if (this.resolveAudio) {
+        const audio = await Promise.resolve(this.resolveAudio(meeting.id)).catch(() => null)
+        if (audio) {
+          await neon.syncMeetingAudioToNeon(meeting.id, audio.filePath, audio.mimeType)
+        }
+      }
+      return true
+    }
+
+    const resp = await fetch(`${transport.baseUrl}/api/sync`, {
+      method: 'POST',
+      headers: { ...transport.headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'meeting', meeting, segments, notes }),
+    })
+    if (!resp.ok) return false
+
     if (this.resolveAudio) {
       const audio = await Promise.resolve(this.resolveAudio(meeting.id)).catch(() => null)
       if (audio) {
-        await neon.syncMeetingAudioToNeon(meeting.id, audio.filePath, audio.mimeType)
+        await this.uploadAudioHttp(transport.baseUrl, transport.headers, meeting.id, audio.filePath, audio.mimeType)
       }
     }
     return true
+  }
+
+  private async syncOneFolder(folder: Folder, transport: NonNullable<RemoteTransport>): Promise<boolean> {
+    if (transport.mode === 'neon') {
+      return neon.syncFolderToNeon(folder, this.getUserId())
+    }
+    const resp = await fetch(`${transport.baseUrl}/api/sync`, {
+      method: 'POST',
+      headers: { ...transport.headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'folder', folder }),
+    })
+    return resp.ok
+  }
+
+  private async fetchHttpBundle(baseUrl: string, headers: Record<string, string>, since?: number): Promise<{
+    meetings: Array<{ meeting: Meeting; segments: Segment[]; notes: Notes | null; updatedAt: number }>
+    folders: Folder[]
+  } | null> {
+    const query = since !== undefined ? `?since=${encodeURIComponent(String(since))}` : ''
+    const resp = await fetch(`${baseUrl}/api/sync${query}`, { headers })
+    if (!resp.ok) return null
+    const data = (await resp.json()) as {
+      meetings?: Array<{ meeting: Meeting; segments: Segment[]; notes: Notes | null; updatedAt: number }>
+      folders?: Folder[]
+    }
+    return { meetings: data.meetings ?? [], folders: data.folders ?? [] }
   }
 
   async pushMeeting(meetingId: string): Promise<boolean> {
     const meeting = this.store.meeting(meetingId)
     if (!meeting) return false
 
-    if (this.isOnline && neon.isNeonConfigured()) {
+    const transport = this.isOnline ? await this.resolveTransport() : null
+    if (transport) {
       try {
-        const ok = await this.syncOneMeeting(meeting)
+        const ok = await this.syncOneMeeting(meeting, transport)
         if (ok) {
           this.store.setMeetingSyncStatus(meetingId, 'synced')
           this.lastSyncedAt = Date.now()
@@ -92,7 +212,7 @@ export class SyncEngine {
       }
     }
 
-    // Offline or failed: enqueue for later retry
+    // Offline, guest mode, or failed: enqueue for later retry
     this.store.setMeetingSyncStatus(meetingId, 'pending')
     this.store.enqueueSync('meeting', meetingId, 'upsert')
     return false
@@ -102,10 +222,10 @@ export class SyncEngine {
     const folder = this.store.folder(folderId)
     if (!folder) return false
 
-    const userId = this.getUserId()
-    if (this.isOnline && neon.isNeonConfigured()) {
+    const transport = this.isOnline ? await this.resolveTransport() : null
+    if (transport) {
       try {
-        const ok = await neon.syncFolderToNeon(folder, userId)
+        const ok = await this.syncOneFolder(folder, transport)
         if (ok) {
           this.lastSyncedAt = Date.now()
           return true
@@ -120,15 +240,16 @@ export class SyncEngine {
   }
 
   async pullMeetings(since?: number): Promise<{ pulled: number; errors: number }> {
-    if (!this.isOnline || !neon.isNeonConfigured()) {
-      return { pulled: 0, errors: 0 }
-    }
+    const transport = this.isOnline ? await this.resolveTransport() : null
+    if (!transport) return { pulled: 0, errors: 0 }
 
     try {
-      const userId = this.getUserId()
-      const remote = await neon.fetchMeetingsFromNeon(userId, since ?? this.lastSyncedAt ?? undefined)
-      let pulled = 0
+      const remote =
+        transport.mode === 'neon'
+          ? await neon.fetchMeetingsFromNeon(this.getUserId(), since ?? this.lastSyncedAt ?? undefined)
+          : (await this.fetchHttpBundle(transport.baseUrl, transport.headers, since ?? this.lastSyncedAt ?? undefined))?.meetings ?? []
 
+      let pulled = 0
       for (const item of remote) {
         const updated = this.store.upsertMeetingFromCloud(
           item.meeting,
@@ -149,15 +270,16 @@ export class SyncEngine {
   }
 
   async pullFolders(): Promise<{ pulled: number; errors: number }> {
-    if (!this.isOnline || !neon.isNeonConfigured()) {
-      return { pulled: 0, errors: 0 }
-    }
+    const transport = this.isOnline ? await this.resolveTransport() : null
+    if (!transport) return { pulled: 0, errors: 0 }
 
     try {
-      const userId = this.getUserId()
-      const folders = await neon.fetchFoldersFromNeon(userId)
-      let pulled = 0
+      const folders =
+        transport.mode === 'neon'
+          ? await neon.fetchFoldersFromNeon(this.getUserId())
+          : (await this.fetchHttpBundle(transport.baseUrl, transport.headers))?.folders ?? []
 
+      let pulled = 0
       for (const folder of folders) {
         const updated = this.store.upsertFolderFromCloud(folder)
         if (updated) pulled++
@@ -172,7 +294,11 @@ export class SyncEngine {
   }
 
   async flushQueue(): Promise<{ processed: number; failed: number }> {
-    if (this.isSyncing || !this.isOnline || !neon.isNeonConfigured()) {
+    if (this.isSyncing || !this.isOnline) {
+      return { processed: 0, failed: 0 }
+    }
+    const transport = await this.resolveTransport()
+    if (!transport) {
       return { processed: 0, failed: 0 }
     }
 
@@ -191,7 +317,7 @@ export class SyncEngine {
               processed++
               continue
             }
-            const ok = await this.syncOneMeeting(m)
+            const ok = await this.syncOneMeeting(m, transport)
             if (ok) {
               this.store.setMeetingSyncStatus(m.id, 'synced')
               this.store.dequeueSync(item.id)
@@ -207,7 +333,7 @@ export class SyncEngine {
               processed++
               continue
             }
-            const ok = await neon.syncFolderToNeon(f, this.getUserId())
+            const ok = await this.syncOneFolder(f, transport)
             if (ok) {
               this.store.dequeueSync(item.id)
               processed++
@@ -234,6 +360,12 @@ export class SyncEngine {
   }
 
   async syncAll(): Promise<{ pushed: number; pulled: number; queueFlushed: number }> {
+    const transport = this.isOnline ? await this.resolveTransport() : null
+    if (transport) {
+      for (const m of this.store.pendingSyncMeetings(50)) {
+        this.store.enqueueSync('meeting', m.id, 'upsert')
+      }
+    }
     const queue = await this.flushQueue()
     const meetings = await this.pullMeetings()
     const folders = await this.pullFolders()

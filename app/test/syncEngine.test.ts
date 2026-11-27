@@ -6,6 +6,7 @@ import { meetingWords, setJargon } from '../src/main/vocab'
 import { spokenOf, whisperLanguage, WHISPER_LANGUAGES } from '../src/shared/spoken'
 import { wordsOf } from '../src/shared/liveWords'
 import * as neonModule from '../src/main/neon'
+import * as cloudAiModule from '../src/main/cloudAi'
 
 describe('Day 2 (Rabu) - Local Whisper Engine & Two-Way Sync Verification', () => {
   let store: Store
@@ -320,6 +321,75 @@ describe('Day 2 (Rabu) - Local Whisper Engine & Two-Way Sync Verification', () =
       const updatedNewer = store.upsertMeetingFromCloud(newerCloudMeeting, [], null, futureTime)
       expect(updatedNewer).toBe(true)
       expect(store.meeting('m-conflict')?.title).toBe('Newer Cloud Title from Laptop B')
+    })
+
+    it('syncs meetings via HTTPS portal API when DATABASE_URL is absent', async () => {
+      const originalFetch = globalThis.fetch
+      const calls: Array<{ url: string; method: string; body?: string }> = []
+      vi.spyOn(neonModule, 'isNeonConfigured').mockReturnValue(false)
+      vi.spyOn(cloudAiModule, 'buildDesktopAuthHeaders').mockResolvedValue({
+        Cookie: 'better-auth.session_token=test-cookie',
+      })
+      globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        const method = init?.method ?? 'GET'
+        calls.push({ url, method, body: typeof init?.body === 'string' ? init.body : undefined })
+        if (url.includes('/api/sync?probe=1')) {
+          return new Response(JSON.stringify({ ok: true, meetings: [], folders: [] }), { status: 200 })
+        }
+        if (method === 'POST' && url.endsWith('/api/sync')) {
+          return new Response(JSON.stringify({ ok: true }), { status: 200 })
+        }
+        return new Response(JSON.stringify({
+          ok: true,
+          meetings: [{
+            meeting: {
+              id: 'm-remote-http',
+              title: 'Synced From Web',
+              startedAt: 4000,
+              endedAt: 5000,
+              eventId: null,
+              app: 'meet',
+              attendees: [],
+              state: 'done',
+              language: 'id',
+              titleSource: 'user',
+              userId: 'user-123',
+            },
+            segments: [],
+            notes: null,
+            updatedAt: Date.now() + 10_000,
+          }],
+          folders: [],
+        }), { status: 200 })
+      }) as typeof fetch
+
+      try {
+        const engine = new SyncEngine(store, () => 'user-123', undefined, 0)
+        const m = store.createMeeting({
+          title: 'Pre-login Local Meeting',
+          startedAt: 1000,
+          endedAt: 2000,
+          eventId: null,
+          app: 'zoom',
+          attendees: [],
+          state: 'done',
+        }, 'm-http-push')
+        store.addSegments([{ meetingId: m.id, track: 'me', startMs: 0, endMs: 500, text: 'Tes sync HTTPS', speaker: null }])
+
+        const status = await engine.getStatus()
+        expect(status.configured).toBe(true)
+        expect(status.online).toBe(true)
+
+        const syncRes = await engine.syncAll()
+        expect(syncRes.pushed).toBe(1)
+        expect(store.meetingSyncStatus(m.id)?.status).toBe('synced')
+        expect(store.meeting('m-remote-http')?.title).toBe('Synced From Web')
+        expect(calls.some((c) => c.method === 'POST' && c.url.endsWith('/api/sync') && c.body?.includes('m-http-push'))).toBe(true)
+        engine.destroy()
+      } finally {
+        globalThis.fetch = originalFetch
+      }
     })
   })
 })

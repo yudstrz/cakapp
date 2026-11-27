@@ -810,8 +810,9 @@ app.whenReady().then(() => {
     removed: id => { for (const w of BrowserWindow.getAllWindows()) w.webContents.send('audio:deleted', id) },
     ...(automatic ? { keep: endedAt => keepsRecording(loadSettings(settingsFile), endedAt) } : {}),
   })
+  let pushMeetingSafe = (_id: string) => {}
   const notes = hookNotes({
-    summarized: id => { folderSuggestions.schedule(id); void removeRecording(id, true) },
+    summarized: id => { folderSuggestions.schedule(id); void removeRecording(id, true); pushMeetingSafe(id) },
     // Windows and Linux: a note waiting while the model loads says so (a Mac shows what it always did)
     showLoading: platform !== 'darwin',
     summaryLanguage: () => summaryLanguageSetting(loadSettings(settingsFile)),
@@ -855,10 +856,12 @@ app.whenReady().then(() => {
     const mimeType = filePath.endsWith('.m4a') ? 'audio/mp4' : filePath.endsWith('.wav') ? 'audio/wav' : 'audio/ogg'
     return { filePath, mimeType }
   })
+  pushMeetingSafe = (id) => { void syncEngine.pushMeeting(id).catch(err => console.warn('[syncEngine] push meeting failed:', err)) }
   onAuthLoggedIn = () => { void syncEngine.syncAll().catch(err => console.warn('[syncEngine] sync after auth failed:', err)) }
+  if (getUserId()) onAuthLoggedIn()
   onMeetingStopSaved((m) => {
     uploads.resume(); savedTranscriptions.resume()
-    void syncEngine.pushMeeting(m.id).catch(err => console.warn('[syncEngine] push meeting failed:', err))
+    pushMeetingSafe(m.id)
   })
   ipcMain.handle('sync:status', () => syncEngine.getStatus())
   ipcMain.handle('sync:push', async (_e, id: unknown) => {

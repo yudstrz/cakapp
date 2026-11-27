@@ -68,7 +68,6 @@ export default function CloudAiMeetingSection({
   const [content, setContent] = useState(initialContent);
   const [localTranscripts, setLocalTranscripts] = useState<TranscriptItem[]>(transcripts);
   const [provider, setProvider] = useState<ClientAiProviderId>('gemini');
-  const [sttMode, setSttMode] = useState<'local' | 'cloud'>('cloud');
   const [sttProvider, setSttProvider] = useState<WebSttProviderId>('gemini');
   const [selectedModels, setSelectedModels] = useState<Partial<Record<ClientAiProviderId, string>>>({});
   const [modelsByProvider, setModelsByProvider] = useState<Record<ClientAiProviderId, VerifiedClientModel[]>>({
@@ -142,9 +141,6 @@ export default function CloudAiMeetingSection({
         if (parsed.provider === 'gemini' || parsed.provider === 'openai' || parsed.provider === 'anthropic') {
           initProv = parsed.provider;
         }
-        if (parsed.sttMode === 'local' || parsed.sttMode === 'cloud') {
-          setSttMode(parsed.sttMode);
-        }
         if (parsed.sttProvider === 'gemini' || parsed.sttProvider === 'openai') {
           setSttProvider(parsed.sttProvider);
         }
@@ -172,11 +168,6 @@ export default function CloudAiMeetingSection({
     const nextMap = { ...selectedModels, [provider]: modelId };
     setSelectedModels(nextMap);
     savePrefs({ provider, models: nextMap });
-  };
-
-  const handleSttModeChange = (nextMode: 'local' | 'cloud') => {
-    setSttMode(nextMode);
-    savePrefs({ sttMode: nextMode });
   };
 
   const handleSttProviderChange = (nextProv: WebSttProviderId) => {
@@ -432,74 +423,44 @@ export default function CloudAiMeetingSection({
           </div>
 
           <div className="pt-3 border-t border-line space-y-2.5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <p className="text-xs font-semibold text-ink">Pengaturan Default Suara ke Teks (Speech-to-Text)</p>
-                <p className="text-xs text-written">
-                  Pilih preferensi default transkripsi Anda atau unggah file rekaman suara.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  disabled={busyTask !== null}
-                  onClick={() => handleSttModeChange('local')}
-                  className={`min-h-[44px] sm:min-h-[34px] rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
-                    sttMode === 'local'
-                      ? 'bg-ink text-paper'
-                      : 'border border-control bg-paper text-ink hover:bg-chrome'
-                  }`}
-                >
-                  Default: Whisper Lokal (PC)
-                </button>
-                <button
-                  type="button"
-                  disabled={busyTask !== null}
-                  onClick={() => handleSttModeChange('cloud')}
-                  className={`min-h-[44px] sm:min-h-[34px] rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
-                    sttMode === 'cloud'
-                      ? 'bg-ink text-paper'
-                      : 'border border-control bg-paper text-ink hover:bg-chrome'
-                  }`}
-                >
-                  Default: Cloud AI (Server)
-                </button>
-              </div>
+            <div>
+              <p className="text-xs font-semibold text-ink">Unggah File Audio ke Teks (Cloud STT)</p>
+              <p className="text-xs text-written">
+                Di browser, transkripsi audio diproses oleh Cloud AI Server. Pengaturan Whisper Lokal tersedia di Cakapp Desktop.
+              </p>
             </div>
 
-            {sttMode === 'cloud' && (
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-paper p-2.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-written">Provider Suara:</span>
-                  {(['gemini', 'openai'] as const).map((sp) => (
-                    <button
-                      key={sp}
-                      type="button"
-                      disabled={busyTask !== null}
-                      onClick={() => handleSttProviderChange(sp)}
-                      className={`min-h-[44px] sm:min-h-[32px] rounded-md px-2.5 py-1 text-xs font-medium ${
-                        sttProvider === sp
-                          ? 'bg-ink text-paper'
-                          : 'border border-control bg-float text-ink hover:bg-chrome'
-                      }`}
-                    >
-                      {sp === 'gemini' ? 'Google Gemini' : 'OpenAI'}
-                    </button>
-                  ))}
-                </div>
-
-                <label className="inline-flex min-h-[44px] sm:min-h-[34px] cursor-pointer items-center justify-center rounded-lg border border-control bg-float px-3 py-1.5 text-xs font-semibold text-ink hover:bg-chrome">
-                  <span>{busyTask === 'stt' ? partInfo || 'Mentranskripsi...' : 'Unggah Suara ke Teks'}</span>
-                  <input
-                    type="file"
-                    accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm"
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-paper p-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-written">Provider Suara:</span>
+                {(['gemini', 'openai'] as const).map((sp) => (
+                  <button
+                    key={sp}
+                    type="button"
                     disabled={busyTask !== null}
-                    onChange={(e) => void handleAudioFileSelected(e)}
-                    className="sr-only"
-                  />
-                </label>
+                    onClick={() => handleSttProviderChange(sp)}
+                    className={`min-h-[44px] sm:min-h-[32px] rounded-md px-2.5 py-1 text-xs font-medium ${
+                      sttProvider === sp
+                        ? 'bg-ink text-paper'
+                        : 'border border-control bg-float text-ink hover:bg-chrome'
+                    }`}
+                  >
+                    {sp === 'gemini' ? 'Google Gemini' : 'OpenAI'}
+                  </button>
+                ))}
               </div>
-            )}
+
+              <label className="inline-flex min-h-[44px] sm:min-h-[34px] cursor-pointer items-center justify-center rounded-lg border border-control bg-float px-3 py-1.5 text-xs font-semibold text-ink hover:bg-chrome">
+                <span>{busyTask === 'stt' ? partInfo || 'Mentranskripsi...' : 'Unggah Suara ke Teks'}</span>
+                <input
+                  type="file"
+                  accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm"
+                  disabled={busyTask !== null}
+                  onChange={(e) => void handleAudioFileSelected(e)}
+                  className="sr-only"
+                />
+              </label>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 pt-1">

@@ -853,9 +853,23 @@ export class Store {
   }
 
   enqueueSync(entityType: 'meeting' | 'folder' | 'notes', entityId: string, action: 'upsert' | 'delete', payload?: unknown): void {
+    const existing = this.db.prepare('SELECT id FROM sync_queue WHERE entity_type = ? AND entity_id = ? AND action = ? LIMIT 1')
+      .get(entityType, entityId, action) as Row | undefined
+    if (existing) return
     const json = payload !== undefined ? JSON.stringify(payload) : null
     this.db.prepare('INSERT INTO sync_queue (entity_type, entity_id, action, payload, created_at) VALUES (?, ?, ?, ?, ?)')
       .run(entityType, entityId, action, json, Date.now())
+  }
+  pendingSyncMeetings(limit = 50): Meeting[] {
+    const rows = this.db.prepare(`
+      SELECT * FROM meetings
+      WHERE trashed_at IS NULL
+        AND state IN ('done', 'stopped')
+        AND (sync_status IS NULL OR sync_status != 'synced')
+      ORDER BY started_at DESC
+      LIMIT ?
+    `).all(limit) as Row[]
+    return rows.map((r) => this.readMeeting(r))
   }
   peekSyncQueue(limit = 20): SyncQueueItem[] {
     const rows = this.db.prepare('SELECT id, entity_type, entity_id, action, payload, attempts, last_error, created_at FROM sync_queue ORDER BY created_at ASC LIMIT ?').all(limit) as Row[]

@@ -12,6 +12,62 @@ export async function ensurePortalSchema(sql: NeonQueryFunction<false, false>): 
   if (!schemaReadyPromise) {
     schemaReadyPromise = (async () => {
       await sql`
+        CREATE TABLE IF NOT EXISTS profiles (
+          id TEXT PRIMARY KEY,
+          email TEXT,
+          full_name TEXT,
+          avatar_url TEXT,
+          created_at TIMESTAMPTZ DEFAULT now()
+        )
+      `;
+      await sql`
+        CREATE TABLE IF NOT EXISTS folders (
+          id TEXT PRIMARY KEY,
+          user_id TEXT,
+          name TEXT NOT NULL,
+          color TEXT DEFAULT 'default',
+          icon TEXT DEFAULT 'folder',
+          created_at TIMESTAMPTZ DEFAULT now()
+        )
+      `;
+      await sql`
+        CREATE TABLE IF NOT EXISTS meetings (
+          id TEXT PRIMARY KEY,
+          user_id TEXT,
+          workspace_id TEXT,
+          folder_id TEXT,
+          title TEXT NOT NULL,
+          started_at BIGINT NOT NULL,
+          ended_at BIGINT,
+          event_id TEXT,
+          app TEXT,
+          attendees JSONB DEFAULT '[]'::jsonb,
+          state TEXT NOT NULL DEFAULT 'done',
+          language TEXT,
+          sync_version INT DEFAULT 1,
+          updated_at TIMESTAMPTZ DEFAULT now()
+        )
+      `;
+      await sql`
+        CREATE TABLE IF NOT EXISTS transcripts (
+          id BIGSERIAL PRIMARY KEY,
+          meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+          track TEXT NOT NULL,
+          start_ms INT NOT NULL,
+          end_ms INT NOT NULL,
+          text TEXT NOT NULL,
+          speaker TEXT
+        )
+      `;
+      await sql`
+        CREATE TABLE IF NOT EXISTS notes (
+          meeting_id TEXT PRIMARY KEY REFERENCES meetings(id) ON DELETE CASCADE,
+          mine TEXT NOT NULL DEFAULT '',
+          enhanced TEXT,
+          updated_at TIMESTAMPTZ DEFAULT now()
+        )
+      `;
+      await sql`
         CREATE TABLE IF NOT EXISTS workspaces (
           id TEXT PRIMARY KEY,
           name TEXT NOT NULL,

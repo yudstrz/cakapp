@@ -33,7 +33,7 @@ export function emitAiFallbackNotice(reason: string): void {
   }
 }
 
-async function buildDesktopAuthHeaders(): Promise<Record<string, string>> {
+export async function buildDesktopAuthHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {}
 
   try {

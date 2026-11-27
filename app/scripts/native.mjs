@@ -61,10 +61,17 @@ mkdirSync(bin, { recursive: true })
 for (const [crate, builtName, name] of CRATES) {
   const dir = join(app, 'native', crate)
   const out = join(bin, exe(name))
-  if (existsSync(out) && statSync(out).mtimeMs > newest(dir)) { console.log(`${exe(name)} is up to date`); continue }
+  if (existsSync(out) && statSync(out).mtimeMs > newest(dir)) {
+    if (statSync(out).size === 0 && !hasCargo) {
+      console.warn(`WARNING: ${exe(name)} is a 0-byte stub (install Rust/cargo + MSVC build tools or build via CI release.yml for real recording/UI-automation).`)
+    } else {
+      console.log(`${exe(name)} is up to date`)
+    }
+    continue
+  }
   if (!hasCargo || !hasCmake || process.env.VERCEL) {
     if (!existsSync(out)) writeFileSync(out, '')
-    console.log(`cargo or cmake not found or on Vercel; stub created for ${exe(name)}`)
+    console.warn(`WARNING: cargo or cmake not found or on Vercel; 0-byte stub created for ${exe(name)} (not suitable for release).`)
     continue
   }
   // the crate's own pinned toolchain (rust-toolchain.toml), installed when rustup doesn't have it yet
