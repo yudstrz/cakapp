@@ -33,7 +33,7 @@ import { language as uiLanguage, onLanguage, setLanguage, t } from '../shared/i1
 import bundledCatalog from '../../../catalog/catalog.json'
 import licenses from '../../../catalog/licenses.json'
 import { loadCatalog } from './catalog'
-import { readSysInfo, toHardware, type GpuProbe } from './hardware'
+import { evaluateHardwareReport, readSysInfo, toHardware, type GpuProbe } from './hardware'
 import { realDeps } from './downloader'
 import { wavOf } from './fakeCapture'
 import { askFakeNotifications, chatMeetings, fakeAccess, fakeDownloadDeps, fakeHardware, fakeHelper, fakeNow, installFakeHooks, manyMeetings, mediaCalls, waitForFakeAudioMetadata } from './fake'
@@ -640,7 +640,17 @@ app.whenReady().then(() => {
     rememberProfile: accountProfile => updateSettings(settingsFile, { accountProfile: accountProfile ?? undefined }),
     onChange: st => win?.webContents.send('auth:changed', st),
   })
-  hookAiIpc()
+  hookAiIpc({
+    checkHardware: async () => {
+      const [hw, catalog] = await Promise.all([
+        isFake()
+          ? fakeHardware(platform)
+          : toHardware(await readSysInfo(userDataDir()), process.platform === 'darwin' ? undefined : await probeGpu()),
+        Promise.resolve(loadCatalog({ bundled: bundledCatalog, licenses })),
+      ])
+      return evaluateHardwareReport(hw, catalog, speedStore(speedFile()).load(), setup.installed())
+    },
+  })
   const getUserId = () => loadSettings(settingsFile).accountProfile?.id ?? null
   setUserIdProvider(getUserId)
   setCalendarSelection(() => loadSettings(settingsFile))
@@ -771,7 +781,7 @@ app.whenReady().then(() => {
   })
   let finishing = false, discardUnsaved = false
   const savedTranscriptions = createSavedTranscriptions({
-    store, ready: () => !!setup.installed()?.asr, recording: () => !!activeMeeting() || !!resumingId || finishing, live: transcriptOpen,
+    store, ready: () => !!setup.installed()?.asr || aiKeyStore.getPublicConfig().sttMode === 'cloud', recording: () => !!activeMeeting() || !!resumingId || finishing, live: transcriptOpen,
     tracks: async id => {
       await recordingSettled(id)
       const tracks: Partial<Record<'me'|'them',AsyncIterable<Float32Array>>> = {}

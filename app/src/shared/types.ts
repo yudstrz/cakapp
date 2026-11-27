@@ -101,6 +101,7 @@ export type CakappApi = {
     setByokKey(provider: string, key: string): Promise<any>
     clearByokKey(provider: string): Promise<any>
     testConnection(provider: string): Promise<{ ok: boolean; message?: string; error?: string }>
+    checkHardware(): Promise<import('../main/hardware').HardwareCheckReport>
     onFallback(cb: (reason: string) => void): () => void
   }
   setup: {

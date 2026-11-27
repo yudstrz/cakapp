@@ -1,10 +1,15 @@
 import { ipcMain } from 'electron'
+import os from 'node:os'
 import { aiKeyStore } from './aiKeyStore'
 import { clearByokApiKey, setByokApiKey } from './byokKey'
 import { fetchCloudUsage, fetchVerifiedCloudModels, testCloudHealth } from './cloudAi'
 import { normalizeCloudProvider, type AIProviderId } from '../engine/providers/types'
+import { evaluateHardwareReport, toHardware, type HardwareCheckReport } from './hardware'
+import { loadCatalog } from './catalog'
+import bundledCatalog from '../../../catalog/catalog.json'
+import licenses from '../../../catalog/licenses.json'
 
-export function hookAiIpc() {
+export function hookAiIpc(deps?: { checkHardware?: () => Promise<HardwareCheckReport> }) {
   ipcMain.handle('ai:get-config', () => {
     return aiKeyStore.getPublicConfig()
   })
@@ -84,5 +89,18 @@ export function hookAiIpc() {
       return { ok: true, message: 'Engine AI Lokal siap digunakan secara offline.' }
     }
     return testCloudHealth(normalizeCloudProvider(providerId))
+  })
+
+  ipcMain.handle('ai:check-hardware', async () => {
+    if (deps?.checkHardware) return deps.checkHardware()
+    const hw = toHardware({
+      platform: process.platform,
+      arch: process.arch,
+      cpuModel: os.cpus()[0]?.model ?? 'unknown',
+      cores: os.availableParallelism(),
+      totalRamBytes: os.totalmem(),
+      freeDiskGB: 20,
+    })
+    return evaluateHardwareReport(hw, loadCatalog({ bundled: bundledCatalog, licenses }))
   })
 }

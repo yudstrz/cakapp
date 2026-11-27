@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ChevronDown } from './Icons'
+import type { HardwareCheckReport } from '../../../shared/types'
 
 type CloudProvider = 'gemini' | 'openai' | 'anthropic'
 
@@ -56,6 +57,8 @@ export function AiSettings() {
   const [cloudNote, setCloudNote] = useState('')
   const [byokInput, setByokInput] = useState('')
   const [busy, setBusy] = useState(false)
+  const [checkingHw, setCheckingHw] = useState(false)
+  const [hwReport, setHwReport] = useState<HardwareCheckReport | null>(null)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
@@ -543,6 +546,118 @@ export function AiSettings() {
                   Sisa kuota transkripsi hari ini: {usage.remainingSttChunks}/{usage.limitSttChunks} potongan suara (otomatis beralih ke Whisper Lokal jika habis).
                 </p>
               )}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-5 pt-4 border-t border-line space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="settings-label">Cek Kelayakan Hardware (AI Offline &amp; Whisper)</p>
+              <p className="settings-description mt-0.5">
+                Periksa CPU, RAM, GPU, dan kapasitas disk perangkat ini untuk melihat apakah direkomendasikan memakai model AI lokal atau Cloud AI.
+              </p>
+            </div>
+            <button
+              type="button"
+              data-testid="check-hardware-btn"
+              disabled={checkingHw || busy}
+              onClick={() => {
+                setCheckingHw(true)
+                setMessage('')
+                setError('')
+                void window.yogurt.ai.checkHardware()
+                  .then((rep) => setHwReport(rep))
+                  .catch(() => setError('Gagal memeriksa spesifikasi hardware perangkat.'))
+                  .finally(() => setCheckingHw(false))
+              }}
+              className="workspace-button"
+            >
+              {checkingHw ? 'Memeriksa hardware...' : hwReport ? 'Periksa Ulang' : 'Cek Hardware Sekarang'}
+            </button>
+          </div>
+
+          {hwReport && (
+            <div className="rounded-lg border border-line bg-bg p-3.5 space-y-3 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-semibold text-ink">{hwReport.recommendation.headline}</p>
+                <span className="rounded border border-line px-2 py-0.5 font-medium text-ink">
+                  {hwReport.recommendation.overall === 'local-optimal'
+                    ? 'AI Lokal Optimal'
+                    : hwReport.recommendation.overall === 'local-lite'
+                      ? 'Lokal Ringan / Hybrid'
+                      : 'Disarankan Cloud'}
+                </span>
+              </div>
+
+              <p className="text-muted leading-relaxed">{hwReport.recommendation.reason}</p>
+
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 border-t border-line pt-2.5">
+                <div className="space-y-1">
+                  <p className="font-medium text-ink">Spesifikasi Perangkat</p>
+                  <p className="text-muted">CPU: {hwReport.hardware.cpuModel} ({hwReport.hardware.cores} core)</p>
+                  <p className="text-muted">
+                    RAM: {hwReport.hardware.totalRamGB} GB · Disk bebas: {hwReport.hardware.freeDiskGB} GB
+                  </p>
+                  <p className="text-muted">
+                    GPU:{' '}
+                    {hwReport.hardware.gpuKind === 'none'
+                      ? 'Tidak ada akselerasi GPU (CPU saja)'
+                      : `${hwReport.hardware.gpuName || hwReport.hardware.gpuKind}${hwReport.hardware.gpuVramGB > 0 ? ` (${hwReport.hardware.gpuVramGB} GB VRAM)` : ''}`}
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="font-medium text-ink">Model Offline Sesuai Perangkat</p>
+                  <p className="text-muted">
+                    Notulen Offline:{' '}
+                    {hwReport.llm.supported && hwReport.llm.recommendedName
+                      ? `${hwReport.llm.recommendedName} (${hwReport.llm.sizeGB} GB, ~${hwReport.llm.estTokPerSec} tok/d, ${hwReport.llm.installedOnDisk ? 'terpasang' : 'belum diunduh'})`
+                      : 'Tidak direkomendasikan di perangkat ini'}
+                  </p>
+                  <p className="text-muted">
+                    Whisper Suara:{' '}
+                    {hwReport.whisper.supported && hwReport.whisper.recommendedName
+                      ? `${hwReport.whisper.recommendedName} (${hwReport.whisper.sizeGB} GB${hwReport.whisper.speedRtf !== null ? `, RTF ${hwReport.whisper.speedRtf}x` : ''}, ${hwReport.whisper.installedOnDisk ? 'terpasang' : 'belum diunduh'})`
+                      : 'Disarankan pakai Cloud STT (Gemini/OpenAI)'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-2.5">
+                <p className="text-muted">
+                  Saran pengaturan: Notulen ={' '}
+                  <strong className="text-ink">
+                    {hwReport.recommendation.suggestedAiMode === 'local' ? 'AI Lokal' : 'Cloud AI'}
+                  </strong>
+                  , Suara-ke-Teks ={' '}
+                  <strong className="text-ink">
+                    {hwReport.recommendation.suggestedSttMode === 'local' ? 'Whisper Lokal' : 'Cloud STT'}
+                  </strong>
+                </p>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setBusy(true)
+                    setMessage('')
+                    setError('')
+                    void window.yogurt.ai.setConfig({
+                      mode: hwReport.recommendation.suggestedAiMode,
+                      sttMode: hwReport.recommendation.suggestedSttMode,
+                    })
+                      .then((updated) => {
+                        setConfig(updated as AiConfigState)
+                        setMessage('Pengaturan AI & Speech-to-Text disesuaikan mengikuti rekomendasi hardware.')
+                      })
+                      .catch(() => setError('Gagal menerapkan rekomendasi hardware.'))
+                      .finally(() => setBusy(false))
+                  }}
+                  className="workspace-button primary"
+                >
+                  Terapkan Rekomendasi Ini
+                </button>
+              </div>
             </div>
           )}
         </div>

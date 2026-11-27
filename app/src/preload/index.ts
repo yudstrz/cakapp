@@ -36,6 +36,7 @@ const api: CakappApi = {
     setByokKey: (provider, key) => ipcRenderer.invoke('ai:set-byok-key', provider, key),
     clearByokKey: (provider) => ipcRenderer.invoke('ai:clear-byok-key', provider),
     testConnection: (provider) => ipcRenderer.invoke('ai:test-connection', provider),
+    checkHardware: () => ipcRenderer.invoke('ai:check-hardware'),
     onFallback: (cb) => {
       const on = (_e: unknown, reason: string) => cb(reason)
       ipcRenderer.on('ai:fallback-notice', on)
