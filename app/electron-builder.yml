@@ -19,9 +19,15 @@ directories:
   # dist/ only: with another output folder electron-builder packs the whole project
   output: dist
   buildResources: build
+compression: maximum
 files:
   - out/**
   - package.json
+  # compile-time llama.cpp source bundle, templates, linker files, source maps, and types are unused at runtime
+  - "!**/node_modules/node-llama-cpp/llama/**"
+  - "!**/node_modules/node-llama-cpp/templates/**"
+  - "!**/node_modules/@node-llama-cpp/**/*.{lib,exp}"
+  - "!**/node_modules/**/*.{map,d.ts,d.mts,d.cts,md,markdown}"
 extraResources:
   # the helpers (scripts/native.mjs): on a Mac native.sh's calendar, call detection and names in calls, recording,
   # speech to text; on Windows and Linux the Rust recorder, system helper and AI apps relay, and whisper-server
@@ -62,6 +68,10 @@ mac:
     # this Mac build only needs the Apple Silicon engine binaries
     - "!**/node_modules/@node-llama-cpp/{linux,win,mac-x64}*/**"
     - "!**/node_modules/node-llama-cpp/bins/{linux,win,mac-x64}*/**"
+    - "!**/node_modules/node-llama-cpp/llama/**"
+    - "!**/node_modules/node-llama-cpp/templates/**"
+    - "!**/node_modules/@node-llama-cpp/**/*.{lib,exp}"
+    - "!**/node_modules/**/*.{map,d.ts,d.mts,d.cts,md,markdown}"
   artifactName: Cakapp-mac-${arch}.${ext}
   target:
     - target: dmg
@@ -100,6 +110,11 @@ win:
     # this Windows build only needs the x64 Windows engine binaries
     - "!**/node_modules/@node-llama-cpp/{linux,mac,win-arm64}*/**"
     - "!**/node_modules/node-llama-cpp/bins/{linux,mac,win-arm64}*/**"
+    - "!**/node_modules/node-llama-cpp/llama/**"
+    - "!**/node_modules/node-llama-cpp/templates/**"
+    - "!**/node_modules/@node-llama-cpp/**/*.{lib,exp}"
+    - "!**/node_modules/**/*.{map,d.ts,d.mts,d.cts,md,markdown}"
+  electronLanguages: ["ar", "bn", "cs", "da", "de", "el", "en-GB", "en-US", "es", "fi", "fil", "fr", "he", "hi", "hu", "id", "it", "ja", "ko", "ms", "nb", "nl", "pl", "pt-BR", "ro", "ru", "sv", "th", "tr", "uk", "vi", "zh-CN", "zh-TW"]
   # added to the extra resources above (unlike files, these merge): the word list for lowercase respelling (scripts/native.mjs; a Mac has its own)
   extraResources:
     - { from: resources/dict, to: dict }
@@ -130,6 +145,10 @@ linux:
     # this Linux build only needs the x64 Linux engine binaries
     - "!**/node_modules/@node-llama-cpp/{mac,win,linux-arm,linux-riscv}*/**"
     - "!**/node_modules/node-llama-cpp/bins/{mac,win,linux-arm,linux-riscv}*/**"
+    - "!**/node_modules/node-llama-cpp/llama/**"
+    - "!**/node_modules/node-llama-cpp/templates/**"
+    - "!**/node_modules/@node-llama-cpp/**/*.{lib,exp}"
+    - "!**/node_modules/**/*.{map,d.ts,d.mts,d.cts,md,markdown}"
   # the default comes from the package name, which isn't a good file name
   executableName: Cakapp
   # added to the extra resources above (unlike files, these merge): the word list for lowercase respelling (scripts/native.mjs; a Mac has its own)
