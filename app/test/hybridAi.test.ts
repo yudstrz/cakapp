@@ -193,5 +193,30 @@ Dimas (QA): Tolong follow up action item jadwal deployment dan PIC pengujian ke 
       expect(result.provider).toBe('local')
       expect(notices[0]).toContain('Cloud AI sedang tidak terjangkau')
     })
+
+    it('routes Ask chat with task=tanya and rejects stub replies when no local runner exists', async () => {
+      const seenTasks: string[] = []
+      const manager = new AIProviderManager({
+        mode: 'cloud',
+        activeProvider: 'gemini',
+        models: { gemini: 'gemini-3.8-flash' },
+        transport: async (req) => {
+          seenTasks.push(req.task)
+          return { text: 'Keputusan rapat telah disetujui.', model: req.model }
+        },
+      })
+
+      const answer = await manager.getProvider('gemini').streamChat({
+        messages: [{ role: 'user', content: 'What was decided?' }],
+        task: 'tanya',
+      })
+      expect(answer).toBe('Keputusan rapat telah disetujui.')
+      expect(seenTasks).toEqual(['tanya'])
+
+      const localOnly = new LocalProvider()
+      await expect(
+        localOnly.streamChat({ messages: [{ role: 'user', content: 'What was decided?' }], task: 'tanya' }),
+      ).rejects.toThrow('Model AI Lokal belum terpasang')
+    })
   })
 })

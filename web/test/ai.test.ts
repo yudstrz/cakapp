@@ -490,4 +490,77 @@ describe('AI Backend Proxy & Protections', () => {
     expect(resNoQuota.status).toBe(200);
     expect(resNoQuota.headers.get('X-Daily-Stt-Remaining')).toBeNull();
   });
+
+  it('configures minimal/low thinkingConfig for Gemini 3 models, strips thought parts, and falls back when stream stalls before first token', async () => {
+    const geminiBodies: Array<Record<string, unknown>> = [];
+    globalThis.fetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const u = String(url);
+      if (u.includes('/models?')) {
+        return new Response(
+          JSON.stringify({
+            models: [
+              { name: 'models/gemini-3.5-flash-lite', supportedGenerationMethods: ['generateContent'] },
+              { name: 'models/gemini-3.8-flash', supportedGenerationMethods: ['generateContent'] },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+
+      geminiBodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+
+      if (u.includes('gemini-3.8-flash:streamGenerateContent')) {
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(init.signal?.reason ?? new Error('aborted')), { once: true });
+        });
+      }
+
+      const encoder = new TextEncoder();
+      const ssePayload = [
+        'data: {"candidates":[{"content":{"parts":[{"thought":true,"text":"Internal reasoning"},{"text":"Keputusan rapat disetujui."}]}}],"usageMetadata":{"promptTokenCount":12,"candidatesTokenCount":5}}\n\n',
+        'data: [DONE]\n\n',
+      ].join('');
+      const body = new ReadableStream({
+        start(ctrl) {
+          ctrl.enqueue(encoder.encode(ssePayload));
+          ctrl.close();
+        },
+      });
+      return new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+    }) as unknown as typeof fetch;
+
+    vi.useFakeTimers();
+    try {
+      const req = makeRequest('http://localhost:3000/api/ai/generate', {
+        body: {
+          provider: 'gemini',
+          model: 'gemini-3.8-flash',
+          task: 'tanya',
+          input: 'What was decided?',
+          stream: true,
+        },
+      });
+      const resPromise = generatePost(req);
+      await vi.advanceTimersByTimeAsync(18_100);
+      const res = await resPromise;
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get('X-Accel-Buffering')).toBe('no');
+      const sseText = await res.text();
+      expect(sseText).toContain('Keputusan rapat disetujui.');
+      expect(sseText).not.toContain('Internal reasoning');
+      expect(sseText).toContain('"model":"gemini-3.5-flash-lite"');
+
+      expect((geminiBodies[0].generationConfig as { thinkingConfig?: unknown }).thinkingConfig).toEqual({
+        thinkingLevel: 'low',
+      });
+      expect((geminiBodies[1].generationConfig as { thinkingConfig?: unknown }).thinkingConfig).toEqual({
+        thinkingLevel: 'minimal',
+      });
+      expect(JSON.stringify(geminiBodies[0].systemInstruction)).toContain('menjawab pertanyaan');
+      expect(JSON.stringify(geminiBodies[0].systemInstruction)).not.toContain('Ringkasan Eksekutif');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

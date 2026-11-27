@@ -136,7 +136,7 @@ export class CloudProxyProvider implements AIProvider {
   }
 
   private async runWithChunking(params: {
-    task: 'notulen' | 'ringkasan'
+    task: 'notulen' | 'ringkasan' | 'tanya'
     input: string
     onToken?: (tok: string) => void
     signal?: AbortSignal

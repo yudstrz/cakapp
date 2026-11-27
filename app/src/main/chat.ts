@@ -229,7 +229,7 @@ export async function* ask(d: Deps, meetingId: string, question: string, history
       if (signal.aborted) return
       o.onStep?.({ kind: 'reading', title: m.title })
       // the engine ends an answer it is told to stop and returns what it had (no error)
-      const answer = await llm.chat(chatPrompt({ context, question, history: recent, recording }), (t) => { if (!signal.aborted) push(t) }, { maxTokens: ANSWER_TOKENS })
+      const answer = await llm.chat(chatPrompt({ context, question, history: recent, recording }), (t) => { if (!signal.aborted) push(t) }, { maxTokens: ANSWER_TOKENS, task: 'tanya' })
       if (!signal.aborted) o.onComplete?.(answer)
     } catch (e) {
       // stopped by the person: what was written stands

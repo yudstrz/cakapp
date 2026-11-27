@@ -179,7 +179,7 @@ export function hookConversations(p: Deps) {
         const answer = await llm.chat(libraryPrompt({ items, question, history: recent, now: now(), spelling }), (t) => {
           if (signal.aborted) return
           written += t; turn.answer = withoutPreamble(written, { streaming: true }); later()
-        }, { maxTokens: ANSWER_TOKENS })
+        }, { maxTokens: ANSWER_TOKENS, task: 'tanya' })
         if (!signal.aborted) completed = answer
       } finally {
         // stopped by the queue alone (a recording needs the room): it starts over later, so what was written goes

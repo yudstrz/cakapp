@@ -53,9 +53,7 @@ export class LocalProvider implements AIProvider {
     if (this.runner) {
       return this.runner(lastMsg, params.onToken, params.signal)
     }
-    const reply = `[Local Engine] Menjawab pertanyaan: "${lastMsg.slice(0, 50)}..."`
-    if (params.onToken) params.onToken(reply)
-    return reply
+    throw new Error('Model AI Lokal belum terpasang. Unduh model offline di Settings atau periksa koneksi Cloud AI.')
   }
 
   async generateTitle(params: GenerateTitleParams): Promise<string> {

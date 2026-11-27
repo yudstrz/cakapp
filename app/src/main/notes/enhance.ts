@@ -19,7 +19,7 @@ export type Llm = {
    * one answer; onToken gets the text as it is written. summary: a part of a long meeting, not shown.
    * before: an earlier prompt and its answer, in that order, that this one follows on from
    */
-  chat(prompt: string, onToken: (text: string) => void, o?: { summary?: boolean; maxTokens?: number; before?: string[]; /** colder sampling for an answer that must come out the same each time */ temperature?: number }): Promise<string>
+  chat(prompt: string, onToken: (text: string) => void, o?: { summary?: boolean; task?: 'notulen' | 'ringkasan' | 'tanya'; maxTokens?: number; before?: string[]; /** colder sampling for an answer that must come out the same each time */ temperature?: number }): Promise<string>
   /** reads the start of a prompt into the model without answering, so a prompt that starts the same way later reads only the rest */
   readAhead?(text: string, signal?: AbortSignal): Promise<void>
 }

@@ -10,6 +10,28 @@ import {
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 
+type GeminiPart = { text?: string; thought?: boolean };
+
+function extractGeminiText(parts?: GeminiPart[]): string {
+  return (parts ?? [])
+    .filter((p) => !p.thought && typeof p.text === 'string')
+    .map((p) => p.text!)
+    .join('');
+}
+
+function buildGeminiGenerationConfig(model: string): Record<string, unknown> {
+  const config: Record<string, unknown> = { temperature: 0.2, maxOutputTokens: 4096 };
+  if (/^gemini-3\.5-flash-lite/i.test(model) || (/flash-lite/i.test(model) && /^gemini-[34]/i.test(model))) {
+    config.thinkingConfig = { thinkingLevel: 'minimal' };
+  } else if (/^gemini-[34]/i.test(model)) {
+    // Gemini 3.8 Flash and 3/4 Flash/Pro models reject 'minimal'; 'low' minimizes TTFT safely.
+    config.thinkingConfig = { thinkingLevel: 'low' };
+  } else if (/^gemini-2\.5-flash/i.test(model)) {
+    config.thinkingConfig = { thinkingBudget: 0 };
+  }
+  return config;
+}
+
 export const geminiAdapter: ProviderAdapter = {
   id: 'gemini',
 
@@ -23,7 +45,7 @@ export const geminiAdapter: ProviderAdapter = {
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
         contents: [{ role: 'user', parts: [{ text: input }] }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
+        generationConfig: buildGeminiGenerationConfig(model),
       }),
       signal,
     });
@@ -34,12 +56,12 @@ export const geminiAdapter: ProviderAdapter = {
     }
 
     const data = (await resp.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      candidates?: Array<{ content?: { parts?: GeminiPart[] } }>;
       usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
     };
 
     return {
-      text: data.candidates?.[0]?.content?.parts?.[0]?.text ?? '',
+      text: extractGeminiText(data.candidates?.[0]?.content?.parts),
       usage: {
         inputTokens: data.usageMetadata?.promptTokenCount ?? Math.ceil(input.length / 4),
         outputTokens: data.usageMetadata?.candidatesTokenCount ?? 0,
@@ -57,7 +79,7 @@ export const geminiAdapter: ProviderAdapter = {
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
         contents: [{ role: 'user', parts: [{ text: input }] }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
+        generationConfig: buildGeminiGenerationConfig(model),
       }),
       signal,
     });
@@ -89,10 +111,10 @@ export const geminiAdapter: ProviderAdapter = {
         if (!payload || payload === '[DONE]') continue;
         try {
           const parsed = JSON.parse(payload) as {
-            candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+            candidates?: Array<{ content?: { parts?: GeminiPart[] } }>;
             usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
           };
-          const chunk = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+          const chunk = extractGeminiText(parsed.candidates?.[0]?.content?.parts);
           if (chunk) callbacks.onToken(chunk);
           if (parsed.usageMetadata?.promptTokenCount !== undefined) {
             usage.inputTokens = parsed.usageMetadata.promptTokenCount;

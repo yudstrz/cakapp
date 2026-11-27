@@ -19,6 +19,12 @@ export const TASK_SYSTEM_PROMPTS: Record<AiTask, string> = {
     'Buat ringkasan singkat dan poin-poin inti dari teks atau potongan transkrip yang diberikan dalam format Markdown yang bersih.',
     'Pertahankan fakta, angka, nama, dan keputusan penting tanpa menambah informasi fiktif.',
   ].join('\n'),
+
+  tanya: [
+    'Anda adalah asisten AI Cakapp yang menjawab pertanyaan pengguna berdasarkan transkrip dan catatan rapat yang diberikan.',
+    'Jawab dengan singkat, langsung ke inti, akurat sesuai fakta dalam konteks, dan ikuti bahasa serta format yang diminta pertanyaan.',
+    'Jangan memaksakan struktur notulen lengkap kecuali diminta secara eksplisit.',
+  ].join('\n'),
 };
 
 export function getSystemPromptForTask(task: AiTask): string {

@@ -47,7 +47,7 @@ export interface GenerateNotesResult {
 
 export interface StreamChatParams {
   messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>
-  task?: 'notulen' | 'ringkasan'
+  task?: 'notulen' | 'ringkasan' | 'tanya'
   onToken?: (token: string) => void
   signal?: AbortSignal
 }
@@ -61,7 +61,7 @@ export interface GenerateTitleParams {
 export type CloudTransportFn = (params: {
   provider: CloudProviderId
   model: string
-  task: 'notulen' | 'ringkasan'
+  task: 'notulen' | 'ringkasan' | 'tanya'
   input: string
   stream?: boolean
   onToken?: (chunk: string) => void

@@ -182,10 +182,13 @@ export async function testCloudHealth(provider: CloudProviderId): Promise<{
   }
 }
 
+const CLIENT_TTFT_CHAT_MS = 28_000
+const CLIENT_TTFT_DEFAULT_MS = 58_000
+
 export async function callVercelAiGenerate(params: {
   provider: CloudProviderId
   model: string
-  task: 'notulen' | 'ringkasan'
+  task: 'notulen' | 'ringkasan' | 'tanya'
   input: string
   stream?: boolean
   onToken?: (chunk: string) => void
@@ -205,98 +208,129 @@ export async function callVercelAiGenerate(params: {
   const byokHeaders = buildByokHeaders(params.provider)
   const stream = params.stream ?? true
 
-  const resp = await fetch(`${getAiApiBaseUrl()}/api/ai/generate`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeaders,
-      ...byokHeaders,
-    },
-    body: JSON.stringify({
-      provider: params.provider,
-      model: modelId,
-      task: params.task,
-      input: params.input,
-      stream,
-    }),
-    signal: params.signal,
-  })
-
-  if (!resp.ok) {
-    const body = (await resp.json().catch(() => null)) as {
-      error?: { code?: string; message?: string; retryAfter?: number }
-    } | null
-    throw new CloudProxyClientError(
-      body?.error?.code || 'PROVIDER_ERROR',
-      body?.error?.message || `Server Cloud AI mengembalikan status ${resp.status}.`,
-      resp.status,
-      body?.error?.retryAfter
-    )
+  const attemptController = new AbortController()
+  let timedOut = false
+  const linkAbort = () => attemptController.abort(params.signal?.reason)
+  if (params.signal?.aborted) {
+    linkAbort()
+  } else {
+    params.signal?.addEventListener('abort', linkAbort, { once: true })
   }
+  const ttftMs = params.task === 'tanya' ? CLIENT_TTFT_CHAT_MS : CLIENT_TTFT_DEFAULT_MS
+  const ttftTimer = setTimeout(() => {
+    timedOut = true
+    attemptController.abort(new Error('TIMEOUT'))
+  }, ttftMs)
+  const clearTtft = () => clearTimeout(ttftTimer)
 
-  if (!stream) {
-    const data = (await resp.json()) as { text?: string; model?: string }
-    const text = data.text ?? ''
-    if (text && params.onToken) params.onToken(text)
-    return { text, model: data.model ?? modelId }
-  }
+  try {
+    const resp = await fetch(`${getAiApiBaseUrl()}/api/ai/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders,
+        ...byokHeaders,
+      },
+      body: JSON.stringify({
+        provider: params.provider,
+        model: modelId,
+        task: params.task,
+        input: params.input,
+        stream,
+      }),
+      signal: attemptController.signal,
+    })
 
-  if (!resp.body) {
-    throw new CloudProxyClientError('PROVIDER_ERROR', 'Stream respons Cloud AI kosong.', 502)
-  }
+    if (!resp.ok) {
+      clearTtft()
+      const body = (await resp.json().catch(() => null)) as {
+        error?: { code?: string; message?: string; retryAfter?: number }
+      } | null
+      throw new CloudProxyClientError(
+        body?.error?.code || 'PROVIDER_ERROR',
+        body?.error?.message || `Server Cloud AI mengembalikan status ${resp.status}.`,
+        resp.status,
+        body?.error?.retryAfter
+      )
+    }
 
-  const reader = resp.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-  let fullText = ''
-  let activeModel = modelId
-  let currentEvent = ''
+    if (!stream) {
+      const data = (await resp.json()) as { text?: string; model?: string }
+      clearTtft()
+      const text = data.text ?? ''
+      if (text && params.onToken) params.onToken(text)
+      return { text, model: data.model ?? modelId }
+    }
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() ?? ''
+    if (!resp.body) {
+      clearTtft()
+      throw new CloudProxyClientError('PROVIDER_ERROR', 'Stream respons Cloud AI kosong.', 502)
+    }
 
-    for (const raw of lines) {
-      const line = raw.trim()
-      if (!line) {
-        currentEvent = ''
-        continue
-      }
-      if (line.startsWith('event:')) {
-        currentEvent = line.slice(6).trim()
-        continue
-      }
-      if (!line.startsWith('data:')) continue
-      const payloadStr = line.slice(5).trim()
-      if (!payloadStr) continue
+    const reader = resp.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let fullText = ''
+    let activeModel = modelId
+    let currentEvent = ''
 
-      let parsed: Record<string, unknown>
-      try {
-        parsed = JSON.parse(payloadStr) as Record<string, unknown>
-      } catch {
-        continue
-      }
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
 
-      if (currentEvent === 'token' && typeof parsed.text === 'string') {
-        fullText += parsed.text
-        params.onToken?.(parsed.text)
-      } else if (currentEvent === 'done' && typeof parsed.model === 'string') {
-        activeModel = parsed.model
-      } else if (currentEvent === 'error') {
-        throw new CloudProxyClientError(
-          typeof parsed.code === 'string' ? parsed.code : 'PROVIDER_ERROR',
-          typeof parsed.message === 'string' ? parsed.message : 'Streaming Cloud AI terputus.',
-          502,
-          typeof parsed.retryAfter === 'number' ? parsed.retryAfter : undefined
-        )
+      for (const raw of lines) {
+        const line = raw.trim()
+        if (!line) {
+          currentEvent = ''
+          continue
+        }
+        if (line.startsWith('event:')) {
+          currentEvent = line.slice(6).trim()
+          continue
+        }
+        if (!line.startsWith('data:')) continue
+        const payloadStr = line.slice(5).trim()
+        if (!payloadStr) continue
+
+        let parsed: Record<string, unknown>
+        try {
+          parsed = JSON.parse(payloadStr) as Record<string, unknown>
+        } catch {
+          continue
+        }
+
+        if (currentEvent === 'token' && typeof parsed.text === 'string') {
+          if (parsed.text) clearTtft()
+          fullText += parsed.text
+          params.onToken?.(parsed.text)
+        } else if (currentEvent === 'done' && typeof parsed.model === 'string') {
+          clearTtft()
+          activeModel = parsed.model
+        } else if (currentEvent === 'error') {
+          clearTtft()
+          throw new CloudProxyClientError(
+            typeof parsed.code === 'string' ? parsed.code : 'PROVIDER_ERROR',
+            typeof parsed.message === 'string' ? parsed.message : 'Streaming Cloud AI terputus.',
+            502,
+            typeof parsed.retryAfter === 'number' ? parsed.retryAfter : undefined
+          )
+        }
       }
     }
-  }
 
-  return { text: fullText, model: activeModel }
+    return { text: fullText, model: activeModel }
+  } catch (err) {
+    if (timedOut && !params.signal?.aborted) {
+      throw new CloudProxyClientError('TIMEOUT', 'Permintaan AI melebihi batas waktu.', 504)
+    }
+    throw err
+  } finally {
+    clearTtft()
+    params.signal?.removeEventListener('abort', linkAbort)
+  }
 }
 
 export async function callVercelAiTranscribe(params: {
@@ -364,7 +398,7 @@ export function createCloudLlm(
       }
       const pub = aiKeyStore.getPublicConfig()
       const provider = pub.activeProvider
-      const task = opts?.summary ? 'ringkasan' : 'notulen'
+      const task = opts?.task ?? (opts?.summary ? 'ringkasan' : 'notulen')
 
       try {
         const active = globalAiManager.getProvider(provider)
@@ -385,11 +419,13 @@ export function createCloudLlm(
           if (localLlm) {
             return localLlm.chat(prompt, onToken, opts)
           }
+          throw err
         }
 
         const local = globalAiManager.getProvider('local')
         return local.streamChat({
           messages: [{ role: 'user', content: fullInput }],
+          task,
           onToken,
           signal,
         })

@@ -32,13 +32,14 @@ import {
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
+const FIRST_TOKEN_FALLBACK_MS = 18_000;
 
 export const OPTIONS = handleCorsPreflight;
 
 const GenerateSchema = z.object({
   provider: z.enum(['gemini', 'openai', 'anthropic']),
   model: z.string().min(1).max(120),
-  task: z.enum(['notulen', 'ringkasan']),
+  task: z.enum(['notulen', 'ringkasan', 'tanya']),
   input: z
     .string()
     .min(1, 'Input tidak boleh kosong.')
@@ -191,17 +192,46 @@ export async function POST(req: NextRequest) {
 
         try {
           let usage: TokenUsage;
-          const onToken = (token: string) => sendEvent('token', { text: token });
+          let firstTokenArrived = false;
+          let stalled = false;
+          let firstTokenTimer: ReturnType<typeof setTimeout> | undefined;
+          const attemptController = new AbortController();
+          const onToken = (token: string) => {
+            if (!firstTokenArrived && token) {
+              firstTokenArrived = true;
+              if (firstTokenTimer) clearTimeout(firstTokenTimer);
+            }
+            sendEvent('token', { text: token });
+          };
+
+          const canFallback = model !== fallbackModelId;
+          const attemptSignal = canFallback ? AbortSignal.any([controller.signal, attemptController.signal]) : controller.signal;
+          if (canFallback) {
+            firstTokenTimer = setTimeout(() => {
+              if (!firstTokenArrived) {
+                stalled = true;
+                attemptController.abort(new Error('FIRST_TOKEN_TIMEOUT'));
+              }
+            }, FIRST_TOKEN_FALLBACK_MS);
+          }
 
           try {
-            usage = await adapter.stream({ model, system, input, signal: controller.signal, apiKey }, { onToken });
+            usage = await adapter.stream({ model, system, input, signal: attemptSignal, apiKey }, { onToken });
           } catch (err) {
-            if (err instanceof AiProxyError && err.code === 'MODEL_UNAVAILABLE' && model !== fallbackModelId) {
+            if (firstTokenTimer) clearTimeout(firstTokenTimer);
+            const shouldFallback =
+              canFallback &&
+              !firstTokenArrived &&
+              !controller.signal.aborted &&
+              (stalled || (err instanceof AiProxyError && err.code === 'MODEL_UNAVAILABLE'));
+            if (shouldFallback) {
               activeModel = fallbackModelId;
               usage = await adapter.stream({ model: fallbackModelId, system, input, signal: controller.signal, apiKey }, { onToken });
             } else {
               throw err;
             }
+          } finally {
+            if (firstTokenTimer) clearTimeout(firstTokenTimer);
           }
 
           if (!isByok) {
@@ -263,6 +293,8 @@ export async function POST(req: NextRequest) {
       headers: {
         ...secHeaders,
         'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-store, no-transform',
+        'X-Accel-Buffering': 'no',
         'Connection': 'keep-alive',
       },
     });

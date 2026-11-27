@@ -1,6 +1,6 @@
 export type AiProviderId = 'gemini' | 'openai' | 'anthropic';
 
-export type AiTask = 'notulen' | 'ringkasan';
+export type AiTask = 'notulen' | 'ringkasan' | 'tanya';
 
 export type AiErrorCode =
   | 'UNAUTHORIZED'
