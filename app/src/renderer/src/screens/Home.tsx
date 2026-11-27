@@ -1,8 +1,9 @@
 import { InlineError, ReadError } from '../components/InlineError'
+import { openAudioUpload } from '../components/AudioUpload'
 import { transcriptionLabel } from '../../../shared/transcription'
 import { LoadingContent } from '../components/LoadingContent'
 import { StartRecording } from '../components/StartRecording'
-import { Mic, SidebarToggle, Check, Circle, FileText, Users } from '../components/Icons'
+import { Mic, SidebarToggle, Check, Circle, FileText, Upload, Users } from '../components/Icons'
 import { createPortal } from 'react-dom'
 import { readAgendaOpen, saveAgendaOpen } from '../agenda'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react'
@@ -27,7 +28,7 @@ const PAGE = 40
 const loadedCounts = new Map<string, number>()
 
 /** The workspace, backed by the existing meeting and calendar bridge. */
-export function Home({ open, openFolder, agendaJump }: { open: (id: string) => void; openFolder?: (id: string) => void; agendaJump?: { at: number } }) {
+export function Home({ open, openFolder, onSettings, agendaJump }: { open: (id: string) => void; openFolder?: (id: string) => void; onSettings?: () => void; agendaJump?: { at: number } }) {
   const past = usePastNotes()
   const day = useDay()
   const recording = past.cards?.find((c) => c.state === 'recording')
@@ -77,6 +78,30 @@ export function Home({ open, openFolder, agendaJump }: { open: (id: string) => v
           {new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date())}
         </time>
       </div>
+      {!past.failed && !!past.cards?.length && past.cards.length <= 3 && (
+        <div className="home-quick-bar" aria-label="Aksi cepat">
+          <div className="home-quick-actions">
+            <button type="button" className="workspace-button primary" onClick={() => void start(null)}>
+              <Mic size={14} aria-hidden="true" />
+              <span>Rekam rapat baru</span>
+            </button>
+            <button type="button" className="workspace-button" onClick={() => void openAudioUpload(open)}>
+              <Upload size={14} aria-hidden="true" />
+              <span>Upload audio</span>
+            </button>
+            {onSettings && (
+              <button type="button" className="workspace-button" onClick={onSettings}>
+                <FileText size={14} aria-hidden="true" />
+                <span>Cek AI &amp; Hardware</span>
+              </button>
+            )}
+          </div>
+          <span className="home-quick-status">
+            <i aria-hidden="true" />
+            Siap merekam tanpa bot
+          </span>
+        </div>
+      )}
       {past.failed && !!past.cards?.length && <InlineError testId="meetings-read-error" retry={past.retry} />}
       <LoadingContent pending={!past.cards && !past.failed} testId="meetings-loading" skeleton={<MeetingListLoading />} className="library-load">{!past.cards?.length ? <LibraryEmpty testId="past-empty" icon={<FileText size={28} aria-hidden="true" />} title={t('Your notes will show up here')} description={t('Your summary appears after you stop recording.')} retry={past.failed ? past.retry : undefined}><div ref={setEmptyActions} /></LibraryEmpty> : <PastNotes cards={past.cards ?? []} day={day} more={past.more} sentinel={past.setSentinel} onOpen={open} openFolder={openFolder} />}</LoadingContent>
     </div>

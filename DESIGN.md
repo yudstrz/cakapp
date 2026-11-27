@@ -1,43 +1,44 @@
-# Cakapp Design Direction — Editorial Paper & Ink
+# Cakapp Design Direction — Sapphire Blue & Emerald Slate
 
-> **Design Read:** Reading this as: desktop meeting & note-taking workspace for focused professionals, in an **Editorial Paper & Ink** style, dial `ENERGY 2 / RHYTHM 2 / MOTION 1`.
+> **Design Read:** Focused meeting workspace & web portal in a **Sapphire Blue & Emerald Slate** palette matching Cakapp's native brand icon (`#2563EB` C-arc + `#10B981` waveform bars), dial `ENERGY 2 / RHYTHM 2 / MOTION 1`.
 
 ## Core Identity & Purpose (antislop R-01, R-06, R-20, R-29, R-31)
 
-- **Why Editorial Paper & Ink?** Cakapp's job is reading, writing, and reviewing meeting notes and transcripts. Warm archival paper (light) and warm inkstone (dark) reduce eye strain compared to cold `#18191D`/`#2563EB` generic tech-gray, while giving notes the tactile feel of an editorial notebook.
-- **Why Top-Bar + Centered Canvas instead of 3-Column Shell?** Removing the permanent 208px left sidebar and permanent 270px right agenda rail eliminates the generic Electron/Slack clone look and gives meeting notes, transcripts, and Ask conversations an uninterrupted, focused reading surface.
-- **Why Terracotta Accent (`#B84A27` / `#DF744F`)?** One warm, grounded accent reserved strictly for the primary action (`Start recording`), active navigation state, live recording indicator, and keyboard focus rings. Zero blue-purple gradients, zero glow-everywhere.
-- **Why `Bricolage Grotesque` for Headings?** Bundled in `app/src/renderer/src/assets/bricolage-grotesque.ttf`; its expressive editorial character contrasts cleanly against system sans-serif body text used for long-form transcripts and UI controls.
+- **Why Blue Primary + Green Secondary?** Established brand colors: crisp **Sapphire Blue** (`#2563EB` / `#60A5FA`) drives primary actions (`Start recording`, `Unduh Cakapp Desktop`, active navigation & focus rings), while **Emerald Green** (`#047857` / `#10B981` / `#34D399`) carries audio waveform tracks, synced/verified badges, and live readiness states. Zero orange/terracotta, zero neon purple gradients.
+- **Why Elevated Slate Cards on Quiet Grounds?** Light (`#F6F8FB` bg / `#FFFFFF` card) and Dark (`#0B111A` bg / `#161F2E` card) keep distinct surface planes with crisp hairline borders (`#DCE3EE` / `#253247`) so workspaces feel structured rather than empty voids, while staying calm and readable.
+- **Why `Bricolage Grotesque` + `Plus Jakarta Sans`?** Expressive headings contrast cleanly against legible sans-serif body text for transcripts and notulen.
 
 ## Color Tokens
 
-### Light (Warm Archival Paper)
-- `--bg`: `#FAF7F2`
-- `--chrome`: `#F2EDE4`
-- `--card`: `#F4EFE6`
-- `--float`: `#FFFDF9`
-- `--ink`: `#1C1917`
-- `--written`: `#44403C`
-- `--muted`: `#6B655E`
-- `--line`: `#E5DFD3`
-- `--accent`: `#B84A27`
-- `--primary`: `#B84A27`
-- `--primary-ink`: `#FFFDF9`
+### Light (Crisp Daylight Slate)
+- `--bg`: `#F6F8FB`
+- `--chrome`: `#EDF2F8`
+- `--card`: `#FFFFFF`
+- `--float`: `#FFFFFF`
+- `--ink`: `#0F172A`
+- `--written`: `#334155`
+- `--muted`: `#475569`
+- `--line`: `#DCE3EE`
+- `--control-border`: `#64748B`
+- `--primary`: `#2563EB` (`--primary-ink`: `#FFFFFF`, ratio 5.17:1 AA)
+- `--accent`: `#1D4ED8` (`--accent-soft`: `#EBF2FE`)
+- `--secondary`: `#047857` (`--secondary-solid`: `#10B981`, `--secondary-soft`: `#ECFDF5`)
 
-### Dark (Warm Inkstone)
-- `--bg`: `#171513`
-- `--chrome`: `#1F1C19`
-- `--card`: `#23201C`
-- `--float`: `#2A2622`
-- `--ink`: `#F2ECE3`
-- `--written`: `#C9C1B6`
-- `--muted`: `#A39B91`
-- `--line`: `#36312B`
-- `--accent`: `#DF744F`
-- `--primary`: `#C85732`
-- `--primary-ink`: `#FFFDF9`
+### Dark (Deep Slate & Sapphire)
+- `--bg`: `#0B111A`
+- `--chrome`: `#111824`
+- `--card`: `#161F2E`
+- `--float`: `#1B2638`
+- `--ink`: `#F1F5F9`
+- `--written`: `#CBD5E1`
+- `--muted`: `#94A3B8`
+- `--line`: `#253247`
+- `--control-border`: `#556680`
+- `--primary`: `#2563EB` (`--primary-ink`: `#FFFFFF`, ratio 5.17:1 AA)
+- `--accent`: `#60A5FA` (`--accent-soft`: `#172554`)
+- `--secondary`: `#34D399` (`--secondary-solid`: `#10B981`, `--secondary-soft`: `#064E3B`)
 
 ## Dials
-- **ENERGY 2 (Balanced):** Distinct editorial masthead and warm terracotta primary CTA; calm, uncluttered reading surfaces.
-- **RHYTHM 2 (Consistent with deliberate breaks):** Top command bar + horizontal folder strip + hairline-divided meeting index; collapsible Agenda drawer on demand rather than a permanent column.
-- **MOTION 1 (Hover & crisp state transitions only):** No endless pulses or decorative floating animations.
+- **ENERGY 2 (Balanced):** Purposeful split hero with real product waveform/transcript preview; calm desktop cards with quick-action bar when meetings are few.
+- **RHYTHM 2 (Structured):** Distinct elevated surfaces + clear hierarchy; no crowded card mosaics.
+- **MOTION 1 (Crisp Transitions Only):** Instant state feedback without endless distracting animations.

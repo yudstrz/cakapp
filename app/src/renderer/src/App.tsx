@@ -201,7 +201,7 @@ export function App() {
     onResumeRequested={resumeRequested ? () => { setResumeRequested(false); rememberRoute(route) } : undefined}
     folderSuggestion={suggestedFolder ? { folder: suggestedFolder, dismiss: () => dismissFolderSuggestion(noteId) } : undefined} />
     : chatId !== undefined ? <ChatPage id={chatId} go={go} openSource={openSource} />
-    : trash ? <Trash open={open} /> : folderScreen || <Home open={open} openFolder={(id) => go(`/folder/${id}`)} agendaJump={agendaJump} />
+    : trash ? <Trash open={open} /> : folderScreen || <Home open={open} openFolder={(id) => go(`/folder/${id}`)} onSettings={() => go('/settings')} agendaJump={agendaJump} />
   const mac = window.yogurt.platform === 'darwin'
   const startupError = !setup && setupFailed
   const launching = mac && !startupError && (!booted || holding)

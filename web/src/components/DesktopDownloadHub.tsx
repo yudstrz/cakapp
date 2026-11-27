@@ -69,6 +69,12 @@ export default function DesktopDownloadHub({ compact = false }: { compact?: bool
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
               <span>Sistem terdeteksi:</span>
               <span className="font-semibold text-ink">{current.name}</span>
+              {current.availableBinary && (
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-secondary-soft px-2 py-0.5 text-[11px] font-semibold text-secondary">
+                  <span className="h-1.5 w-1.5 rounded-full bg-secondary-solid" aria-hidden="true" />
+                  Siap Diunduh
+                </span>
+              )}
             </div>
             <h2 className="font-display text-xl sm:text-2xl font-semibold text-ink">
               {current.fileLabel}
@@ -112,7 +118,7 @@ export default function DesktopDownloadHub({ compact = false }: { compact?: bool
                 onClick={() => setOs(item)}
                 className={`min-h-[44px] sm:min-h-[34px] rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
                   os === item
-                    ? 'bg-ink text-paper'
+                    ? 'bg-primary text-primary-ink border border-primary'
                     : 'border border-control bg-float text-ink hover:bg-chrome'
                 }`}
               >

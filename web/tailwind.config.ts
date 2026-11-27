@@ -19,10 +19,18 @@ export default {
         muted: 'var(--muted)',
         line: 'var(--line)',
         control: 'var(--control-border)',
-        accent: 'var(--accent)',
+        accent: {
+          DEFAULT: 'var(--accent)',
+          soft: 'var(--accent-soft)',
+        },
         primary: {
           DEFAULT: 'var(--primary)',
           ink: 'var(--primary-ink)',
+        },
+        secondary: {
+          DEFAULT: 'var(--secondary)',
+          soft: 'var(--secondary-soft)',
+          solid: 'var(--secondary-solid)',
         },
       },
       fontFamily: {
