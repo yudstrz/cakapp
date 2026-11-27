@@ -45,9 +45,9 @@ const OS_META: Record<
   linux: {
     name: 'Linux (x86_64 AppImage)',
     subtitle: 'PipeWire/ALSA native audio capture untuk Ubuntu 22.04+, siap unduh langsung sebagai AppImage.',
-    fileLabel: 'Cakapp-linux-x64.AppImage',
+    fileLabel: 'Cakapp-linux-x86_64.AppImage',
     availableBinary: true,
-    primaryUrl: 'https://github.com/yudstrz/cakapp/releases/latest/download/Cakapp-linux-x64.AppImage',
+    primaryUrl: 'https://github.com/yudstrz/cakapp/releases/latest/download/Cakapp-linux-x86_64.AppImage',
     primaryLabel: 'Unduh Cakapp untuk Linux (.AppImage)',
   },
 };
