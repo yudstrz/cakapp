@@ -19,8 +19,8 @@ export function buildWindowsUninstallPlan(
   return { uninstallerPath, args, shellCommand }
 }
 
-/** checking again while Cakapp stays open for days */
-const EVERY_MS = 4 * 60 * 60 * 1000
+/** checking once a day while Cakapp stays open for days */
+const EVERY_MS = 24 * 60 * 60 * 1000
 
 /**
  * Installed copies update themselves from GitHub Releases (latest-mac.yml, latest.yml for the Windows installer,

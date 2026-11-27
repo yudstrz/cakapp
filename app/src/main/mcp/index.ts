@@ -46,12 +46,14 @@ export async function hookMcp(d: {
   audio: (id: string) => Promise<Array<{ track: 'me' | 'them'; path: string }>>
   /** Settings is told when apps come and go */
   send: (clients: string[]) => void
+  /** Called when the last connected MCP client disconnects (#147) */
+  onEmpty?: () => void
 }) {
   const mcp = createMcp({ store: d.store, enabled: d.enabled, changesEnabled: d.changesEnabled, me: d.me, version: d.version, audio: d.audio, app: d.app, platform: process.platform })
   let server: Awaited<ReturnType<typeof serveMcp>> | undefined
   const address = mcpAddress(process.platform, d.profile, randomBytes(16).toString('hex'))
   try {
-    server = await serveMcp(address, mcp, d.send)
+    server = await serveMcp(address, mcp, d.send, d.onEmpty)
     if (process.platform === 'win32') writeWhole(join(d.profile, PIPE_FILE), address)
   } catch (e) { console.error('mcp: could not open its socket', e) }
   // what the helper starts when Cakapp is closed (Windows, Linux): recorded each launch, as an AppImage can move

@@ -269,6 +269,20 @@ export function Settings({ revision = 0, focus }: { revision?: number; focus?: s
                 }}><span className="settings-toggle-knob" /></button>
             </div>
             <NotesModel reveal={focus === 'notes-model'} />
+            <div className="settings-row">
+              <div className="settings-copy">
+                <label htmlFor="models-dir-pick" className="settings-label">{t('AI model storage')}</label>
+                <p id="models-dir-description" className="settings-description break-all">{prefs?.modelsDir ?? '…'}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {prefs?.customModelsDir && <button type="button" data-testid="models-dir-reset" disabled={general.busy} className="workspace-button settings-action" onClick={() => {
+                  void general.save(async () => { const next = await window.yogurt.settings.resetModelsDir(); setPrefs(p => p && { ...p, modelsDir: next, customModelsDir: undefined }) }, 'settings-models-dir-reset')
+                }}>{t('Default')}</button>}
+                <button id="models-dir-pick" type="button" data-testid="models-dir-pick" aria-describedby="models-dir-description" disabled={!prefs || general.busy} className="workspace-button settings-action" onClick={() => {
+                  void general.save(async () => { const next = await window.yogurt.settings.pickModelsDir(); if (next) setPrefs(p => p && { ...p, modelsDir: next, customModelsDir: next }) }, 'settings-models-dir-pick')
+                }}>{t('Choose folder')}</button>
+              </div>
+            </div>
           </LoadingContent></div>
 
           <h2 className="settings-section-heading">{t('What Cakapp can use')}</h2>

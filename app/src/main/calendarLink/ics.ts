@@ -14,8 +14,8 @@ export type RawEvent = {
   calendarId: string; calendar: string; calendarSource: string; me: string | null; declined?: boolean
 }
 
-/** at most this many occurrences of one event are walked, so a feed with a years-long daily event stays quick */
-const MAX_STEPS = 5000
+/** at most this many occurrences of one event are walked, so a feed with a years-long daily event reaches today cleanly (#146) */
+const MAX_STEPS = 50_000
 
 const parse = (text: string): ICAL.Component => {
   if (!/BEGIN:VCALENDAR/i.test(text)) throw new Error('Not a calendar')

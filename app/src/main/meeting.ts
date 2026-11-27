@@ -188,13 +188,14 @@ export function pauseMeetingClock(id: string, paused: boolean) {
   else if (!paused && clock.pausedAt !== null) { clock.pausedMs += Math.max(0, now - clock.pausedAt); clock.pausedAt = null }
 }
 
-export function stopMeeting(id: string): MeetingView | undefined {
+export function stopMeeting(id: string, reason = 'manual'): MeetingView | undefined {
   if (!store) return undefined
   const pending = pendingStops.get(id)
   if (pending) return { ...pending, stopSavePending: true }
   // Stopping live capture must never depend on a successful database read.
   const cur = active?.id === id ? active : store.meeting(id)
   if (!cur || cur.state !== 'recording') return cur
+  console.info(`MEETING stop id=${id} reason=${reason} app=${cur.app ?? 'none'}`)
   const endedAt = Date.now()
   const durationMs = active?.id === id && clock?.measured ? Math.max(0, clock.before + (clock.pausedAt ?? endedAt) - clock.startedAt - clock.pausedMs) : undefined
   const m: Meeting = { ...cur, state: 'stopped', endedAt, ...(durationMs == null ? {} : { durationMs }) }

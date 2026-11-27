@@ -192,6 +192,7 @@ export function Transcript({ id, notice, processing=false, replacing=false, reco
   // the mic's copy of the call (hidden as an echo) never shows
   const timeline = useMemo(() => echoRuns(withLive(allLines, liveSaid)).filter(run => !run.echo), [allLines, liveSaid])
   const lines = useMemo(() => echoRuns(allLines).filter(run => !run.echo).flatMap(run => run.lines), [allLines])
+  const echoSpans = useMemo(() => echoRuns(allLines).filter(run => run.echo).flatMap(run => run.lines.map(l => ({ startMs: l.startMs, ...(l.endMs !== undefined ? { endMs: l.endMs } : {}) }))), [allLines])
   const [finding, setFinding] = useState(false)
   // a long recording draws its latest lines; the earlier ones on request (recentRuns)
   const [showAll, setShowAll] = useState(false)
@@ -455,7 +456,7 @@ export function Transcript({ id, notice, processing=false, replacing=false, reco
           </button>
         )}
       </div>
-      {active && playable && <div ref={playbackDock} className="transcript-player-dock"><Player ref={player} id={id} tracks={tracks} openTranscript={drawn.runs.length ? () => {
+      {active && playable && <div ref={playbackDock} className="transcript-player-dock"><Player ref={player} id={id} tracks={tracks} echoSpans={echoSpans} openTranscript={drawn.runs.length ? () => {
         const row = rowOf(drawn.runs[0].k)
         visibility.current?.programmatic()
         row?.focus({ preventScroll: true })

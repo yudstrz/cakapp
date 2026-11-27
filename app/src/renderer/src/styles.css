@@ -666,6 +666,7 @@ input::selection, textarea::selection, .note-prose ::selection { background: var
 .note-record-action:hover:not(:disabled) { background:var(--control-hover); }
 .note-record-action:active:not(:disabled) { background:var(--control-pressed); }
 .note-record-action:disabled { opacity:.45; }
+.note-record-action[aria-pressed="true"] { background:color-mix(in oklch, var(--danger) 12%, var(--float));border-color:color-mix(in oklch, var(--danger) 45%, var(--line));color:var(--danger); }
 .note-record-action.primary { background:var(--primary);border-color:var(--primary);color:var(--primary-ink);box-shadow:var(--shadow-soft); }
 .note-record-action.primary:hover:not(:disabled) { background:var(--primary-hover); }
 .note-record-action.primary:active:not(:disabled) { box-shadow:none; }

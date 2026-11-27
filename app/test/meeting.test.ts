@@ -432,3 +432,16 @@ it('links an uploaded note to the event time and people while keeping its title 
   expect(store.meeting(imported.id)).toMatchObject({ source: 'audio-file', startedAt, durationMs, endedAt: startedAt + durationMs, eventId: invite.id, eventStartedAt: invite.start, eventEndedAt: invite.end, title: imported.title, titleSource: 'user', eventTitle: invite.title, attendees: invite.attendees })
   expect(store.notes(imported.id)).toMatchObject({ mine: 'Keep my notes.', enhanced: 'Keep this summary.' })
 })
+
+it('logs the stop reason when ending a recording (#127)', () => {
+  const info = vi.spyOn(console, 'info')
+  try {
+    const started = startMeeting({ title: 'Sync', event: null, app: 'Zoom' })
+    expect('id' in started).toBe(true)
+    if (!('id' in started)) return
+    stopMeeting(started.id, 'call-ended')
+    expect(info.mock.calls.some(([line]) => String(line).includes(`MEETING stop id=${started.id} reason=call-ended`))).toBe(true)
+  } finally {
+    info.mockRestore()
+  }
+})

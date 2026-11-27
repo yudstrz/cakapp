@@ -11,7 +11,7 @@ const MAX_LINE = 1024 * 1024
  * yogurt-mcp helper passes through). Only this Mac's user can open it. clients: the apps connected now, by the
  * name they gave (onClients hears every change, for Settings).
  */
-export async function serveMcp(path: string, mcp: Mcp, onClients: (names: string[]) => void) {
+export async function serveMcp(path: string, mcp: Mcp, onClients: (names: string[]) => void, onEmpty?: () => void) {
   const names = new Map<Socket, string>()
   const changed = () => { try { onClients([...names.values()]) } catch (e) { console.error('mcp: telling about clients failed', e) } }
   const server = createServer((sock) => {
@@ -41,7 +41,7 @@ export async function serveMcp(path: string, mcp: Mcp, onClients: (names: string
         }).catch((e) => console.error('mcp: answering failed', e))
       }
     })
-    const gone = () => { if (names.delete(sock)) changed() }
+    const gone = () => { if (names.delete(sock)) { changed(); if (names.size === 0) onEmpty?.() } }
     sock.on('close', gone)
     sock.on('error', gone)
   })

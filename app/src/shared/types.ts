@@ -12,6 +12,7 @@ export type CalendarLinkInfo = { id: string; name: string; host: string }
 import type { Access, PermissionKind, PermissionStatus } from '../main/permissions'
 import type { Capabilities } from './platform'
 export type { Access, PermissionKind, PermissionStatus }
+export type { HardwareCheckReport } from '../main/hardware'
 /** one first-run question: a permission, or open at login last */
 export type OnboardingStep = { kind: PermissionKind; status: Access }
 /** the first run: the intro screens (once), then one step per permission still open */
@@ -26,7 +27,7 @@ export type AuthUser = { id: string; email: string; name: string }
 export type AuthState = { configured: boolean; secureStorage: boolean; user: AuthUser | null; google?: boolean; webPortalUrl?: string }
 export type AuthResult = { ok: true; state: AuthState; message?: 'check-email' | 'browser-opened' } | { ok: false; error: string }
 /** The capture has stopped, but its final database state may still need an explicit retry. */
-export type MeetingView = Meeting & { stopSavePending?: true; paused?: true }
+export type MeetingView = Meeting & { stopSavePending?: true; paused?: true; micMuted?: true }
 export type FolderMeetingChoice = Pick<Meeting, 'id' | 'title' | 'startedAt'> & { inFolder: boolean }
 export type MeetingCard = StoredMeetingCard & { paused?: true }
 
@@ -161,6 +162,8 @@ export type CakappApi = {
     stop(id: string): void
     /** pauses or resumes this active recording without finishing the note */
     setPaused(id: string, paused: boolean): Promise<boolean>
+    /** mutes or unmutes only the microphone track while recording */
+    setMicMuted(id: string, muted: boolean): Promise<boolean>
     /** retries saving the original stop time without stopping or finalizing the capture again */
     retryStopSave(id: string): Promise<boolean>
     /** the person's own title (tidied; blank keeps the old one) */
@@ -327,7 +330,7 @@ export type CakappApi = {
     /** Windows and Linux: the calendar links connected (never their addresses) */
     links(): Promise<CalendarLinkInfo[]>
     /** connect a private calendar address; why not when it can't be */
-    addLink(url: string): Promise<{ ok: true; id: string; name: string } | { ok: false; error: 'bad-url' | 'unreachable' | 'not-calendar' | 'public-address' }>
+    addLink(url: string): Promise<{ ok: true; id: string; name: string } | { ok: false; error: 'bad-url' | 'unreachable' | 'not-calendar' | 'public-address' | 'too-big' }>
     removeLink(id: string): Promise<boolean>
   }
   /** what Cakapp may use: read it, ask for it (the Mac's own prompt), or open its pane of System Settings */
@@ -352,7 +355,7 @@ export type CakappApi = {
   }
   settings: {
     /** myName: what the person is called in meetings (their Mac's full name, macName, when they never changed it) */
-    get(): Promise<{ theme: Theme; openAtLogin: boolean; showInMenuBar: boolean; showNextMeeting: boolean; showRecordingPill: boolean; appVisibility: AppVisibility; /** the language picked; '' follows the Mac */ language: string; /** the language in use */ locale: string; /** the Mac's language, among Cakapp's */ systemLocale: string; myName: string; macName: string; accountProfile?: AuthUser; /** a recording stops by itself when its call ends (off: ask first) */ stopWhenCallEnds: boolean; recordingReminder: boolean; includeRecordingCredit: boolean; keepRecordings: boolean; cloudAudioUpload: boolean; /** personal jargon, spelled as typed */ jargon: string[]; /** the language people speak in meetings */ spoken: import('./spoken').Spoken; /** default summary language; '' follows the meeting */ summaryLanguage: string }>
+    get(): Promise<{ theme: Theme; openAtLogin: boolean; showInMenuBar: boolean; showNextMeeting: boolean; showRecordingPill: boolean; appVisibility: AppVisibility; /** the language picked; '' follows the Mac */ language: string; /** the language in use */ locale: string; /** the Mac's language, among Cakapp's */ systemLocale: string; myName: string; macName: string; accountProfile?: AuthUser; /** a recording stops by itself when its call ends (off: ask first) */ stopWhenCallEnds: boolean; recordingReminder: boolean; includeRecordingCredit: boolean; keepRecordings: boolean; cloudAudioUpload: boolean; /** personal jargon, spelled as typed */ jargon: string[]; /** the language people speak in meetings */ spoken: import('./spoken').Spoken; /** default summary language; '' follows the meeting */ summaryLanguage: string; modelsDir: string; customModelsDir?: string }>
     /** blank goes back to the Mac's full name */
     setName(name: string): Promise<void>
     setTheme(v: Theme): Promise<void>
@@ -375,6 +378,9 @@ export type CakappApi = {
     onLanguage(cb: (locale: string) => void): () => void
     /** English only or Multi-language: the meeting being recorded and the next ones */
     setSpoken(v: import('./spoken').Spoken): Promise<void>
+    /** Choose or reset a custom folder where downloaded AI models are stored (#88) */
+    pickModelsDir(): Promise<string | null>
+    resetModelsDir(): Promise<string>
   }
   /** finds meetings by date, title, attendees, folders, transcript and notes; nothing typed: the latest. folder: only the meetings in it */
   search: { query(q: string, folder?: string, people?: Person[]): Promise<SearchResult[]>; people(): Promise<Person[]> }

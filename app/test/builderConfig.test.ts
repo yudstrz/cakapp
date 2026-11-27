@@ -8,6 +8,8 @@ const config = readFileSync(join(__dirname, '../electron-builder.yml'), 'utf8').
 it('uninstalling on Windows never deletes the profile: it holds every meeting', () => {
   expect(config).toMatch(/^nsis:\n(?:  .*\n)*  deleteAppDataOnUninstall: false$/m)
   expect(config).not.toMatch(/deleteAppDataOnUninstall: true/)
+  expect(config).toContain('oneClick: false')
+  expect(config).toContain('allowToChangeInstallationDirectory: true')
 })
 
 it('Windows and Linux builds have fixed file names, like the Mac one', () => {

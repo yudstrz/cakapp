@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Hardware } from '@Cakapp/picker'
-import { MIN_CPU_CORES, tooSlow, tooWeak } from '../src/main/localCheck'
+import { MIN_CPU_CORES, needsDeferredLiveSpeech, tooSlow, tooWeak } from '../src/main/localCheck'
 
 const pc = (o: Partial<Hardware> = {}): Hardware => ({ os: 'win32', arch: 'x64', cpuModel: 'Intel Core i5-1135G7', totalRamGB: 16, freeDiskGB: 200, gpu: { kind: 'none', name: '', vramGB: 0 }, cores: 8, ...o })
 
@@ -13,8 +13,8 @@ describe('too weak to run everything here', () => {
   it('Windows and Linux: no notes model that runs well is the memory sentence', () => {
     expect(tooWeak(pc(), false)).toBe("Cakapp runs entirely on your computer, and this one isn't strong enough. It needs at least 8 GB of memory.")
   })
-  it('a processor alone with under 4 cores cannot transcribe two voices as they talk, so it says so plainly (never the cloud)', () => {
-    expect(tooWeak(pc({ cores: 2 }), true)).toBe("Cakapp runs entirely on your computer, and this one can't keep up with a meeting as it happens. It needs a processor with at least 4 cores, or graphics it can use.")
+  it('a processor alone with under 4 cores defers to post-meeting transcription instead of blocking setup', () => {
+    expect(tooWeak(pc({ cores: 2 }), true)).toBeNull()
     expect(tooWeak(pc({ cores: 4 }), true)).toBeNull()
     for (const kind of ['discrete', 'unified'] as const) expect(tooWeak(pc({ cores: 2, gpu: { kind, name: 'GPU', vramGB: 4 } }), true)).toBeNull()
     expect(tooWeak(pc({ cores: undefined }), true)).toBeNull()
@@ -30,5 +30,14 @@ describe('too slow, measured (Windows and Linux)', () => {
   })
   it('the core count stays a quick check before anything is measured', () => {
     expect(MIN_CPU_CORES).toBe(4)
+  })
+})
+
+describe('deferred live speech check', () => {
+  it('routes sub-4-core CPU laptops to record-first mode without failing setup', () => {
+    expect(needsDeferredLiveSpeech(pc({ cores: 2 }))).toBe(true)
+    expect(needsDeferredLiveSpeech(pc({ cores: 4 }))).toBe(false)
+    expect(needsDeferredLiveSpeech(pc({ cores: 2, gpu: { kind: 'discrete', name: 'GPU', vramGB: 4 } }))).toBe(false)
+    expect(needsDeferredLiveSpeech(pc({ os: 'darwin', cores: 2 }))).toBe(false)
   })
 })

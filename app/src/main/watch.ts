@@ -142,8 +142,9 @@ export class Watcher {
     const using = !m.app || onMic
     if (using) r.lastMic = now
     const silentMs = this.d.silentMs?.() ?? 0
-    if (!r.byHand && this.d.autoStop && this.d.autoStopOn?.() && callGone({ app: m.app, seen: r.seen, micIdleMs: now - r.lastMic, silentMs, graceMs: this.d.graceMs })) {
-      console.info(`CALL gone meeting=${m.id} app=${m.app} idle_ms=${now - r.lastMic} silent_ms=${silentMs}`)
+    const autoApp = m.app === 'Zoom' || m.app === 'Teams'
+    if ((!r.byHand || autoApp) && this.d.autoStop && this.d.autoStopOn?.() && callGone({ app: m.app, seen: r.seen, micIdleMs: now - r.lastMic, silentMs, graceMs: this.d.graceMs })) {
+      console.info(`CALL gone meeting=${m.id} app=${m.app} idle_ms=${now - r.lastMic} silent_ms=${silentMs} manual=${r.byHand}`)
       r.stopped = true
       if (this.shown === 'stop') { this.shown = null; this.d.hide() }
       this.d.autoStop(m)

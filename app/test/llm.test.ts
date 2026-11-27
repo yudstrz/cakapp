@@ -100,4 +100,8 @@ describe('too little room on the graphics card for the notes', () => {
     await expect(createLlm().load('fixture.gguf', 32768, 8192)).rejects.toThrow('bad file')
     expect(fake.loads).toEqual([undefined])
   })
+  it('generic VRAM/CUDA allocation errors also fall back to CPU (#165)', async () => {
+    fake.loadFails = 2; fake.contextError = () => new Error('CUDA out of memory allocating buffer')
+    expect(await createLlm().load('fixture.gguf', 32768, 8192)).toMatchObject({ gpu: false, gpuLayers: 0 })
+  })
 })

@@ -1,18 +1,26 @@
-import { mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { expect, it } from 'vitest'
+import { afterEach, expect, it } from 'vitest'
 import { logLine, writeLog } from '../src/main/log'
+
+const dirs: string[] = []
+afterEach(() => dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force: true })))
 
 it('a log line has the time, the level and the error with its stack', () => {
   const line = logLine('error', ['web search failed', new Error('connect ECONNREFUSED')], new Date('2026-10-22T20:00:00Z'))
   expect(line).toMatch(/^2026-10-22T20:00:00.000Z error web search failed Error: connect ECONNREFUSED\n\s+at /)
 })
 
-it('the log file never grows past its cap: the older half goes', () => {
-  const file = join(mkdtempSync(join(tmpdir(), 'Cakapp-log-')), 'main.log')
-  writeFileSync(file, 'x'.repeat(900))
-  writeLog(file, 'y'.repeat(200) + '\n', 1000)
-  expect(statSync(file).size).toBeLessThanOrEqual(1000)
-  expect(readFileSync(file, 'utf8').endsWith('y'.repeat(200) + '\n')).toBe(true)
+it('moves main.log to main.old.log when crossing maxBytes so morning logs stay intact', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'Cakapp-log-')); dirs.push(dir)
+  const file = join(dir, 'main.log')
+  const oldFile = join(dir, 'main.old.log')
+
+  writeFileSync(file, 'morning-entry-'.repeat(20))
+  writeLog(file, 'afternoon-entry\n', 100)
+
+  expect(existsSync(oldFile)).toBe(true)
+  expect(readFileSync(oldFile, 'utf8')).toContain('morning-entry-')
+  expect(readFileSync(file, 'utf8')).toBe('afternoon-entry\n')
 })

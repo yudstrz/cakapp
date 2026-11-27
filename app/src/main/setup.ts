@@ -5,10 +5,10 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { ChecksumError, DiskSpaceError, ensureFile, fileNameFor, isVerified, partialDownloadGB, type DownloadDeps } from './downloader'
 import type { SetupState } from '../shared/types'
 import { t } from '../shared/i18n'
-import { tooSlow, tooWeak } from './localCheck'
+import { tooWeak, needsDeferredLiveSpeech } from './localCheck'
 
 /** What the speed check found on one computer (speedKey): the model kept (null: none keeps up) and each one's time over the clip's length */
-export type SpeedResult = { key: string; model: string | null; rtf: Record<string, number | null>; at: number; /** whisper had to leave the graphics card while it was timed */ gpuOff?: boolean }
+export type SpeedResult = { key: string; model: string | null; rtf: Record<string, number | null>; at: number; /** whisper had to leave the graphics card while it was timed */ gpuOff?: boolean; /** too slow for live transcription: record first, transcribe after meeting ends */ recordOnly?: boolean }
 /** Windows and Linux: time a speech model on this computer (null: it ran out of time), and keep what was found */
 export type SpeedDeps = {
   measure(modelPath: string): Promise<{ rtf: number | null; gpuOff?: boolean }>
@@ -36,7 +36,7 @@ export type SetupDeps = {
 }
 
 /** Where the models ended up, for the parts of the app that use them; llm once the first notes model is in (after ready) */
-export type Installed = { asr: string; llm?: string; recommendedLlm?: string; /** meaning search across meetings; word search works without it */ embed?: string }
+export type Installed = { asr: string; llm?: string; recommendedLlm?: string; /** meaning search across meetings; word search works without it */ embed?: string; /** computer is too slow for live speech: record now and transcribe after meeting */ recordOnly?: boolean }
 
 /** the first notes model keeps being tried after ready: a minute, five, then every ten (a download picks up where it stopped) */
 const NOTES_RETRY_MS = [60_000, 5 * 60_000, 10 * 60_000]
@@ -258,17 +258,20 @@ export class SetupController {
       const e = catalog.embedding
       const embedItem: Item = { url: e.url, sha256: e.sha256, bytes: e.bytes, dir: dirs.embed, fileName: fileNameFor(e.url) }
 
-      // Windows and Linux: the speed check's stored pick for this computer, or the models it will time, best first
-      const speed = hw.os === 'darwin' ? undefined : this.deps.speed
+      // Windows and Linux: the speed check's stored pick for this computer, or the models it will time, best first.
+      // Computers too slow for live speech record first and transcribe after the meeting finishes.
+      const lowCores = needsDeferredLiveSpeech(hw)
+      const speed = hw.os === 'darwin' || lowCores ? undefined : this.deps.speed
       const key = speedKey(hw)
       const saved = speed && !this.recheck ? speed.load() : undefined
       this.recheck = false
       const known = saved?.key === key ? saved : undefined
       const candidates = speed ? asrCandidates(hw, catalog) : []
-      if (speed && (known?.model === null || !candidates.length)) return this.set({ phase: 'error', fraction: 0, message: tooSlow(hw.os) })
+      let recordOnly = lowCores || (!!speed && (known?.model === null || !candidates.length))
       const keep = known && candidates.find((a) => a.id === known.model)
+      const slowest = candidates.at(-1) ?? asr.model
 
-      const waitFor: Item[] = [asrItem(speed ? keep ?? candidates[0] : asr.model)]
+      const waitFor: Item[] = [asrItem(recordOnly ? slowest : speed ? keep ?? candidates[0] : asr.model)]
       const total = waitFor.reduce((n, i) => n + i.bytes, 0)
       // room for the first notes model too, so it never runs out of disk after ready
       await this.checkDisk([...waitFor, ...(hasUpgrade ? [] : [starterItem]), embedItem])
@@ -286,17 +289,13 @@ export class SetupController {
       // speech: if the first choice downloads corrupted twice, the smaller one takes its place
       const tried: string[] = []
       let asrPath: string | undefined
-      if (speed && keep) asrPath = await get(asrItem(keep))
+      if (recordOnly) asrPath = await get(asrItem(slowest))
+      else if (speed && keep) asrPath = await get(asrItem(keep))
       else if (speed) {
         const r = await this.timeSpeech(speed, candidates, get, asrItem)
+        recordOnly = !!r.result.recordOnly
         speed.save({ key, ...r.result, at: Date.now() })
-        if (!r.path) {
-          const fallback = candidates[0]
-          if (fallback) asrPath = await get(asrItem(fallback))
-          else return this.set({ phase: 'error', fraction: this._state.fraction, message: tooSlow(hw.os) })
-        } else {
-          asrPath = r.path
-        }
+        asrPath = r.path ?? (await get(asrItem(slowest)))
       }
       while (!asrPath) {
         try { asrPath = await get(asrItem(asr.model)) } catch (err) {
@@ -305,7 +304,7 @@ export class SetupController {
           asr = pickAsr(hw, catalog, { exclude: tried })
         }
       }
-      this.paths = { asr: asrPath }
+      this.paths = { asr: asrPath, ...(recordOnly ? { recordOnly: true } : {}) }
       if (hasUpgrade) {
         this.paths.recommendedLlm = join(bigger!.dir, bigger!.fileName)
         if (isVerified(starterItem.dir, starterItem.fileName, this.sha(starterItem))) this.paths.llm = join(starterItem.dir, starterItem.fileName)
@@ -344,10 +343,10 @@ export class SetupController {
       return t.rtf
     // small may lag a little behind live: base and tiny are very weak outside English (#107)
     }, { lagsOk: (m) => m.id.startsWith('whisper-small') })
-    const chosenModel = r.model ?? candidates[0]
+    const chosenModel = r.model ?? candidates.at(-1) ?? candidates[0]
     for (const [id, p] of paths) if (id !== chosenModel?.id) rmSync(p, { force: true })
     const chosenPath = (r.model && paths.get(r.model.id)) ?? (chosenModel ? paths.get(chosenModel.id) : undefined)
-    return { path: chosenPath, result: { model: chosenModel?.id ?? null, rtf: r.rtf, ...(gpuOff ? { gpuOff } : {}) } }
+    return { path: chosenPath, result: { model: r.model ? chosenModel?.id ?? null : null, rtf: r.rtf, ...(r.model ? {} : { recordOnly: true }), ...(gpuOff ? { gpuOff } : {}) } }
   }
 
   /**

@@ -563,3 +563,24 @@ it("reads the helper's speech-off frame (Apple's speech could not run) and passe
   await new Promise((r) => setTimeout(r, 10))
   expect(off).toBe(1)
 })
+
+it('setMuted zeros me PCM samples and mic level while leaving them untouched', async () => {
+  const f = fakeProc()
+  const c = new Capture(f.proc)
+  const frames: number[][] = []
+  const lvs: Array<{ me: number; them: number }> = []
+  c.on('pcm', (_track, _ms, samples) => frames.push(Array.from(samples)))
+  c.on('level', (lv) => lvs.push(lv))
+
+  expect(c.setMuted(true)).toBe(true)
+  expect(f.commands).toEqual(['mute'])
+
+  f.out.write(encodeFrame(pcm('me', 0, [0.5, -0.5])))
+  f.out.write(encodeFrame(pcm('them', 0, [0.5, -0.5])))
+  f.out.write(encodeFrame({ t: 'level', me: 0.8, them: 0.4 }))
+  await new Promise((r) => setTimeout(r, 10))
+
+  expect(frames[0]).toEqual([0, 0])
+  expect(frames[1]).toEqual([0.5, -0.5])
+  expect(lvs[0]).toEqual({ me: 0, them: 0.4 })
+})

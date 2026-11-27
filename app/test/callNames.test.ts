@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { openStore, type Meeting, type Store } from '../src/main/store'
 import { hookCallNames, watchIds, type WatchLine } from '../src/main/callNames'
-import { readCall, type AxNode } from '../src/main/callNames/parse'
+import { readCall, readCallDetail, type AxNode } from '../src/main/callNames/parse'
 
 const dirs: string[] = [], stores: Store[] = []
 afterEach(() => { stores.splice(0).forEach((s) => s.close()); dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force: true })) })
@@ -303,5 +303,42 @@ describe('hookCallNames', () => {
     for (let t = 1_000_000; t < 1_005_000; t += 500) p.emit(zoomLine(t, ['Alex Morgan', 'Dana Smith']))
     expect(p.hook.nameFor(p.m.id, 1000, 3000)).toBe('Dana Smith')
     await wait()
+  })
+
+  it('ignores Zoom caption elements so subtitles never enter the speaker list', () => {
+    const r = readCall('zoom', [{ id: 'zm.meeting.window.main', tree: { r: 'AXWindow', k: [
+      { r: 'AXGroup', d: 'Captions', k: [{ r: 'AXStaticText', v: 'Live transcript words', d: 'Closed captioning, Active speaker' }] },
+      { r: 'AXTabGroup', d: 'Dana Smith, Computer audio unmuted, Active speaker' },
+    ] } }])
+    expect(r.participants).toEqual(['Dana Smith'])
+    expect(r.speaking).toEqual(['Dana Smith'])
+  })
+
+  it('Google Meet keeps (You) identified while attributing other multi-speaker names (#112)', () => {
+    const meetTile = (name: string, classes: string[] = []): AxNode => {
+      let n: AxNode = { r: 'AXStaticText', v: name }
+      for (let i = 0; i < 6; i++) n = { r: 'AXGroup', k: [n] }
+      return { r: 'AXGroup', c: classes, k: [n] }
+    }
+    const r = readCall('meet', [{ title: 'Meet - Daily Sync', tree: { r: 'AXWindow', k: [
+      meetTile('Sam Rivera (You)', ['v5h6Xc']),
+      meetTile('Priya Nair', ['v5h6Xc']),
+    ] } }])
+    expect(r.me).toBe('Sam Rivera')
+    expect(r.participants).toContain('Priya Nair')
+    expect(r.speaking).toContain('Priya Nair')
+  })
+
+  it('Teams reads video tiles in English/German, tracks unmuted speakers, and avoids false 1:1 when callCount > 2 (#83)', () => {
+    const r = readCallDetail('teams', [{ title: 'Weekly Sync | Microsoft Teams', tree: { r: 'AXWindow', k: [
+      { r: 'AXGroup', t: 'Max Mustermann (Contoso)', d: 'Video, stummgeschaltet' },
+      { r: 'AXGroup', t: 'Erika Musterfrau', d: 'Video, Aktiviert, spricht' },
+      { r: 'AXGroup', t: 'Sam Rivera (You)', d: 'Video, stummgeschaltet' },
+      { r: 'AXStaticText', v: '+4' },
+    ] } }])
+    expect(r.me).toBe('Sam Rivera')
+    expect(r.participants).toEqual(expect.arrayContaining(['Max Mustermann (Contoso)', 'Erika Musterfrau', 'Sam Rivera']))
+    expect(r.unmuted).toEqual(['Erika Musterfrau'])
+    expect((r.callCount ?? 0)).toBeGreaterThan(2)
   })
 })

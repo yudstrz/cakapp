@@ -9,13 +9,12 @@ import { t } from '../shared/i18n'
  * before downloading anything. That is only a quick first look: the speed check (setup.ts) then times the speech models.
  */
 export const MIN_CPU_CORES = 4
-export function tooWeak(hw: Hardware, hasPick: boolean): string | null {
-  if (hasPick) {
-    if (hw.os !== 'darwin' && hw.gpu.kind === 'none' && hw.cores !== undefined && hw.cores < MIN_CPU_CORES)
-      return t("Cakapp runs entirely on your computer, and this one can't keep up with a meeting as it happens. It needs a processor with at least 4 cores, or graphics it can use.")
-    return null
-  }
-  return hw.os === 'darwin'
+export const needsDeferredLiveSpeech = (hw: Hardware): boolean =>
+  hw.os !== 'darwin' && hw.gpu.kind === 'none' && hw.cores !== undefined && hw.cores < MIN_CPU_CORES
+
+export function tooWeak(_hw: Hardware, hasPick: boolean): string | null {
+  if (hasPick) return null
+  return _hw.os === 'darwin'
     ? t('Cakapp needs a Mac with at least 8 GB of memory.')
     : t("Cakapp runs entirely on your computer, and this one isn't strong enough. It needs at least 8 GB of memory.")
 }

@@ -31,6 +31,7 @@ const ERRORS = {
   'unreachable': () => t('Cakapp couldn\'t reach that address. Check your connection and the address.'),
   'not-calendar': () => t('That address isn\'t a calendar. Copy the iCal address, not the page\'s address.'),
   'public-address': () => t('That\'s the public address, which only works if your calendar is public. Copy "Secret address in iCal format" instead.'),
+  'too-big': () => t('That calendar has too much history for Cakapp to read.'),
 }
 
 /** Shared validation and copy; setup keeps its primary Connect and Not now actions. */

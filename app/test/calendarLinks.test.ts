@@ -111,4 +111,8 @@ describe('calendar links (Windows and Linux): a private calendar address, kept o
     expect(r.links.status()).toBe('notDetermined')
     expect(await r.links.events(...day)).toEqual([])
   })
+  it('reports oversized multi-year calendar feeds with a clear too-big error (#146)', async () => {
+    const r = rig(() => { throw Object.assign(new Error('calendar too big'), { code: 'too-big' }) })
+    await expect(r.links.add('https://example.com/huge.ics')).resolves.toEqual({ ok: false, error: 'too-big' })
+  })
 })

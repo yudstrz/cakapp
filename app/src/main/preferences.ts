@@ -1,4 +1,5 @@
 import { BrowserWindow, ipcMain, nativeTheme } from 'electron'
+import { join } from 'node:path'
 import { includesRecordingCredit, loadSettings, localeOf, recordingReminderOn, spokenSetting, stopsWhenCallEnds, updateSettings, visibilityOf, summaryLanguageSetting } from './settings'
 import { systemLocale } from './locale'
 import { PERMISSION_KINDS, type PermissionKind, type Permissions } from './permissions'
@@ -29,7 +30,11 @@ export function hookPreferences(d: { file: string; permissions: Permissions; ask
   /** the permissions this computer has (supportedKinds in platform.ts); a Mac has them all */
   kinds?: readonly PermissionKind[]; os?: string
   /** Windows and Linux: whether a calendar link is connected (the first run asks for one while none is) */
-  calendarLinked?: () => boolean }) {
+  calendarLinked?: () => boolean
+  /** Default models folder path when no custom folder is configured (#88) */
+  defaultModelsDir?: string
+  /** Open native folder chooser and return selected path (#88) */
+  pickFolder?: (current: string) => Promise<string | null> }) {
   const kinds = d.kinds ?? PERMISSION_KINDS
   const os = d.os ?? process.platform
   let plan: Promise<OnboardingPlan> | undefined
@@ -54,15 +59,25 @@ export function hookPreferences(d: { file: string; permissions: Permissions; ask
   ipcMain.handle('permissions:status', () => d.permissions.status())
   ipcMain.handle('permissions:request', (_e, k: unknown) => (isKind(k) ? d.permissions.request(k) : 'unknown'))
   ipcMain.handle('permissions:open', (_e, k: unknown) => { if (isKind(k)) return d.permissions.openSettings(k) })
+  const defaultModels = d.defaultModelsDir ?? join(d.file, '..', 'models')
   const read = () => {
     const s = loadSettings(d.file)
     const visible = visibilityOf(s, os)
-    // what the Mac says, so a change in System Settings shows here
-    // locale: every window (main, card, widget) shows the interface language
-    // language: the one picked ('' is the Mac's); locale: the one in use; systemLocale: the Mac's, for the picker
-    return { theme: s.theme ?? 'system', openAtLogin: d.loginOn(s.openAtLogin), showInMenuBar: visible.showInMenuBar, showNextMeeting: s.showNextMeeting !== false, showRecordingPill: visible.showRecordingPill, appVisibility: !visible.showInMenuBar ? 'dock' : visible.showInDock ? 'both' : 'menu-bar', language: isLocale(s.language) ? s.language : '', locale: localeOf(s, systemLocale()), systemLocale: systemLocale(), myName: s.myName?.trim() || d.macName(), macName: d.macName(), accountProfile: s.accountProfile, stopWhenCallEnds: stopsWhenCallEnds(s), recordingReminder: recordingReminderOn(s), includeRecordingCredit: includesRecordingCredit(s), keepRecordings: s.keepRecordings !== false, cloudAudioUpload: s.cloudAudioUpload === true, jargon: cleanJargon(s.jargon), spoken: spokenSetting(s), summaryLanguage: summaryLanguageSetting(s) }
+    const customModelsDir = s.modelsDir?.trim() || undefined
+    return { theme: s.theme ?? 'system', openAtLogin: d.loginOn(s.openAtLogin), showInMenuBar: visible.showInMenuBar, showNextMeeting: s.showNextMeeting !== false, showRecordingPill: visible.showRecordingPill, appVisibility: !visible.showInMenuBar ? 'dock' : visible.showInDock ? 'both' : 'menu-bar', language: isLocale(s.language) ? s.language : '', locale: localeOf(s, systemLocale()), systemLocale: systemLocale(), myName: s.myName?.trim() || d.macName(), macName: d.macName(), accountProfile: s.accountProfile, stopWhenCallEnds: stopsWhenCallEnds(s), recordingReminder: recordingReminderOn(s), includeRecordingCredit: includesRecordingCredit(s), keepRecordings: s.keepRecordings !== false, cloudAudioUpload: s.cloudAudioUpload === true, jargon: cleanJargon(s.jargon), spoken: spokenSetting(s), summaryLanguage: summaryLanguageSetting(s), modelsDir: customModelsDir ?? defaultModels, ...(customModelsDir ? { customModelsDir } : {}) }
   }
   ipcMain.handle('settings:get', read)
+  ipcMain.handle('settings:pick-models-dir', async () => {
+    if (!d.pickFolder) return null
+    const picked = await d.pickFolder(read().modelsDir)
+    if (!picked) return null
+    updateSettings(d.file, { modelsDir: picked })
+    return picked
+  })
+  ipcMain.handle('settings:reset-models-dir', () => {
+    updateSettings(d.file, { modelsDir: undefined })
+    return defaultModels
+  })
   // what the person is called in meetings (who "You" is when naming voices); blank: the Mac's full name again
   ipcMain.handle('settings:name', (_e, v: unknown) => {
     if (typeof v !== 'string') return

@@ -116,7 +116,8 @@ win:
       arch: [x64]
   icon: build/icon.png
 nsis:
-  oneClick: true
+  oneClick: false
+  allowToChangeInstallationDirectory: true
   # carries on when an update's old uninstaller fails (#126)
   include: build/installer.nsh
   perMachine: false

@@ -36,6 +36,8 @@ function evaluate(hw: Hardware, model: CatalogModel, build: CatalogBuild): Choic
   let best: Choice | null = null
   for (const pool of pools(hw)) {
     const kv = (c: number) => (KV_GB_PER_1K * c) / 1024
+    // Skip 14 GB+ builds purely on CPU/system memory off a Mac: painfully slow when no GPU fits (#32).
+    if (hw.os !== 'darwin' && pool.device === 'cpu' && build.sizeGB >= 14) continue
     const ctx = CONTEXTS.find((c) => c <= model.contextMax && build.sizeGB + kv(c) + OVERHEAD_GB <= pool.memGB)
     if (!ctx) continue
     const bytesPerToken = build.sizeGB * (build.activeParamsB / build.paramsB)

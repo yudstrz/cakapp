@@ -6,6 +6,10 @@ import { engineThreads } from './threads'
 import { availableParallelism } from 'node:os'
 import type { EngineMessage } from '../shared/engine-protocol'
 
+export const isOom = (e: unknown): boolean =>
+  e instanceof InsufficientMemoryError ||
+  (e instanceof Error && /out of memory|insufficient memory|failed to allocate|vram|vk.*(?:out of|alloc)/i.test(e.message))
+
 const toHistory = (messages: EngineMessage[]): ChatHistoryItem[] =>
   messages.map((m) => (m.role === 'system' ? { type: 'system', text: m.content } : m.role === 'user' ? { type: 'user', text: m.content } : { type: 'model', response: [m.content] }))
 
@@ -87,8 +91,8 @@ export function createLlm() {
           continue
         }
         try { context = await model.createContext({ contextSize: size, ...threads(used) }); break } catch (e) {
-          if (!(e instanceof InsufficientMemoryError) || last) throw e
-          console.warn('the notes did not fit next to the model; loading it again with fewer layers on the graphics', e.message)
+          if (!isOom(e) || last) throw e
+          console.warn('the notes did not fit next to the model; loading it again with fewer layers on the graphics', (e as Error).message)
           await model.dispose(); model = undefined
         }
       }

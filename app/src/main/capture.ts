@@ -121,6 +121,7 @@ export interface Capture {
 export class Capture extends EventEmitter {
   private stopping = false
   private exited = false
+  private micMuted = false
   private done: Promise<void>
   private end: number
 
@@ -131,8 +132,12 @@ export class Capture extends EventEmitter {
     const parser = new FrameParser()
     proc.stdout.on('data', (d: Buffer) => {
       for (const f of parser.push(d)) {
-        if (f.t === 'pcm') { this.end = Math.max(this.end, f.ms + f.samples.length / 16); this.emit('pcm', f.track, f.ms, f.samples) }
-        else if (f.t === 'level') this.emit('level', { me: f.me, them: f.them })
+        if (f.t === 'pcm') {
+          this.end = Math.max(this.end, f.ms + f.samples.length / 16)
+          const samples = this.micMuted && f.track === 'me' ? new Float32Array(f.samples.length) : f.samples
+          this.emit('pcm', f.track, f.ms, samples)
+        }
+        else if (f.t === 'level') this.emit('level', { me: this.micMuted ? 0 : f.me, them: f.them })
         else if (f.t === 'speech') this.emit('speech', f)
         else if (f.t === 'speech-off') this.emit('speech-off')
         else if (f.t === 'speech-ready') this.emit('speech-ready', f.tracks)
@@ -161,6 +166,8 @@ export class Capture extends EventEmitter {
   }
   pause() { return !this.stopping && this.send('pause') }
   resume() { return !this.stopping && this.send('resume') }
+  /** mutes or unmutes microphone capture locally without pausing the meeting */
+  setMuted(muted: boolean) { this.micMuted = muted; return !this.stopping && this.send(muted ? 'mute' : 'unmute') }
   /** records from this mic from now on (null: Auto), without stopping */
   setMic(uid: string | null) { return !this.stopping && this.send(uid ? `mic ${uid}` : 'mic auto') }
 
@@ -247,6 +254,7 @@ export type RecordingEvent =
   | { t: 'hiccup' }
   | { t: 'gave-up' }
   | { t: 'paused'; meetingId: string; paused: boolean; at: number }
+  | { t: 'mic-muted'; meetingId: string; muted: boolean }
 const recordingListeners: Array<(e: RecordingEvent) => void> = []
 export const onRecordingEvent = (fn: (e: RecordingEvent) => void) => { recordingListeners.push(fn); return () => { const i = recordingListeners.indexOf(fn); if (i >= 0) recordingListeners.splice(i, 1) } }
 export const tell = (e: RecordingEvent) => { for (const fn of [...recordingListeners]) { try { fn(e) } catch (err) { console.error('recording listener failed', err) } } }
@@ -258,8 +266,18 @@ export const onCaptureStart = (fn: (c: Capture, meetingId: string) => void) => {
  * The meeting being recorded: its folder, how many restarts it has had (each restart is a part), and its "files are
  * final" promise, made when it starts so a hook that runs before ours on Stop still waits for the recorder
  */
-let session: { id: string; dir: string; parts: number; paused: boolean; startedAt: number; restart?: () => void; join: (dir: string) => Promise<void>; settled: Promise<void>; settle: () => void } | null = null
+let session: { id: string; dir: string; parts: number; paused: boolean; micMuted: boolean; startedAt: number; restart?: () => void; join: (dir: string) => Promise<void>; settled: Promise<void>; settle: () => void } | null = null
 export const recordingPaused = (id: string): boolean => session?.id === id && session.paused
+export const recordingMicMuted = (id: string): boolean => session?.id === id && session.micMuted
+/** Mute or unmute only the microphone track while keeping system audio and meeting time running. */
+export function setRecordingMicMuted(id: string, muted: boolean): boolean {
+  if (!session || session.id !== id || !active) return false
+  if (session.micMuted === muted) return true
+  session.micMuted = muted
+  active.setMuted(muted)
+  tell({ t: 'mic-muted', meetingId: id, muted })
+  return true
+}
 /** Pause the current helper without ending its files, transcript session or meeting. */
 export function setRecordingPaused(id: string, paused: boolean): boolean {
   if (!session || session.id !== id || !active) return false
@@ -343,7 +361,7 @@ export function hookCapture(p: {
   onStart: (fn: (m: Pick<RecordingStart, 'id' | 'resume'>) => void) => unknown
   onStop: (fn: (m: { id: string }) => void) => unknown
   /** ends the meeting when recording can't go on */
-  stopMeeting: (id: string) => void
+  stopMeeting: (id: string, reason?: string) => void
   /** the locale Apple's live speech listens in for this meeting, null for whisper only */
   speech?: (meetingId: string) => string | null
   /** the mic the person chose (null: Auto), read at each start so a restart keeps a switch made meanwhile */
@@ -358,7 +376,7 @@ export function hookCapture(p: {
     const dir = p.dirOf(m.id)
     let settle!: () => void
     const settled: Promise<void> = new Promise<void>((r) => { settle = r }).finally(() => { inFlight.delete(settled); if (finished.get(m.id) === settled) finished.delete(m.id) })
-    const s: NonNullable<typeof session> = session = { id: m.id, dir, parts: m.resume?.part ?? 0, paused: false, startedAt: Date.now() - (m.resume?.startMs ?? 0), join: p.join ?? joinParts, settled, settle }
+    const s: NonNullable<typeof session> = session = { id: m.id, dir, parts: m.resume?.part ?? 0, paused: false, micMuted: false, startedAt: Date.now() - (m.resume?.startMs ?? 0), join: p.join ?? joinParts, settled, settle }
     finished.set(m.id, settled)
     const speech = p.speech?.(m.id) ?? null
     const micOpt = () => { const mic = p.mic?.() ?? null; return mic ? { mic } : {} }
@@ -374,7 +392,7 @@ export function hookCapture(p: {
         else restart()
       },
       hiccup: () => tell({ t: 'hiccup' }),
-      giveUp: () => { tell({ t: 'gave-up' }); void finish(); p.stopMeeting(m.id) },
+      giveUp: () => { tell({ t: 'gave-up' }); void finish(); p.stopMeeting(m.id, 'capture-gave-up') },
     })
     // how loud each side got, once a minute in main.log (levelLog.ts)
     const levels = createLevelLog()
@@ -383,7 +401,7 @@ export function hookCapture(p: {
       c.on('warn', (code) => { console.warn('capture warning', code); tell({ t: 'warn', code }) })
       c.on('level', (lv) => {
         tell({ t: 'level', me: s.paused ? 0 : lv.me, them: s.paused ? 0 : lv.them })
-        const line = s.paused ? undefined : levels(lv, Date.now())
+        const line = s.paused ? undefined : levels(s.micMuted ? { me: 0, them: lv.them } : lv, Date.now())
         if (line) console.info(line)
       })
       c.on('ended', (e) => {

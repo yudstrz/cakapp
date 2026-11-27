@@ -20,7 +20,7 @@ import { resumesNote } from '../shared/agendaNote'
 import { relaunchOptions, stripAppImageEnv } from './relaunch'
 import { capabilities, micListHelper, platformOf, supportedKinds } from '../shared/platform'
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, protocol, safeStorage, screen, shell } from 'electron'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import { basename, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -58,7 +58,7 @@ import { deleteMeeting } from './deleteMeeting'
 import { emptyTrash, moveToTrash, purgeTrash } from './trash'
 import { isId, text, rewriteNote } from './ipcArgs'
 import { hookMics } from './mics'
-import { activeCapture, audioHelperPath, hookCapture, joinParts, onCaptureStart, onRecordingEvent, prepareAppend, recordingFinished, recordingPaused, recordingSettled, rejoinInterrupted, setRecordingPaused, settleRecording, tell, type WarnCode } from './capture'
+import { activeCapture, audioHelperPath, hookCapture, joinParts, onCaptureStart, onRecordingEvent, prepareAppend, recordingBusy, recordingFinished, recordingMicMuted, recordingPaused, recordingSettled, rejoinInterrupted, setRecordingMicMuted, setRecordingPaused, settleRecording, tell, type WarnCode } from './capture'
 import { createWidget } from './widget'
 import { liveSilentMs, hookTranscription, transcribeRecorded, onWhisperGpuOff, meetingLanguage, settleTranscription, speechLocaleFor, spokenChanged, transcriptionBacklogMs, stopTranscriptionServer, releaseIdleSpeech, transcriptFinished, transcriptOpen, transcriptPartials } from './asr'
 import { hookCallNames, type Watch } from './callNames'
@@ -90,7 +90,7 @@ import { hookShare } from './share'
 import { hookBackup } from './backupIpc'
 import { hookFolders } from './foldersIpc'
 import { hookMcp } from './mcp'
-import { startedHidden } from './mcp/paths'
+import { LAUNCH_FILE, startedHidden } from './mcp/paths'
 import { deleteRecording } from './deleteRecording'
 import { SyncEngine } from './syncEngine'
 import { AUDIO_SCHEME, audioExts, createAudioHandler, trackFile, type AudioExt } from './audio'
@@ -130,11 +130,16 @@ else if (!app.requestSingleInstanceLock()) app.quit()
 let win: BrowserWindow | undefined
 setupBetterAuthMain(() => win)
 let allowQuit = false
+let mcpQuiet = false
+let mcpAutoQuit = false
+let relaunching = false
+let wakeDetection = () => {}
 let presentMain = (_foreground = false) => {}
 let updateMainMenu = () => {}
 let menuBar: ReturnType<typeof createTray> | undefined
 /** test runs: no window on screen, never takes focus from what the person is doing */
 const BACKGROUND = process.env.YOGURT_BACKGROUND === '1'
+mcpQuiet = !BACKGROUND && startedHidden(process.platform, process.argv)
 // an AI app's yogurt-mcp starting Cakapp while it was still opening (--hidden) brings no window forward.
 // Also handles deep-link callbacks (com.cakapp.app://...) arriving via second-instance on Windows/Linux.
 app.on('second-instance', (_e, argv) => {
@@ -218,7 +223,7 @@ function createWindow() {
 /** Windows and Linux: what graphics the notes engine can use; null when it can't tell (or crashed checking: it then runs without them) */
 let probeGpu: () => Promise<GpuProbe | null> = async () => null
 function createSetup(): SetupController {
-  const modelsDir = join(userDataDir(), 'models')
+  const modelsDir = loadSettings(join(userDataDir(), 'settings.json')).modelsDir?.trim() || join(userDataDir(), 'models')
   return new SetupController({
     modelsDir,
     upgradePreference: {
@@ -273,6 +278,7 @@ const permissions = createPermissions({
 
 /** Reuse the hidden main window, including its route, scroll, drafts and position. */
 function showMain() {
+  if (mcpQuiet) { mcpQuiet = false; wakeDetection() }
   if (!win) { createWindow(); presented++ }
   presentMain(true)
 }
@@ -287,6 +293,7 @@ function askFromMenu() {
   win?.webContents.send('nav:ask')
 }
 function goTo(next: string, resume = false) {
+  if (mcpQuiet) { mcpQuiet = false; wakeDetection() }
   route = next
   resumeRequested = resume
   if (!win) createWindow()
@@ -361,7 +368,7 @@ function startDetection() {
     read: async (at) => (lastReading = await signals.read(at)), now, active: activeMeeting, bindApp: bindMeetingApp,
     offer: (p) => prompts.offer(p), askStop: (m) => prompts.askStop(m), hide: () => prompts.hide(),
     // the call ended: the same stop as the widget's Stop button, then say so
-    autoStop: (m) => { widget.callEnded(m.id); stopMeeting(m.id); prompts.stopped(m) },
+    autoStop: (m) => { widget.callEnded(m.id); stopMeeting(m.id, 'call-ended'); prompts.stopped(m) },
     silentMs: () => { if (isFake() && fakeSilence !== undefined) return fakeSilence; const m = activeMeeting(); return m ? liveSilentMs(m.id) : 0 },
     autoStopOn: () => stopsWhenCallEnds(loadSettings(join(userDataDir(), 'settings.json'))),
     // no "Take notes?" while onboarding is still on screen
@@ -373,7 +380,7 @@ function startDetection() {
   const prompts = createPrompts({
     windowVisible: () => !!win && win.isVisible() && !win.isMinimized(),
     takeNotes: (p) => begin({ title: p.title || t('{app} call', { app: p.app ?? '' }).trim(), event: p.event, app: p.app }),
-    stop: (id) => { stopMeeting(id) },
+    stop: (id) => { stopMeeting(id, 'prompt') },
     dismissed: (key) => watcher.dismiss(key),
     keepGoing: () => watcher.keepGoing(),
     dismissStop: () => watcher.dismissStop(),
@@ -387,7 +394,7 @@ function startDetection() {
     showRecordingPill: () => showRecordingPill,
     os: platform, windowOs: process.platform,
     open: (id) => goTo(`/note/${id}`),
-    stop: (id) => { stopMeeting(id) },
+    stop: (id) => { stopMeeting(id, 'widget') },
     foreground: () => !!win && !win.isDestroyed() && win.isVisible() && !win.isMinimized() && win.isFocused(),
   })
   onMeetingStart(() => { prompts.hide(); watcher.cleared() })
@@ -464,7 +471,7 @@ function startDetection() {
     }
   })
   // the note's own Stop button: the same stop as the widget and the menu bar
-  ipcMain.on('meetings:stop', (_e, id: unknown) => { if (isId(id) && activeMeeting()?.id === id) stopMeeting(id) })
+  ipcMain.on('meetings:stop', (_e, id: unknown) => { if (isId(id) && activeMeeting()?.id === id) stopMeeting(id, 'manual') })
   const pauseRecording = (id: unknown, paused: unknown) => {
     if (!isId(id) || typeof paused !== 'boolean' || activeMeeting()?.id !== id) return false
     const changed = setRecordingPaused(id, paused)
@@ -472,15 +479,21 @@ function startDetection() {
     return changed
   }
   ipcMain.handle('meetings:set-paused', (_e, id: unknown, paused: unknown) => pauseRecording(id, paused))
+  ipcMain.handle('meetings:set-mic-muted', (_e, id: unknown, muted: unknown) => {
+    if (!isId(id) || typeof muted !== 'boolean' || activeMeeting()?.id !== id) return false
+    const changed = setRecordingMicMuted(id, muted)
+    if (changed) win?.webContents.send('meetings:changed')
+    return changed
+  })
   recordingControls = { start: startNotes, pause: pauseRecording }
   ipcMain.handle('meetings:retry-stop-save', (_e, id: unknown) => isId(id) && retryStopSave(id))
   // the menu bar: open, new note or stop, quit; Cakapp stays there with its window closed
   const tray = createTray({
-    show: !BACKGROUND, visible: visibility.showInMenuBar, showNextMeeting: preferences.showNextMeeting,
+    show: !BACKGROUND, visible: !mcpQuiet && visibility.showInMenuBar, showNextMeeting: preferences.showNextMeeting,
     showRecordingPill: () => showRecordingPill,
     open: () => { presented++; showMain() },
     newNote: () => { if (!activeMeeting()) begin({ title: '', event: null, app: null }) },
-    stop: (id) => { stopMeeting(id) },
+    stop: (id) => { stopMeeting(id, 'tray') },
     pause: pauseRecording,
     ask: askFromMenu, settings: () => goTo('/settings'),
     openNote: (id) => { const note = storeRef?.meeting(id); if (note && note.trashedAt == null) goTo(`/note/${id}`) },
@@ -508,8 +521,16 @@ function startDetection() {
   }
   // cheap, and only while Cakapp runs; more often while recording, so the end of a quiet call is noticed promptly
   let timer: NodeJS.Timeout | undefined
-  const watchLoop = () => { timer = setTimeout(() => { void watcher.tick().catch((e) => console.error('detect failed', e)).finally(watchLoop) }, watchEveryMs(!!activeMeeting())) }
-  watchLoop()
+  const watchLoop = () => {
+    if (mcpQuiet) { timer = undefined; return }
+    timer = setTimeout(() => { void watcher.tick().catch((e) => console.error('detect failed', e)).finally(watchLoop) }, watchEveryMs(!!activeMeeting()))
+  }
+  wakeDetection = () => {
+    const vis = visibilityOf(loadSettings(join(userDataDir(), 'settings.json')), platform)
+    menuBar?.setVisible(vis.showInMenuBar)
+    if (!timer) watchLoop()
+  }
+  if (!mcpQuiet) watchLoop()
   app.on('will-quit', () => clearTimeout(timer))
   if (isFake()) {
     installFakeHooks({
@@ -595,10 +616,17 @@ app.whenReady().then(() => {
     setDockVisible: (on) => setDockVisible(on, win),
     loginOn: (saved) => (isFake() ? !!saved : loginItemOn(saved)),
     macName,
+    defaultModelsDir: join(userDataDir(), 'models'),
+    pickFolder: async (current) => {
+      const opts = { defaultPath: current, properties: ['openDirectory', 'createDirectory'] as ('openDirectory' | 'createDirectory')[] }
+      const res = win && !win.isDestroyed() ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+      return res.canceled || !res.filePaths[0] ? null : res.filePaths[0]
+    },
     // never mid-meeting: quitting would end the recording
     relaunch: () => {
       if (activeMeeting()) return false
       if (isFake()) { relaunched++; return true }
+      relaunching = true
       stripAppImageEnv()
       app.relaunch(relaunchOptions(process.platform, app.isPackaged, process.execPath, process.env.APPIMAGE)); app.quit()
       return true
@@ -682,6 +710,7 @@ app.whenReady().then(() => {
     warn: (code) => tell({ t: 'warn', code }), pidFile: join(userDataDir(), 'whisper-server.pid'),
     // whisper-server went down mid-meeting (#127): the rest is read from the saved recording once the transcript is settled
     queued: () => { void savedTranscriptions.pump() },
+    deferLive: () => !!setup.installed()?.recordOnly && aiKeyStore.getPublicConfig().sttMode !== 'cloud',
     // English only (the default) or Multi-language, read on each chunk so the footer's picker counts at once
     spoken: () => spokenSetting(loadSettings(settingsFile)),
     // Apple's on-device speech for the live words (macOS 26, Apple Silicon); fake mode has a stand-in when a test asks
@@ -718,7 +747,7 @@ app.whenReady().then(() => {
   hookCapture({ dirOf: (id) => join(userDataDir(), 'meetings', id), onStart: onMeetingStart, onStop: onMeetingStop, speech: (id) => speechLocaleFor(id),
     mic: () => loadSettings(settingsFile).mic ?? null,
     // recording that can't go on ends the meeting, with the notes kept
-    stopMeeting: (id) => { stopMeeting(id) } })
+    stopMeeting: (id, reason) => { stopMeeting(id, reason) } })
   // 32 GB and up: the notes model reads each meeting in as it happens (notes/readAhead.ts)
   const readsAhead = !isFake() && readAheadAllowed(os.totalmem())
   // the notes model: one job at a time, recording first; loaded when needed, the best one downloaded
@@ -963,6 +992,7 @@ app.whenReady().then(() => {
     beforeExport: () => { notes.retryDrafts(); return notes.pendingDraftId() } })
   // AI apps change things only through the functions behind the app's own buttons
   const noteSaved = (id: string, r: ReturnType<typeof notes.replace>) => { if (r === 'saved') win?.webContents.send('meetings:changed'); return r }
+  let mcpQuitTimer: NodeJS.Timeout | undefined
   void hookMcp({
     store, profile: userDataDir(), me, version: app.getVersion(),
     enabled: () => !!loadSettings(settingsFile).aiApps, setEnabled: (on) => { updateSettings(settingsFile, { aiApps: on || undefined }) },
@@ -987,7 +1017,7 @@ app.whenReady().then(() => {
       notesReady: () => !!setup.notesPath(),
       startRecording: (o) => recordingControls?.start(o) ?? Promise.resolve({ error: 'failed' as const }),
       pauseRecording: (id, paused) => recordingControls?.pause(id, paused) ?? false,
-      stopRecording: (id) => { if (activeMeeting()?.id !== id) return false; stopMeeting(id); return true },
+      stopRecording: (id) => { if (activeMeeting()?.id !== id) return false; stopMeeting(id, 'mcp'); return true },
       recording: () => activeMeeting(),
       setJargon: (terms) => preferences.setJargon(terms),
       setSpoken: (v) => preferences.setSpoken(v),
@@ -997,7 +1027,17 @@ app.whenReady().then(() => {
       await rejoined; await recordingSettled(id)
       return (['me', 'them'] as const).flatMap((track) => { const path = trackFile(meetingDir(id), track, audioKinds); return path ? [{ track, path }] : [] })
     },
-    send: (clients) => win?.webContents.send('mcp:clients', clients),
+    send: (clients) => {
+      if (clients.length > 0) clearTimeout(mcpQuitTimer)
+      win?.webContents.send('mcp:clients', clients)
+    },
+    onEmpty: () => {
+      if (!mcpQuiet || activeMeeting() || recordingBusy()) return
+      clearTimeout(mcpQuitTimer)
+      mcpQuitTimer = setTimeout(() => {
+        if (mcpQuiet && !activeMeeting() && !recordingBusy()) { mcpAutoQuit = true; app.quit() }
+      }, 1500)
+    },
   })
   // notes only for a meeting that exists: saving one for an unknown id would throw (its row must exist)
   const known = (id: unknown): id is string => isId(id) && !!store.meeting(id)
@@ -1096,10 +1136,13 @@ app.whenReady().then(() => {
       }
       // If final unload is vetoed, the resumed UI must describe the same stopped capture.
       const recording = activeMeeting()
-      if (recording) stopMeeting(recording.id)
+      if (recording) stopMeeting(recording.id, 'quit')
       // Music, recorder files and transcription still receive the same bounded graceful shutdown.
       await Promise.all([media.resume(), settleRecording().then(() => settleTranscription())])
       allowQuit = true
+      if (!mcpAutoQuit && !relaunching) {
+        try { rmSync(join(userDataDir(), LAUNCH_FILE), { force: true }) } catch {}
+      }
       finishQuit()
     })().catch((err) => console.error('quit was cancelled because saving or shutdown failed', err)).finally(() => {
       if (!allowQuit) resumeEditing()
@@ -1114,7 +1157,7 @@ app.whenReady().then(() => {
   ipcMain.handle('meetings:get', (_e, id: unknown) => {
     const m = isId(id) ? getMeeting(id) : undefined
     if (m) store.noteOpened(m.id)
-    return m && { ...m, ...(recordingPaused(m.id) ? { paused: true } : {}) }
+    return m && { ...m, ...(recordingPaused(m.id) ? { paused: true } : {}), ...(recordingMicMuted(m.id) ? { micMuted: true } : {}) }
   })
   // the person's own title for a note
   ipcMain.handle('meetings:rename', (_e, id: unknown, title: unknown) => { if (isId(id) && typeof title === 'string') renameMeeting(id, title) })
@@ -1205,7 +1248,7 @@ app.whenReady().then(() => {
     const limit = Math.max(1, Math.min(1000, Number(o?.limit) || 40))
     const b = o?.before
     return store.meetingCards({ limit, before: b && typeof b.at === 'number' && typeof b.id === 'string' ? b : undefined, ...(isId(o?.folder) ? { folder: o.folder } : {}) })
-      .map((m) => ({ ...withStopState(m), ...(recordingPaused(m.id) ? { paused: true } : {}) }))
+      .map((m) => ({ ...withStopState(m), ...(recordingPaused(m.id) ? { paused: true } : {}), ...(recordingMicMuted(m.id) ? { micMuted: true } : {}) }))
   })
   const calendarList = async () => {
     const list = await calendars(), settings = loadSettings(settingsFile), hidden = settings.hiddenCalendarIds ?? []

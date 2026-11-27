@@ -520,25 +520,23 @@ describe('the speed check (Windows and Linux): speech models timed on this compu
     expect(s.stored()?.model).toBe('whisper-small-q5_1')
   })
 
-  it("none keeps up: setup stops with the plain words, stores that, and says it again next time without timing; Try again times again", async () => {
+  it("none keeps up: installs lightest model in record-only deferred mode without blocking setup", async () => {
     for (const os of ['win32', 'linux'] as const) {
       const pc = { ...cpuPc, os }
       const s = speed({ 'whisper-small-q5_1': 2, 'whisper-base-q5_1': 1.1, 'whisper-tiny-q5_1': null })
       const first = setup({ getHardware: async () => pc, speed: s.deps })
-      await first.c.start()
-      expect(first.c.state).toMatchObject({ phase: 'error', message: tooSlow(os) })
-      expect(first.c.installed()).toBeUndefined()
+      await first.c.start(); await first.c.idle()
+      expect(first.c.state.phase).toBe('ready')
+      expect(first.c.installed()?.recordOnly).toBe(true)
+      expect(first.c.installed()?.asr).toContain('tiny')
       expect(s.stored()).toMatchObject({ model: null, rtf: { 'whisper-small-q5_1': 2, 'whisper-base-q5_1': 1.1, 'whisper-tiny-q5_1': null } })
       expect(s.timed).toHaveLength(3)
 
       const again = setup({ getHardware: async () => pc, speed: s.deps, modelsDir: first.root })
-      await again.c.start()
-      expect(again.c.state).toMatchObject({ phase: 'error', message: tooSlow(os) })
+      await again.c.start(); await again.c.idle()
+      expect(again.c.state.phase).toBe('ready')
+      expect(again.c.installed()?.recordOnly).toBe(true)
       expect(s.timed).toHaveLength(3)
-      expect(again.rec.asked).toEqual([])
-
-      await again.c.retry()
-      expect(s.timed).toHaveLength(6)
     }
   })
 
@@ -552,12 +550,13 @@ describe('the speed check (Windows and Linux): speech models timed on this compu
     expect(s.timed).toEqual(['whisper-base-q5_1'])
   })
 
-  it('the quick core count still stops a 2-core computer without graphics before anything downloads or is timed', async () => {
+  it('a 2-core computer without graphics skips live speed test and installs lightest model for post-meeting transcription', async () => {
     const s = speed({ 'whisper-small-q5_1': 0.1 })
     const { c, rec } = setup({ getHardware: async () => ({ ...cpuPc, cores: 2 }), speed: s.deps })
-    await c.start()
-    expect(c.state.phase).toBe('error')
-    expect(rec.asked).toEqual([])
+    await c.start(); await c.idle()
+    expect(c.state.phase).toBe('ready')
+    expect(c.installed()?.recordOnly).toBe(true)
+    expect(rec.asked).toHaveLength(3)
     expect(s.timed).toEqual([])
   })
 })

@@ -1,6 +1,5 @@
-import { InsufficientMemoryError } from 'node-llama-cpp'
 import { serial } from './serial'
-import type { createLlm } from './llm'
+import { isOom, type createLlm } from './llm'
 import type { EngineEvent, EngineRequest } from '../shared/engine-protocol'
 
 type Llm = Pick<ReturnType<typeof createLlm>, 'load' | 'unload' | 'count' | 'chat' | 'preload' | 'embed' | 'unloadEmbed' | 'probe'>
@@ -38,7 +37,7 @@ export function createHandler(llm: Llm, send: (e: EngineEvent) => void) {
       const result = req.type === 'abort' ? aborts.get(req.targetId)?.abort() : await run(() => handle(req))
       send({ id: req.id, type: 'result', data: result ?? null })
     } catch (err) {
-      send({ id: req.id, type: 'error', message: err instanceof Error ? err.message : String(err), code: err instanceof InsufficientMemoryError ? 'OOM' : undefined })
+      send({ id: req.id, type: 'error', message: err instanceof Error ? err.message : String(err), code: isOom(err) ? 'OOM' : undefined })
     } finally {
       if (req.type === 'chat' || req.type === 'preload') aborts.delete(req.id)
     }

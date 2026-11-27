@@ -104,12 +104,12 @@ export class UtilityEngine implements Engine {
       clearTimeout(p.timer)
       if (e.type === 'result' && p.model) this.loaded = true
       if (e.type === 'result') p.resolve(e.data)
-      else if (this.opts.gpuFallback && deviceLost(e.message)) {
-        // the card was reset under it: a fresh engine (on the processor, where that works) is the only way on
-        if (!this.opts.cpuCrashes) this.cpuOnly = true
-        console.warn(`notes engine: the graphics card was lost (${e.message}); starting it again${this.cpuOnly ? ' without the graphics card' : ''}`)
+      else if (this.opts.gpuFallback && (deviceLost(e.message) || (e.code === 'OOM' && !this.cpuOnly))) {
+        // the card was reset or ran out of VRAM under it (e.g. dual-GPU Windows laptop #165): retry on the processor
+        if (!this.opts.cpuCrashes || e.code === 'OOM') this.cpuOnly = true
+        console.warn(`notes engine: ${e.code === 'OOM' ? 'graphics out of memory' : `the graphics card was lost (${e.message})`}; starting it again${this.cpuOnly ? ' without the graphics card' : ''}`)
         this.pending.set(e.id, p)
-        this.drop(() => new GraphicsGaveUpError(`The graphics card was lost: ${e.message}`))
+        this.drop(() => new GraphicsGaveUpError(e.message))
       } else p.reject(e.code === 'OOM' ? new InsufficientMemoryError(e.message) : new Error(e.message))
     })
     proc.on('exit', (code: number) => {

@@ -91,8 +91,8 @@ export function spokenChanged() {
   const spoken = spokenNow()
   for (const s of sessions.values()) if (s.speech && !speechFits(spoken, s.speech)) speechOff(s, 'English only was picked')
 }
-/** segments and hideSegments: the echo sweep after the meeting (tests may leave them out) */
-type SessionStore = Pick<Store, 'updateMeeting'> & Partial<Pick<Store, 'segments' | 'hideSegments' | 'meeting'>>
+/** segments, deleteSegments and hideSegments: the echo sweep & dropped-chunk backfill (#156) */
+type SessionStore = Pick<Store, 'updateMeeting'> & Partial<Pick<Store, 'segments' | 'hideSegments' | 'deleteSegments' | 'meeting'>>
 
 let server: WhisperServer | undefined
 let serverKey: string | undefined
@@ -194,6 +194,8 @@ export function hookTranscription(p: {
   spoken?: () => Spoken
   /** a live transcript came out incomplete (whisper-server died, #127): its saved recording waits to be transcribed */
   queued?: (meetingId: string) => void
+  /** computer too slow for live ASR: skip live pipeline and queue post-meeting transcription from saved audio */
+  deferLive?: () => boolean
 }): () => void {
   idleMs = p.serverIdleMs ?? SERVER_IDLE_MS
   queuedListener = p.queued
@@ -223,7 +225,9 @@ export function hookTranscription(p: {
       if (locked && s.speech && speechDisagrees(s.speech, lang)) speechOff(s, `whisper heard ${lang}, not ${s.speech}`)
     }
     const promptOf = () => { const m = p.store.meeting?.(id); return m ? whisperPrompt(meetingWords(m)) : '' }
-    if (p.transcriber) { const f = p.transcriber; transcribe = async (c, o) => f(c, (l, n, locked) => hear(l, n, locked), o) }
+    const defer = !later && !!p.deferLive?.()
+    if (defer) transcribe = undefined
+    else if (p.transcriber) { const f = p.transcriber; transcribe = async (c, o) => f(c, (l, n, locked) => hear(l, n, locked), o) }
     // fake mode's stand-in is loaded only in fake mode, so it stays out of what real runs load
     else if (isFake()) transcribe = async (c, o) => (await import('./fake')).fakeTranscribe(c, o, promptOf(), whisperLanguage(spokenNow()))
     else {
@@ -330,8 +334,8 @@ export function hookTranscription(p: {
       }
     }
     const s: Session = {
-      complete: () => !!transcribe && !pendingBefore && !saveFailed && !warned.has('transcribe-failed') && !s.failed && !options?.signal?.aborted,
-      replacement: !!options?.save, liveEngine: !later && !!transcribe, store: p.store, refresh: p.refresh, speech: speechLocaleFor(id), priorLines: new Set(p.store.segments?.(id).map((s) => s.id) ?? []),
+      complete: () => !!transcribe && !pendingBefore && !saveFailed && !warned.has('transcribe-failed') && !s.failed && !options?.signal?.aborted && !(s.pipeline?.stats().dropped.length),
+      replacement: !!options?.save, liveEngine: !later && (!!transcribe || defer), store: p.store, refresh: p.refresh, speech: speechLocaleFor(id), priorLines: new Set(p.store.segments?.(id).map((s) => s.id) ?? []),
       pipeline: transcribe ? createPipeline({ meetingId: id, transcribe, save: (segs) => {
         try { if(options?.save) options.save(segs); else p.store.addSegments(segs) } catch (e) { saveFailed = true; throw e }
         if (segs.some(s => s.hidden)) p.refresh?.(id)
@@ -435,9 +439,17 @@ function finishSession(id: string, s: Session, audioDone: () => Promise<void> = 
   s.done ??= audioDone().then(() => s.pipeline?.finish()).then(() => {
     if (!s.replacement) sweepEcho(id, s)
     if (!s.replacement && s.complete?.()) s.store?.updateMeeting(id, { transcriptionPending: false })
-    // whisper-server went down partway (#127): the audio is all in the saved recording, so the rest is transcribed from
-    // there, from where the lines end. Queued (not left as is) because a meeting with some lines is otherwise never picked up.
-    else if (s.liveEngine) { s.store?.updateMeeting(id, { transcriptionState: 'queued' }); queued = true; console.warn('ASR the transcript is incomplete: the rest is transcribed from the saved recording') }
+    // whisper-server went down or chunks were dropped on a slow computer (#127, #156): trim from the earliest gap and finish from saved audio
+    else if (s.liveEngine) {
+      const dropped = s.pipeline?.stats().dropped ?? []
+      if (!s.replacement && dropped.length && s.store?.segments && s.store?.deleteSegments) {
+        const earliest = Math.min(...dropped.map(d => d.startMs))
+        const tailIds = s.store.segments(id, { hidden: true }).filter(x => !s.priorLines.has(x.id) && x.endMs > earliest).map(x => x.id)
+        if (tailIds.length) s.store.deleteSegments(tailIds)
+      }
+      s.store?.updateMeeting(id, { transcriptionState: 'queued' }); queued = true
+      console.warn('ASR the transcript is incomplete: the rest is transcribed from the saved recording')
+    }
   }).catch((e) => { s.failed = true; console.error('finishing the transcript failed', e) }).finally(() => {
     // the meeting's main language is kept with it, for notes written later (after a restart too)
     const lang = meetingLanguage(id)

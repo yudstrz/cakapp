@@ -107,6 +107,7 @@ const api: CakappApi = {
     resume: (id) => ipcRenderer.invoke('meetings:resume', id),
     stop: (id) => { ipcRenderer.send('meetings:stop', id) },
     setPaused: (id, paused) => ipcRenderer.invoke('meetings:set-paused', id, paused),
+    setMicMuted: (id, muted) => ipcRenderer.invoke('meetings:set-mic-muted', id, muted),
     retryStopSave: (id) => ipcRenderer.invoke('meetings:retry-stop-save', id),
     rename: (id, title) => ipcRenderer.invoke('meetings:rename', id, title),
     delete: (id) => ipcRenderer.invoke('meetings:delete', id),
@@ -298,6 +299,8 @@ const api: CakappApi = {
     setSummaryLanguage: (id) => ipcRenderer.invoke('settings:summary-language', id),
     onLanguage: (cb) => { const f = (_e: unknown, locale: string) => cb(locale); ipcRenderer.on('settings:language', f); return () => { ipcRenderer.off('settings:language', f) } },
     setSpoken: (v) => ipcRenderer.invoke('settings:spoken', v),
+    pickModelsDir: () => ipcRenderer.invoke('settings:pick-models-dir'),
+    resetModelsDir: () => ipcRenderer.invoke('settings:reset-models-dir'),
   },
   search: { query: (q, folder, people) => ipcRenderer.invoke('search:query', q, folder, people), people: () => ipcRenderer.invoke('search:people') },
   folders: {

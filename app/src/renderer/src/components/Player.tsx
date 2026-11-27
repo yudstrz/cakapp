@@ -23,9 +23,17 @@ const DRIFT_S = 0.08
  * `onTime` gets the spot while it plays and when it is moved (paused too, so the line stays marked where it stopped),
  * with `seek` for an explicit move, and null once the meeting or panel changes; `onPlaying` whether any side is playing.
  */
-type PlayerProps = { id: string; tracks: Track[]; openTranscript?: () => void; ref?: Ref<PlayerHandle>; onTime?: (ms: number | null, seek?: boolean) => void; onPlaying?: (on: boolean) => void; onBusy?: (on: boolean) => void }
+export type EchoSpan = { startMs: number; endMs?: number }
+const ECHO_PAD_MS = 180
+function echoAt(spans: EchoSpan[] | undefined, sec: number): boolean {
+  if (!spans?.length) return false
+  const ms = sec * 1000
+  return spans.some((s) => ms >= s.startMs - ECHO_PAD_MS && ms <= (s.endMs ?? s.startMs + 2500) + ECHO_PAD_MS)
+}
+
+type PlayerProps = { id: string; tracks: Track[]; echoSpans?: EchoSpan[]; openTranscript?: () => void; ref?: Ref<PlayerHandle>; onTime?: (ms: number | null, seek?: boolean) => void; onPlaying?: (on: boolean) => void; onBusy?: (on: boolean) => void }
 export function Player(props: PlayerProps) { return props.tracks.length ? <MeetingPlayer key={props.id} {...props} /> : null }
-function MeetingPlayer({ id, tracks, openTranscript, ref, onTime, onPlaying, onBusy }: PlayerProps) {
+function MeetingPlayer({ id, tracks, echoSpans, openTranscript, ref, onTime, onPlaying, onBusy }: PlayerProps) {
   const [confirm, setConfirm] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [deleted, setDeleted] = useState(false)
@@ -51,18 +59,27 @@ function MeetingPlayer({ id, tracks, openTranscript, ref, onTime, onPlaying, onB
   const touched = useRef(false)
   const rateRef = useRef(rate)
   rateRef.current = rate
+  const echoRef = useRef(echoSpans)
+  echoRef.current = echoSpans
 
   const all = () => shown.map((tr) => els.current[tr]).filter((a): a is HTMLAudioElement => !!a)
   const lenOf = (a: HTMLAudioElement) => (Number.isFinite(a.duration) ? a.duration : 0)
+  const hasThem = shown.includes('them')
+  const duckEcho = (sec: number) => {
+    const me = els.current.me
+    if (me) me.volume = hasThem && echoAt(echoRef.current, sec) ? 0.06 : 1
+  }
   /** the longest track sets the time; the other follows it */
   const lead = () => all().reduce<HTMLAudioElement | undefined>((a, b) => (!a || lenOf(b) > lenOf(a) ? b : a), undefined)
   const anyPlaying = () => all().some((a) => !a.paused)
   const start = (a: HTMLAudioElement) => {
     a.playbackRate = rateRef.current
+    duckEcho(a.currentTime)
     void a.play().catch((e: unknown) => { if ((e as Error)?.name !== 'AbortError') console.error('playing a track failed', e) })
   }
 
   const seek = (s: number) => {
+    duckEcho(s)
     const on = anyPlaying()
     for (const a of all()) {
       a.currentTime = Math.min(s, lenOf(a) || s)
@@ -90,6 +107,7 @@ function MeetingPlayer({ id, tracks, openTranscript, ref, onTime, onPlaying, onB
   useEffect(() => { if (pendingPlayFrom.current !== undefined) playFrom(pendingPlayFrom.current) }, [broken])
 
   useEffect(() => { for (const a of all()) a.playbackRate = rate }, [rate])
+  useEffect(() => { const l = lead(); if (l) duckEcho(l.currentTime) }, [echoSpans, hasThem])
   useEffect(() => { setBroken([]); setPlaying(false); setTime(0); setDuration(0); touched.current = false }, [id])
   // another meeting, or the panel closing: stop
   // React lets go of the elements (els) before this cleanup runs, and an audio let go keeps playing: pause every one it had
@@ -102,6 +120,7 @@ function MeetingPlayer({ id, tracks, openTranscript, ref, onTime, onPlaying, onB
     // A queued timeupdate can still carry the old clock during a seek. The requested position owns the UI until
     // the media element has settled; otherwise a drag briefly sends the thumb and transcript backwards.
     if (a !== lead() || a.seeking) return
+    duckEcho(a.currentTime)
     setTime(a.currentTime)
     if (touched.current) onTimeRef.current?.(a.currentTime * 1000)
     for (const b of all()) {

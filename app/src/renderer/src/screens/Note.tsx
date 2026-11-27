@@ -10,7 +10,7 @@ import { LoadingContent } from '../components/LoadingContent'
 import { motion, useReducedMotion } from '../motion'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useScrollMemory } from '../useScrollMemory'
-import { Lock, RotateCcw, Trash2, Mic, Pause, Play } from '../components/Icons'
+import { Lock, RotateCcw, Trash2, Mic, MicOff, Pause, Play } from '../components/Icons'
 import type { MeetingView, NoteSaveResult, NoteSide, NoteView, SetupState, WidgetView } from '../../../shared/types'
 import { t } from '../../../shared/i18n'
 import { osWords } from '../keys'
@@ -81,6 +81,7 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
   const [resumeFailed, setResumeFailed] = useState(false)
   const [pausing, setPausing] = useState(false)
   const [pauseFailed, setPauseFailed] = useState<'pause' | 'resume' | null>(null)
+  const [mutingMic, setMutingMic] = useState(false)
   const [notes, setNotes] = useState<NoteView>()
   const [hasTranscript, setHasTranscript] = useState(false)
   const [setup, setSetup] = useState<SetupState>()
@@ -169,6 +170,13 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
       else setM(await window.yogurt.meetings.get(id))
     } catch { setPauseFailed(paused ? 'pause' : 'resume') }
     finally { setPausing(false) }
+  }
+  const toggleMicMute = async () => {
+    const muted = !m?.micMuted
+    setMutingMic(true)
+    try {
+      if (await window.yogurt.meetings.setMicMuted(id, muted)) setM(await window.yogurt.meetings.get(id))
+    } finally { setMutingMic(false) }
   }
   useEffect(() => {
     if (!isRecording) { setRecorder(null); return }
@@ -393,6 +401,10 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
                 </>}
                 <div data-testid="note-state" data-state={m.state} data-paused={!!m.paused} className="note-recording-group" data-treatment={RECORDING_CONTROL_TREATMENT} data-recording={recording && !finishing} role="group" aria-label={recording ? m.paused ? t('Paused') : t('Recording') : t('Meeting controls')}>
                   {recording && !finishing && <>
+                    <RecordingAction data-testid="note-mute-mic" disabled={mutingMic} aria-pressed={!!m.micMuted} onClick={() => { void toggleMicMute() }}
+                      label={m.micMuted ? t('Unmute microphone') : t('Mute microphone')} className="note-record-action note-pause-action">
+                      <Swap show={m.micMuted ? 'off' : 'on'} options={{ on: <Mic className="flex-none" size={14} />, off: <MicOff className="flex-none" size={14} /> }} />
+                    </RecordingAction>
                     <RecordingAction data-testid="note-pause" disabled={pausing} onClick={() => { void togglePause() }}
                       label={m.paused ? t('Resume recording') : t('Pause recording')} className="note-record-action note-pause-action">
                       <Swap show={m.paused ? 'play' : 'pause'} options={{ pause: <Pause className="flex-none" size={14} fill="currentColor" strokeWidth={0} />, play: <Play className="flex-none" size={14} fill="currentColor" strokeWidth={0} /> }} />

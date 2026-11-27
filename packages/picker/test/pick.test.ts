@@ -142,4 +142,14 @@ describe('models only for some computers', () => {
     expect(ids(r)).not.toContain('gemma-4-26b-a4b-compact')
     expect(r.unavailable.map((u) => u.model.id)).not.toContain('gemma-4-26b-a4b-compact')
   })
+  it('skips 14 GB+ models when only non-Mac CPU fits (#32)', () => {
+    const largeCpuModel = {
+      ...models[0],
+      id: 'huge-notes',
+      name: 'Huge Notes 14B',
+      builds: [{ quant: 'Q4_K_M', sizeGB: 14.2, files: { model: { url: 'http://x', sha256: 'a', bytes: 1 } } }],
+    }
+    const r = pick({ ...machines.winLaptop8, totalRamGB: 32, freeDiskGB: 200 }, [largeCpuModel])
+    expect(r.all.map(c => c.model.id)).not.toContain('huge-notes')
+  })
 })

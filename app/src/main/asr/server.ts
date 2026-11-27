@@ -115,6 +115,12 @@ export function createWhisperServer(o: Opts) {
   let lastRelaunch = 0
   /** the program went away without being asked to */
   let died = false
+  /** the server is stopping intentionally (quit / idle), never treat its exit as GPU failure (#127) */
+  let killing = false
+  /** an optional companion Vulkan build tried before falling back to CPU when the primary NVIDIA/default binary fails to start (#32) */
+  let binary = o.binary
+  const vulkanBin = o.binary.replace(/(\.exe)?$/i, '-vulkan$1')
+  let triedVulkan = false
   /** a launch died before it answered, with gpuFallback: the graphics stay off from now on */
   let cpuOnly = false
   /** hangs on the graphics card (gpuFallback): the second one turns them off (#76) */
@@ -123,8 +129,9 @@ export function createWhisperServer(o: Opts) {
   const GPU_HANGS = 2
 
   const launch = async (): Promise<string> => {
-    if (!existsSync(o.binary)) {
-      throw new Error(`whisper-server executable not found at ${o.binary}`)
+    killing = false
+    if (!existsSync(binary)) {
+      throw new Error(`whisper-server executable not found at ${binary}`)
     }
     if (o.pidFile) { mkdirSync(dirname(o.pidFile), { recursive: true }); killStale(o.pidFile, o.lookup) }
     const port = await freePort()
@@ -135,7 +142,7 @@ export function createWhisperServer(o: Opts) {
     if (cpuOnly) args.push('-ng')
     // which model goes in the log too: a report of poor transcripts needs to know if a smaller model was picked (#107)
     console.info('ASR', `whisper-server starts with ${basename(o.model)} on ${cpuOnly ? 'the processor' : 'the graphics card if it can'}`)
-    const p = spawn(o.binary, args, { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true })
+    const p = spawn(binary, args, { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true })
     launches++
     child = p
     died = false
@@ -170,7 +177,13 @@ export function createWhisperServer(o: Opts) {
     let up: string
     try { up = await Promise.race([healthy, gone]) } catch (e) {
       healthy.catch(() => {})
-      if (o.gpuFallback && !cpuOnly && (p.exitCode !== null || p.signalCode !== null)) { cpuOnly = true; console.error('whisper-server stopped while loading; starting it again without the graphics card'); o.onGpuOff?.() }
+      if (!killing && o.gpuFallback && !cpuOnly && !triedVulkan && vulkanBin !== binary && existsSync(vulkanBin)) {
+        triedVulkan = true; binary = vulkanBin
+        console.warn('whisper-server failed to start; trying Vulkan build')
+        p.kill('SIGKILL')
+        return launch()
+      }
+      if (!killing && o.gpuFallback && !cpuOnly && (p.exitCode !== null || p.signalCode !== null)) { cpuOnly = true; console.error('whisper-server stopped while loading; starting it again without the graphics card'); o.onGpuOff?.() }
       p.kill('SIGKILL')
       throw e
     }
@@ -241,8 +254,9 @@ export function createWhisperServer(o: Opts) {
       try { return (await fetch(a + '/', { signal: AbortSignal.timeout(2000) })).ok } catch { return false }
     },
     /** hard stop, for quitting (no waiting) */
-    kill() { child?.kill('SIGKILL') },
+    kill() { killing = true; child?.kill('SIGKILL') },
     async stop(): Promise<void> {
+      killing = true
       await starting?.catch(() => {})
       const p = child
       child = null; address = null; died = false

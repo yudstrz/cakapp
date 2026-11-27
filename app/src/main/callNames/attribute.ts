@@ -13,6 +13,10 @@ export type CallSample = {
   participants: string[]
   /** the person using Cakapp, when the app says which one they are ("(me)", "You") */
   me: string | null
+  /** people shown with microphone unmuted when no explicit speaking indicator is present (#83) */
+  unmuted?: string[]
+  /** total participant count announced by the call UI when larger than rendered tiles (#83) */
+  callCount?: number
   /** false: the app could not be read at this moment (no window, no permission) */
   ok?: boolean
 }
@@ -39,13 +43,19 @@ function whoAt(s: CallSample, o: Opts): string | null {
   // A floating speaker tile can name someone before (or after) the roster refreshes. In that case this is not
   // evidence of a two-person call, so do not assign their speech to the one other roster entry.
   const speakerOutsideRoster = s.speaking.some((p) => !isMe(p, s, o) && !roster.has(norm(p)))
-  // one other person in the call: the call's sound can only be them, whoever the app marks
-  if (people.length === 2 && !speakerOutsideRoster) {
+  // one other person in the call: the call's sound can only be them, whoever the app marks.
+  // Never treat 2 visible video tiles in a larger call (callCount > 2) as 1:1 (#83).
+  if (people.length === 2 && !speakerOutsideRoster && !(s.callCount && s.callCount > 2)) {
     const mine = people.filter((p) => isMe(p, s, o))
     if (mine.length === 1) return people.find((p) => !isMe(p, s, o))!
   }
   const others = [...new Set(s.speaking.filter((p) => !isMe(p, s, o)))]
-  return others.length === 1 ? others[0] : null
+  if (others.length === 1) return others[0]
+  if (others.length === 0 && s.unmuted?.length) {
+    const unmutedOthers = [...new Set(s.unmuted.filter((p) => !isMe(p, s, o)))]
+    if (unmutedOthers.length === 1) return unmutedOthers[0]
+  }
+  return null
 }
 
 /** The name for a line of the other side spoken over [startMs, endMs], or null for Them */

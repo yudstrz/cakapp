@@ -9,7 +9,7 @@
 export type AxNode = { r: string; s?: string; d?: string; t?: string; v?: string; i?: string; c?: string[]; w?: number; h?: number; k?: AxNode[] }
 export type AxWindow = { title?: string; id?: string; tree: AxNode }
 export type CallKind = 'zoom' | 'teams' | 'meet' | 'webex'
-export type CallReading = { speaking: string[]; participants: string[]; me: string | null }
+export type CallReading = { speaking: string[]; participants: string[]; me: string | null; unmuted?: string[]; callCount?: number }
 
 // A role has two names: macOS Accessibility says AXTabGroup, AXStaticText, AXRow, AXOutline; AT-SPI (Linux) says
 // page tab, label/static/text, table row/list item, tree table/table/list. The rules below know both. Windows's helper
@@ -65,10 +65,20 @@ const tagsOf = (raw: string): string[] => {
   return out
 }
 
+const ZOOM_CAPTION_CONTAINER = /\b(?:closed )?captions?\b|\bsubtitles?\b|\blive transcript\b/i
+const isLikelyZoomName = (name: string): boolean => {
+  const words = name.split(/\s+/).filter(Boolean)
+  if (name.length < 2 || name.length > 60 || words.length > 5) return false
+  if (/\d|[?!…]|\.\./.test(name)) return false
+  // Zoom live captions read like sentences with lowercase words rather than display names
+  if (words.length >= 4 && words.filter((w) => /^\p{Ll}/u.test(w)).length >= 2) return false
+  return true
+}
+
 const cleanZoom = (raw: string): string | null => {
   let name = raw.normalize('NFKC').trim()
   while (ZOOM_TAGS.test(name)) name = name.replace(ZOOM_TAGS, '')
-  return name && !/^participants \(/i.test(name) ? name : null
+  return name && !/^participants \(/i.test(name) && isLikelyZoomName(name) ? name : null
 }
 
 /** "Ana Ruiz, Computer audio unmuted, Video off, Active speaker" → Ana Ruiz, talking; null when it isn't a tile */
@@ -121,8 +131,8 @@ function readZoom(windows: AxWindow[]): CallReading {
           if (tile) { participants.push(tile.name); linuxTiles.push(tile) }
         }
       }
-      // the floating window's "Talking: Name"; AT-SPI labels carry it as their name
-      if (STATIC_TEXT.has(n.r)) {
+      // the floating window's "Talking: Name"; AT-SPI labels carry it as their name; skip Zoom caption areas
+      if (STATIC_TEXT.has(n.r) && n.r !== 'caption' && !up.some((a) => ZOOM_CAPTION_CONTAINER.test(a.d ?? a.t ?? ''))) {
         for (const raw of [n.v, n.t]) {
           if (!raw) continue
           const v = raw.normalize('NFKC')
@@ -193,7 +203,7 @@ const isLive = (n: AxNode) => LIVE.has(n.r) || (!!n.s && LIVE.has(n.s))
 
 function readMeet(windows: AxWindow[], o: { talkingClasses?: string[] }): CallReading {
   const marks = new Set(o.talkingClasses ?? MEET_TALKING_CLASSES)
-  const groups = new Map<AxNode, string[]>()
+  const groups = new Map<AxNode, { names: string[]; hasMe: boolean }>()
   for (const w of windows) {
     if (w.title && !/\bMeet\b/.test(w.title)) continue
     const skip = new Set((w.title ?? '').split(/\s+[-–—]\s+/).map(low))
@@ -201,20 +211,22 @@ function readMeet(windows: AxWindow[], o: { talkingClasses?: string[] }): CallRe
       if (!STATIC_TEXT.has(n.r) || up.length < TILE_UP || up.some(isLive) || up.some((a) => !MEET_PAGE.has(a.r) && MEET_CHAT.test(a.d ?? a.t ?? ''))) return
       const text = n.v ?? n.t
       if (!text) return
+      const isSelfMark = /\((?:you|anda|me|moi|yo|io|eu|ik|jag|自分|我)\)/i.test(text)
       const name = meetName(text)
       if (!name || skip.has(low(name))) return
       const root = up[up.length - TILE_UP]
-      groups.set(root, [...(groups.get(root) ?? []), name])
+      const prev = groups.get(root) ?? { names: [], hasMe: false }
+      groups.set(root, { names: [...prev.names, name], hasMe: prev.hasMe || isSelfMark })
     })
   }
   const speaking: string[] = [], participants: string[] = []
   let me: string | null = null
-  for (const [root, names] of groups) {
-    const one = uniq(names)
+  for (const [root, entry] of groups) {
+    const one = uniq(entry.names)
     if (one.length !== 1) continue
     participants.push(one[0])
-    // Meet labels the person's own tile "You"
-    if (low(one[0]) === 'you') me = one[0]
+    // Meet labels the person's own tile "You" or appends "(You)" (#112)
+    if (entry.hasMe || low(one[0]) === 'you') me = one[0]
     let talking = false
     walk(root, (x) => { if (x.c?.some((c) => marks.has(c))) talking = true })
     if (talking) speaking.push(one[0])
@@ -231,20 +243,31 @@ function readMeet(windows: AxWindow[], o: { talkingClasses?: string[] }): CallRe
 // builds), and "(You)" after the person's own name. When the roster is closed and nobody is marked, only a call of two
 // can be named (attribute.ts).
 
-const TEAMS_SPEAKING = [/^(.{2,60}?)(?:,\s*|\s+is\s+)(?:speaking|talking)\b/i, /\b(?:active speaker|now speaking|speaking now)[:,]?\s+(.{2,60})$/i]
-/** the state Teams puts after a person in the roster; the role ("Organizer", "Presenter", ...) may sit between */
-const TEAMS_STATUS = /^(?:muted|unmuted|mic(?:rophone)? (?:on|off)|video (?:is )?(?:on|off)|camera (?:is )?(?:on|off))$/i
+const TEAMS_SPEAKING = [
+  /^(.{2,60}?)(?:,\s*|\s+is\s+|\s+are\s+)(?:speaking|talking)\b/i,
+  /\b(?:active speaker|now speaking|speaking now)[:,]?\s+(.{2,60})$/i,
+  /^(.{2,60}?)(?:,\s*|\s+)(?:spricht|redet|spricht gerade)\b/i,
+  /^(.{2,60}?)(?:,\s*|\s+)(?:sedang berbicara|berbicara)\b/i,
+]
+/** the state Teams puts after a person in the roster or video tile (English, German, and common locales, #83) */
+const TEAMS_STATUS = /^(?:muted|unmuted|mic(?:rophone)? (?:is )?(?:on|off)|stumm|stummgeschaltet|stummschaltung aufgehoben|mikrofon (?:ist )?(?:an|ein|aus|stumm)|aktiviert|sourdine|désactivé|silenciado)$/i
+const TEAMS_UNMUTED = /^(?:unmuted|mic(?:rophone)? (?:is )?on|stummschaltung aufgehoben|mikrofon (?:ist )?(?:an|ein)|aktiviert)$/i
+/** non-person tile labels Teams puts before status on video tiles (not the person's name) */
+const TEAMS_TILE_META = /^(?:video|camera|kamera|screen sharing|audio|avatar)$/i
 /** the roles Teams puts between the name and the state */
-const TEAMS_ROLE = /^(?:organizer|presenter|guest|external|co-?organizer|attendee|host|co-?host|interpreter)$/i
-const TEAMS_SAYS = /^(?:speaking|talking|active speaker|now speaking)$/i
-const TEAMS_ME = /^(.{2,60}?)\s*\((?:you|me)\)/i
-const cleanTeams = (s: string) => s.replace(/\s*\((?:organizer|presenter|guest|external|you|me)\)/gi, '').replace(/[,.:;]+$/, '').trim()
+const TEAMS_ROLE = /^(?:organizer|presenter|guest|external|co-?organizer|attendee|host|co-?host|interpreter|organisator|referent|gast|extern)$/i
+const TEAMS_SAYS = /^(?:speaking|talking|active speaker|now speaking|spricht|redet|spricht gerade|sedang berbicara)$/i
+const TEAMS_ME = /^(.{2,60}?)\s*\((?:you|me|sie|moi|yo|anda)\)/i
+const TEAMS_COUNT = /^(?:meeting )?(?:participants|attendees|people|in (?:this|the) meeting|teilnehmer)\s*[(（]\s*(\d+)\s*[)）]$|^\+\s*(\d+)$/i
+const cleanTeams = (s: string) => s.replace(/\s*\((?:organizer|presenter|guest|external|you|me|sie|moi|yo|anda|organisator|referent|gast|extern)\)/gi, '').replace(/[,.:;]+$/, '').trim()
 
 /** the roles a roster row has: the People panel's tree, or a table/list in another build */
 const TEAMS_ROW = new Set(['tree item', 'table row', 'list item', 'row', 'AXRow'])
 /** a list that can hold the roster; its name says whether it does */
 const TEAMS_LIST = new Set(['tree', 'tree table', 'table', 'list', 'list box', 'outline', 'AXOutline', 'AXTable'])
-const TEAMS_LIST_NAME = /^(?:meeting )?(?:participants|attendees|people|in (?:this|the) meeting)\b/i
+const TEAMS_LIST_NAME = /^(?:meeting )?(?:participants|attendees|people|in (?:this|the) meeting|teilnehmer)\b/i
+const TEAMS_TILE = new Set(['group', 'AXGroup', 'AXTabGroup'])
+const TEAMS_CHAT = /^(?:chat|messages?|calendar)$/i
 
 /** whether an element sits in the People panel: a row, inside a list named Participants/Attendees/People */
 function inTeamsRoster(n: AxNode, up: AxNode[]): boolean {
@@ -252,34 +275,78 @@ function inTeamsRoster(n: AxNode, up: AxNode[]): boolean {
   return up.some((a) => TEAMS_LIST.has(a.r) && TEAMS_LIST_NAME.test((a.d ?? a.t ?? '').trim()))
 }
 
-/** "Dana Smith, Organizer, Unmuted" → Dana Smith; "Smith, Dana, Organizer, Unmuted" → Smith, Dana */
-function teamsPersona(label: string): { name: string; speaking: boolean } | null {
-  const fields = label.normalize('NFKC').split(/\s*,\s*/)
-  const state = fields.findIndex((f) => TEAMS_STATUS.test(f))
+/** "Dana Smith, Organizer, Unmuted" -> Dana Smith; preserves company in parens like "Dana Smith (Contoso)" (#83) */
+function teamsPersona(label: string, tile = false): { name: string; speaking: boolean; unmuted: boolean; me: boolean } | null {
+  const fields = label.normalize('NFKC').split(/\s*,\s*/).map(f => f.trim()).filter(Boolean)
+  const hasMe = TEAMS_ME.test(fields[0] ?? '') || fields.some((f) => /^(?:you|me|sie|anda)$/i.test(f))
+  const state = fields.findIndex((f) => TEAMS_STATUS.test(f) || TEAMS_SAYS.test(f))
   if (state < 1) return null
-  const before = fields.slice(0, state)
+  if (tile && !fields.some((f) => TEAMS_STATUS.test(f) || TEAMS_TILE_META.test(f) || /^spricht/i.test(f))) return null
+  const before = fields.slice(0, state).filter((f) => !TEAMS_TILE_META.test(f))
   while (before.length > 1 && TEAMS_ROLE.test(before.at(-1)!)) before.pop()
   const name = cleanTeams(before.join(', '))
   if (name.length < 2 || name.length > 60) return null
-  return { name, speaking: fields.some((f) => TEAMS_SAYS.test(f)) }
+  const speaking = fields.some((f) => TEAMS_SAYS.test(f))
+  const unmuted = speaking || fields.some((f) => TEAMS_UNMUTED.test(f))
+  return { name, speaking, unmuted, me: hasMe }
 }
 
-function readTeams(windows: AxWindow[]): CallReading {
-  const speaking: string[] = [], participants: string[] = []
+function readTeams(windows: AxWindow[], withMeta = false): CallReading {
+  const speaking: string[] = [], participants: string[] = [], unmuted: string[] = []
   let me: string | null = null
+  let callCount: number | undefined
   for (const w of windows) {
     walk(w.tree, (n, up) => {
       const roster = inTeamsRoster(n, up)
-      for (const label of texts(n)) {
-        for (const re of TEAMS_SPEAKING) { const m = re.exec(label); if (m) { const name = cleanTeams(m[1]); if (name.length >= 2 && !/^(you|me)\b/i.test(name)) speaking.push(name) } }
-        const persona = roster ? teamsPersona(label) : null
-        if (persona) { participants.push(persona.name); if (persona.speaking) speaking.push(persona.name) }
-        const mine = roster ? TEAMS_ME.exec(label) : null
+      const inTile = TEAMS_TILE.has(n.r) && !up.some((a) => TEAMS_LIST.has(a.r) && TEAMS_CHAT.test((a.d ?? a.t ?? '').trim()))
+      // Windows Teams often puts display name in `t` and mute/video/speaking state in `d` or child image nodes
+      const extraLabels = inTile && n.t && n.d && n.t !== n.d ? [`${n.t}, ${n.d}`] : []
+      for (const label of [...texts(n), ...extraLabels]) {
+        const cm = TEAMS_COUNT.exec(label.normalize('NFKC').trim())
+        if (cm) {
+          const nCount = Number(cm[1] ?? cm[2])
+          callCount = Math.max(callCount ?? 0, cm[2] ? nCount + 1 : nCount)
+        }
+        for (const re of TEAMS_SPEAKING) {
+          const m = re.exec(label)
+          if (!m) continue
+          const parts = m[1].split(/\s*,\s*/).map((s) => s.trim()).filter((s) => s && !TEAMS_TILE_META.test(s) && !TEAMS_STATUS.test(s) && !TEAMS_ROLE.test(s))
+          const name = cleanTeams(parts.join(', '))
+          if (name.length >= 2 && !/^(you|me|sie|anda)\b/i.test(name)) { speaking.push(name); unmuted.push(name) }
+        }
+        const persona = roster ? teamsPersona(label, false) : inTile ? teamsPersona(label, true) : null
+        if (persona) {
+          participants.push(persona.name)
+          if (persona.speaking) speaking.push(persona.name)
+          if (persona.unmuted) unmuted.push(persona.name)
+          if (persona.me) me = persona.name
+        }
+        const mine = (roster || inTile) ? TEAMS_ME.exec(label) : null
         if (mine) { me = cleanTeams(mine[1]); participants.push(me) }
+      }
+      if (inTile && n.k?.length) {
+        const tileText = texts(n).map(cleanTeams).find((s) => s.length >= 2 && !TEAMS_STATUS.test(s) && !TEAMS_SAYS.test(s) && !TEAMS_TILE_META.test(s) && !s.includes(','))
+        if (tileText) {
+          const hints = n.k.flatMap(texts).join(', ').normalize('NFKC')
+          const combined = hints ? teamsPersona(`${tileText}, ${hints}`, true) : null
+          if (combined) {
+            participants.push(combined.name)
+            if (combined.speaking) speaking.push(combined.name)
+            if (combined.unmuted) unmuted.push(combined.name)
+            if (combined.me) me = combined.name
+          }
+        }
       }
     })
   }
-  return { speaking: uniq(speaking), participants: uniq(participants.filter((p) => p.length >= 2)), me }
+  const uniqUnmuted = uniq(unmuted)
+  return {
+    speaking: uniq(speaking),
+    participants: uniq(participants.filter((p) => p.length >= 2)),
+    me,
+    ...(withMeta && uniqUnmuted.length ? { unmuted: uniqUnmuted } : {}),
+    ...(withMeta && callCount !== undefined ? { callCount } : {}),
+  }
 }
 
 // ---- Webex desktop app ----
@@ -329,6 +396,10 @@ function readWebex(windows: AxWindow[]): CallReading {
 /** What the call app shows right now */
 export function readCall(kind: CallKind, windows: AxWindow[], o: { talkingClasses?: string[] } = {}): CallReading {
   return kind === 'zoom' ? readZoom(windows) : kind === 'meet' ? readMeet(windows, o) : kind === 'webex' ? readWebex(windows) : readTeams(windows)
+}
+
+export function readCallDetail(kind: CallKind, windows: AxWindow[], o: { talkingClasses?: string[] } = {}): CallReading {
+  return kind === 'teams' ? readTeams(windows, true) : readCall(kind, windows, o)
 }
 
 /**

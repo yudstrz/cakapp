@@ -1,7 +1,7 @@
 import type { RecordingStart } from '../meeting'
 import type { Meeting, Store } from '../store'
 import { nameFor, othersIn, type CallSample } from './attribute'
-import { readCall, summarize, type AxWindow, type CallKind } from './parse'
+import { readCallDetail, summarize, type AxWindow, type CallKind } from './parse'
 
 /**
  * Names from the call: while a meeting records, the call app it is in (Zoom, Teams, Meet in a browser) is read through
@@ -108,7 +108,7 @@ export function hookCallNames(p: {
     }
     // the first reading of each meeting goes to the log in short, so a real call shows what its app gives
     if (!s.pictured) { s.pictured = true; log(`call names: reading ${l.app} (${kind}), its window in short:\n${summarize(l.windows)}`) }
-    const r = readCall(kind, l.windows)
+    const r = readCallDetail(kind, l.windows)
     s.samples.push({ t: l.t, ...r })
     // counts only: main.log is pasted into public issues, and names belong to the people in the call
     const said = `${r.speaking.length} of ${r.participants.length}${r.me ? ', me known' : ''}`
